@@ -1,2 +1,16 @@
 # PHIS-OpenAgent-2026
 Evidence-first personal health intelligence agent | Open Agent Hackathon 2026 | AI Venture Studio
+
+## Build-window prototype
+
+This public branch currently contains a **synthetic-only, local descriptive core**, not a completed agent or sponsor integration. It was written after the 22 October build opening and imports no private PHIS code. See the [dated build-window audit](docs/BUILD_WINDOW_AUDIT_2026-10-22.md) for rules, dependencies, evidence and blockers.
+
+Python 3.11+ is sufficient for this first slice:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest discover -s tests -v
+python -m phis_open_agent
+```
+
+The emitted dataset and outputs are fictional. Descriptive comparisons do not establish a cause, clinical conclusion or statistical association. Zetaris, Meterless and Cursor remain unverified in this prototype.
