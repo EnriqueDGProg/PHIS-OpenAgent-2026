@@ -34,6 +34,17 @@ test('client accepts source IDs for sleep_hours follow-up', () => {
   assert.equal(validateInvestigation(sleep).series[0].variable,'sleep_hours');
 });
 
+test('insufficient and tool failure cannot retain a previous numeric comparison', () => {
+  for (const status of ['INSUFFICIENT_DATA','ERROR']) {
+    const run=base();
+    run.status=status; run.comparison=null;
+    if (status === 'ERROR') run.series=[];
+    assert.equal(validateInvestigation(run).status,status);
+    run.comparison=base().comparison;
+    assert.throws(() => validateInvestigation(run),/Comparación/);
+  }
+});
+
 test('client sends follow-up and rejects HTTP errors', async () => {
   let sent;
   const accepted = await fetchInvestigation('¿Y el sueño?',{parentRunId:'SYN-RUN-previous',fetcher:async (_,options)=>{

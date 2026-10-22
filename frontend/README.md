@@ -38,3 +38,17 @@ npm test
 `contracts/investigation.v1.schema.json` y `.d.ts` fijan ejecución, `dataset_id`, ventana, cobertura, serie con nulos, medias del núcleo, hallazgos, traza y pruebas de patrocinadores. El frontend no importa `fixture.mjs` ni `tools.mjs`; esos módulos se eliminan en esta rama. La API clasifica solo preguntas acotadas de energía/sueño mediante reglas explícitas. No hay LLM, PHIS privado, análisis de asociación o consejo médico. El umbral de 14 observaciones por periodo es una política de presentación descriptiva del adaptador; queda identificado como bloqueo cuando falla.
 
 Las fuentes de Google Fonts son opcionales y el CSS tiene fuentes de sistema de reserva. El panel de evidencias no muestra trazas de sponsor como verificadas sin llamada real.
+
+## Revisión visual del PR #4
+
+La [captura anterior de escritorio](../docs/evidence/result-desktop.jpg) y la [captura anterior móvil](../docs/evidence/result-mobile.jpg) se compararon con capturas **reales de Chrome** tomadas contra el servidor Python local:
+
+| Después | Recorrido |
+| --- | --- |
+| [Resultado de escritorio](evidence/after-desktop.jpg) | Pregunta prioritaria, traza completa, periodos visibles y hallazgos con origen. |
+| [Origen de un punto](evidence/after-evidence.jpg) | Fecha, valor e ID sintético seleccionados desde el gráfico; servicios externos desconectados. |
+| [Seguimiento móvil](evidence/after-followup-mobile.jpg) | Nueva ejecución de sueño con `parent_run_id`; gráfico adaptado a 390 px. |
+| [Cobertura insuficiente](evidence/after-insufficient.jpg) | Serie con huecos; sin medias ni inferencia. |
+| [Fallo de herramienta](evidence/after-tool-error.jpg) | Sin serie, cobertura ni cifras de una ejecución anterior. |
+
+En móvil, la pregunta comienza a 267 px del borde superior en una ventana de 390 × 844; la anchura del documento es 375 px y no hay desbordamiento horizontal. La actividad en curso se inspeccionó en navegador antes de recibir la respuesta. Una solicitud clínica muestra abstención sin comparación. Estas comprobaciones visuales no sustituyen una auditoría con lector de pantalla, pruebas en varios navegadores ni un estudio con usuarios. Los IDs verifican la procedencia **dentro del fixture sintético**, no un origen externo o clínico.
