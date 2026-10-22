@@ -1,11 +1,22 @@
 /** @typedef {import('../contracts/investigation.v1.d.ts').InvestigationV1} InvestigationV1 */
 
 export function validateInvestigation(value) {
-  if (!value || value.contract_version !== 'investigation.v1' || value.mode !== 'SYNTHETIC_LOCAL_ONLY') throw new Error('Contrato o modo no admitido');
+  if (!value || value.contract_version !== 'investigation.v1' || !['SYNTHETIC_LOCAL_ONLY','LIVE_SYNTHETIC_ZETARIS'].includes(value.mode)) throw new Error('Contrato o modo no admitido');
   if (!['PASS','EXECUTED_PARTIAL','INSUFFICIENT_DATA','BLOCKED','ERROR'].includes(value.status)) throw new Error('Estado desconocido');
   if (typeof value.run_id !== 'string' || typeof value.summary !== 'string' || !value.window?.start || !value.window?.end) throw new Error('Ejecución incompleta');
   if (!Array.isArray(value.coverage) || !Array.isArray(value.series) || !Array.isArray(value.findings) || !Array.isArray(value.tool_trace) || !Array.isArray(value.sponsor_proofs)) throw new Error('Colecciones ausentes');
-  if (value.sponsor_proofs.some(proof => proof.status !== 'NOT_CONNECTED' || proof.trace_id !== null)) throw new Error('Prueba de patrocinador inesperada');
+  const zetaris = value.sponsor_proofs.find(proof => proof.sponsor === 'zetaris');
+  if (value.sponsor_proofs.some(proof => proof.sponsor !== 'zetaris' && (proof.status !== 'NOT_CONNECTED' || proof.trace_id !== null))) throw new Error('Prueba de patrocinador inesperada');
+  if (value.mode === 'SYNTHETIC_LOCAL_ONLY' && value.sponsor_proofs.some(proof => proof.status !== 'NOT_CONNECTED' || proof.trace_id !== null)) throw new Error('Prueba de patrocinador inesperada');
+  if (value.mode === 'LIVE_SYNTHETIC_ZETARIS') {
+    if (!zetaris) throw new Error('Falta prueba Zetaris');
+    const query = value.tool_trace.find(step => step.tool === 'zetaris.synthetic_query' && step.trace_id === zetaris.trace_id);
+    if (zetaris.status === 'VERIFIED' && (!zetaris.trace_id || !query || query.status !== 'PASS' || query.source_record_ids.length !== 156 || !query.query_id || !/^[0-9a-f]{64}$/.test(query.sql_sha256))) throw new Error('Prueba Zetaris no trazable');
+    if (value.status === 'PASS') {
+      if (zetaris.status !== 'VERIFIED') throw new Error('Prueba Zetaris no trazable');
+    }
+    if (value.reason_code === 'source_error' && (value.status !== 'ERROR' || value.coverage.length || value.series.length || value.comparison !== null || zetaris.status === 'VERIFIED')) throw new Error('Fallo Zetaris con datos no verificados');
+  }
   for (const series of value.series) {
     if (!['energy','sleep_hours'].includes(series.variable) || !['score/10','hours'].includes(series.unit)) throw new Error('Variable o unidad inválida');
     if (!Array.isArray(series.points)) throw new Error('Serie inválida');

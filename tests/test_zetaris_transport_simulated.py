@@ -85,6 +85,16 @@ class ZetarisSimulatedTransportTests(unittest.TestCase):
         self.assertEqual(len(result["source_record_ids"]), 156)
         self.assertIn("LIMIT 200", synthetic_query())
 
+    def test_simulated_readback_converts_rows_but_cannot_prove_live_mode(self):
+        self.client.preflight()
+        result = self.client.read_synthetic_rows()
+        self.assertEqual(result["status"], "SIMULATED")
+        self.assertEqual(len(result["rows"]), 156)
+        self.assertEqual(result["rows"][0]["synthetic"], True)
+        self.assertEqual(result["rows"][0]["source_record_id"],
+                         generate_observations()[0]["source_record_id"])
+        self.assertEqual(result["sponsor_proof"]["status"], "NOT_CONNECTED")
+
     def test_rejects_false_success_and_non_synthetic_row(self):
         client = ZetarisClient(self.config, SimulatedTransport(bad_select=True))
         with self.assertRaises(ZetarisBlocked):
