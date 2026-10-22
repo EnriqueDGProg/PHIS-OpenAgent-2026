@@ -32,6 +32,7 @@ node frontend/tests/e2e_chrome.mjs
 | --- | --- | --- |
 | Python unit + handler integration | PASS | `python -m unittest discover -s tests -q`; 35 tests after final integration. |
 | Frontend contract tests | PASS | `node --test frontend/tests/*.test.mjs`; 6 tests. |
+| Clean clone | PASS with local bundle | A new `git clone --branch codex/phis-release-candidate-20261022 phis-rc.bundle phis-rc-clean-clone` at commit `b1e5403` passed 35 Python and 6 Node tests, then remained clean. Direct HTTPS clone was blocked by the sandbox (`getaddrinfo() thread failed to start`); the bundle was created from the pushed commit. |
 | Browser desktop and mobile | PASS with intercepted transport | Real installed Chrome, 1440×900 and 390×844; no horizontal mobile overflow or page errors. |
 | Follow-up after Python process restart | PASS | Each browser POST starts a new Python handler process; persisted parent decision changes the follow-up tools. |
 | Sparse coverage and tool error | PASS | Both abstain; no comparison or stale numbers in failed response. |
