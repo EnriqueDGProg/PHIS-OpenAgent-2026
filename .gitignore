@@ -210,6 +210,8 @@ tempCodeRunnerFile.py
 
 # PyPI configuration file
 .pypirc
+.local-state/
+.synthetic-agent-state.jsonl
 
 # Marimo
 marimo/_static/
