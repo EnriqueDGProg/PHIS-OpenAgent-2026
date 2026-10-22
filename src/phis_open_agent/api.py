@@ -26,8 +26,12 @@ MAX_BODY = 4096
 class DemoServer(ThreadingHTTPServer):
     daemon_threads = True
 
-    def __init__(self, address, handler=BaseHTTPRequestHandler, *, state_path=None):
+    def __init__(self, address, handler=BaseHTTPRequestHandler, *, state_path=None, data_mode=None):
         super().__init__(address, handler)
+        self.data_mode = data_mode if data_mode is not None else os.environ.get("PHIS_DATA_MODE", "SYNTHETIC_LOCAL_ONLY")
+        if self.data_mode not in {"SYNTHETIC_LOCAL_ONLY", "LIVE_SYNTHETIC_ZETARIS"}:
+            self.server_close()
+            raise ValueError("Unknown PHIS_DATA_MODE")
         self.world_model = MeterlessRunWorldModel(
             state_path if state_path is not None else ROOT / ".local-state" / "agent-events.jsonl")
         self.lock = Lock()
@@ -50,7 +54,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = urlsplit(self.path).path
         if path == "/api/health":
-            self._send(200, {"status": "ok", "mode": "SYNTHETIC_LOCAL_ONLY", "sponsors": "NOT_CONNECTED"})
+            self._send(200, {"status": "ok", "mode": getattr(self.server, "data_mode", "SYNTHETIC_LOCAL_ONLY"),
+                             "sponsors": "NOT_CONNECTED"})
             return
         if path not in STATIC:
             self._send(404, {"error": "Not found"})
@@ -77,7 +82,8 @@ class Handler(BaseHTTPRequestHandler):
             with self.server.lock:
                 result = investigate(payload.get("question"), parent_run_id=payload.get("parent_run_id"),
                                      scenario=payload.get("scenario", "normal"),
-                                     world_model=self.server.world_model)
+                                     world_model=self.server.world_model,
+                                     mode=getattr(self.server, "data_mode", "SYNTHETIC_LOCAL_ONLY"))
             self._send(200, result)
         except (ValueError, TypeError, json.JSONDecodeError) as exc:
             self._send(400, {"error": str(exc)})

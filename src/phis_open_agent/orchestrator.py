@@ -52,6 +52,29 @@ class SyntheticAgent:
         self.toolset = toolset if toolset is not None else tools
         self.claim_selector = claim_selector
 
+    def source_failure(self, *, run_id: str, question: str) -> dict:
+        """Persist an external-source failure without constructing local observations."""
+        intent = _intent(question)
+        trace = []
+        for phase, status, action, reason in (
+            ("PLAN", "PASS", "none", "planned"),
+            ("TOOLS", "ERROR", "none", "source_error"),
+            ("ABSTAIN", "ERROR", "abstain", "source_error"),
+        ):
+            event = self.world_model.append(
+                run_id=run_id, kind="agent_state",
+                payload={"phase": phase, "status": status, "intent": intent,
+                         "action": action, "reason_code": reason, "parent_event_id": None},
+                source_record_ids=[],
+            )
+            trace.append({"phase": phase, "status": status, "action": action,
+                          "reason_code": reason, "event_id": event["event_id"],
+                          "parent_event_id": None, "source_record_ids": []})
+        return {"run_id": run_id, "synthetic": True, "status": "ERROR",
+                "intent": intent, "question": question, "trace": trace,
+                "evidence": [], "claims": [],
+                "answer": "La fuente Zetaris no está disponible o no superó la verificación; no se publican resultados."}
+
     def run(self, *, run_id: str, question: str, rows: list[dict], parent_run_id: str | None = None) -> dict:
         if not isinstance(run_id, str) or not re.fullmatch(r"SYN-RUN-[A-Za-z0-9_-]{1,64}", run_id):
             raise ValueError("Synthetic run ID required")
