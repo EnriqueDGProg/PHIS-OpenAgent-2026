@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#173c35" />
+  <meta name="description" content="PHIS Open Agent: investigación longitudinal con evidencias verificables en datos sintéticos." />
+  <title>PHIS — Explorador de evidencias</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <script type="module" src="./app.mjs"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Saltar al resultado</a>
+  <div class="app-shell">
+    <aside class="investigation-rail" aria-label="Investigación">
+      <div class="brand-row"><div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></div><div class="brand-name">phis<span class="brand-dot">.</span></div><span class="brand-caption">OPEN AGENT</span></div>
+      <div class="rail-topline"><span class="live-dot" aria-hidden="true"></span> LABORATORIO DE EVIDENCIAS <span>01 / 01</span></div>
+      <div class="rail-hero">
+        <div class="hero-ornament" aria-hidden="true"><span></span><span></span><span></span></div>
+        <p class="eyebrow">UNA PREGUNTA. DATOS CON CONTEXTO.</p>
+        <h1>Entiende el <em>cambio.</em><br />Conoce el límite.</h1>
+        <p class="hero-copy">Explora qué muestran tus registros a lo largo del tiempo, de dónde viene cada hallazgo y qué todavía no se puede concluir.</p>
+      </div>
+      <div class="demo-notice" role="note"><span class="notice-icon" aria-hidden="true">✳</span><div><strong>Demostración sintética</strong><p>Participante ficticio · herramientas locales · sin servicios conectados. No es consejo médico.</p></div></div>
+      <form id="question-form" class="question-panel">
+        <label for="question">TU INVESTIGACIÓN</label>
+        <div class="question-field"><textarea id="question" name="question" rows="3" maxlength="240" spellcheck="true">¿Por qué ha cambiado mi energía últimamente?</textarea><span class="question-cursor" aria-hidden="true">↗</span></div>
+        <div class="question-actions"><span>Pregunta libre · alcance acotado</span><button class="ask-button" type="submit"><span>Explorar evidencia</span><span aria-hidden="true">↗</span></button></div>
+      </form>
+      <div class="example-row"><span>PRUEBA TAMBIÉN</span><button type="button" class="text-chip" data-question="¿Y cómo cambió mi sueño en ese periodo?">¿Y el sueño?</button><button type="button" class="text-chip" data-question="¿Debería cambiar mi medicación?">Límite clínico</button></div>
+      <section class="agent-panel" aria-labelledby="agent-title"><div class="panel-heading"><span class="tiny-star" aria-hidden="true">✳</span><h2 id="agent-title">Actividad del agente</h2><span class="local-tag">LOCAL</span></div><p class="agent-caption">Pasos ejecutados sobre el fixture; los bloqueos se muestran explícitamente.</p><ol id="trace-list" class="trace-list"><li class="trace-empty">Inicia una exploración para ver la planificación y las herramientas.</li></ol></section>
+      <div class="rail-footer"><span>PHIS / DISCOVERY</span><span>2026 · DEMO</span></div>
+    </aside>
+    <main id="main" class="workbench" tabindex="-1">
+      <header class="workbench-header"><div class="breadcrumb">ESPACIO DE INVESTIGACIÓN <span>/</span> ENERGÍA</div><div class="header-right"><span class="mode-pill"><i aria-hidden="true"></i> VISTA PREVIA LOCAL</span><span class="avatar" aria-label="Participante ficticio">SF</span></div></header>
+      <div class="content-wrap">
+        <div class="intro-row"><div><div class="section-kicker"><span class="section-number">01</span> INVESTIGACIÓN LONGITUDINAL <span class="kicker-line"></span> 09 SEP — 20 OCT 2026</div><h2 class="page-title">¿Qué cambió en mi <em>energía?</em></h2><p class="page-subtitle">Una lectura de los registros, con incertidumbre a la vista.</p></div><button id="evidence-button" class="evidence-button" type="button" aria-controls="evidence-dialog"><span class="button-icon" aria-hidden="true">▦</span> Examinar fuentes <span aria-hidden="true">↗</span></button></div>
+        <div class="status-strip"><div class="strip-main"><span class="status-bloom" aria-hidden="true">✳</span><div><span id="status-label" class="status-label">LISTO PARA EXPLORAR</span><p id="status-copy">Ejecuta la pregunta para consultar el fixture sintético.</p></div></div><span id="run-id" class="run-id">SIN EJECUCIÓN</span></div>
+        <div class="overview-grid"><section class="chart-card" aria-labelledby="chart-title"><div class="card-header"><div><p class="card-eyebrow">SEÑAL PRINCIPAL <span class="eyebrow-line"></span> REGISTRO DIARIO</p><h3 id="chart-title">Evolución de la energía</h3></div><span class="chart-unit">ESCALA 1–10</span></div><div id="chart-container" class="chart-container"><div class="chart-placeholder"><span class="placeholder-symbol" aria-hidden="true">⌁</span><strong>La serie aparecerá aquí</strong><span>Los huecos del registro se mantienen visibles.</span></div></div><div class="chart-footer"><span><i class="legend-dot" aria-hidden="true"></i> Energía registrada</span><span><i class="legend-gap" aria-hidden="true"></i> Días sin registro</span><span id="coverage-label">— / 42 días registrados</span></div></section>
+        <aside class="period-card" aria-labelledby="period-title"><div class="period-icon" aria-hidden="true">↗</div><p class="card-eyebrow">LECTURA DESCRIPTIVA</p><h3 id="period-title">Dos periodos,<br />una pregunta.</h3><p id="period-description" class="period-copy">Al explorar, comparamos dos ventanas consecutivas del fixture. Ninguna diferencia prueba una causa.</p><div id="period-values" class="period-values"><div><span>PRIMEROS 21 DÍAS</span><strong>—</strong></div><div><span>ÚLTIMOS 21 DÍAS</span><strong>—</strong></div></div><div class="period-footnote">Media de días observados · escala subjetiva 1–10</div></aside></div>
+        <div class="findings-heading"><div><p class="card-eyebrow">CAPAS DE INTERPRETACIÓN</p><h3>Lo que sabemos. Lo que no.</h3></div><span id="finding-count">SIN HALLAZGOS</span></div><div id="findings" class="findings-grid"><article class="finding-card empty-card"><span class="finding-index">01 / OBSERVACIÓN</span><h4>La evidencia toma forma al explorar.</h4><p>Cada lectura tendrá su fuente y su límite.</p></article></div>
+        <footer class="workbench-footer"><span>DATOS 100 % SINTÉTICOS · SIN DIAGNÓSTICO</span><span>PHIS OPEN AGENT / EXPERIENCIA DE DEMO</span></footer>
+      </div>
+    </main>
+  </div>
+  <dialog id="evidence-dialog" class="evidence-dialog" aria-labelledby="dialog-title"><div class="dialog-header"><div><p class="card-eyebrow">TRAZABILIDAD / FUENTES</p><h2 id="dialog-title">Detrás de cada lectura.</h2></div><button id="dialog-close" class="close-button" type="button" aria-label="Cerrar panel de evidencias">×</button></div><div id="dialog-content" class="dialog-content"><p>Inicia una exploración para inspeccionar registros y herramientas.</p></div></dialog>
+</body>
+</html>
