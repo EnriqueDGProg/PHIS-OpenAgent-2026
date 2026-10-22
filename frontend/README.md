@@ -1,21 +1,21 @@
-# PHIS · release candidate sintética
+# PHIS Open Agent · synthetic local release candidate
 
-La UI de PR #4 consume `POST /api/investigations`. Esa ruta ejecuta `SyntheticAgent` de PR #5, que selecciona herramientas deterministas del núcleo Python según pregunta, cobertura y estado persistido. Los adaptadores opcionales de PR #3 están disponibles en el repositorio, pero esta demo no los llama ni acredita sponsors. Todos los registros son ficticios.
+The English-first demo calls `POST /api/investigations`. This route runs the Python `SyntheticAgent`, which chooses deterministic tools based on the question, coverage, and persisted World Model state. The optional adapters remain available in the repository, but this demo does not call sponsors or claim sponsor verification. All participant records are fictional.
 
-## Ejecutar
+## Run locally
 
-Requiere Python 3.11+ y Node.js 20+. No hace falta instalar paquetes para la demo local.
+Requires Python 3.11+ and Node.js 20+. No package installation is needed for the local demo.
 
 ```powershell
 $env:PYTHONPATH='src'
 python -m phis_open_agent.api
 ```
 
-Abre `http://127.0.0.1:4173`. También puedes ejecutar `npm start` desde `frontend/`; el lanzador inicia el mismo servidor Python. El estado sintético se guarda en `.local-state/agent-events.jsonl`, ignorado por Git. Para elegir otra ruta local, define `PHIS_SYNTHETIC_STATE_FILE`. Conserva ese archivo entre reinicios para que el seguimiento recupere decisiones anteriores. El navegador guarda solo el ID sintético de la última investigación comparable.
+Open `http://127.0.0.1:4173`. Alternatively, run `npm start` from `frontend/`; the launcher starts the same Python server. Synthetic state is stored in Git-ignored `.local-state/agent-events.jsonl`. Set `PHIS_SYNTHETIC_STATE_FILE` to choose another local path. Keep this file across restarts so follow-up investigations can recover previous decisions. The browser stores only the synthetic ID of the last comparable run.
 
-`GET /api/health` declara modo sintético y sponsors desconectados. El POST acepta `question`, `parent_run_id` opcional y `scenario`: `normal`, `insufficient` o `tool_error`. Los dos últimos son controles de evaluación explícitamente sintéticos; se activan en la UI con `/?scenario=insufficient` y `/?scenario=tool_error`.
+`GET /api/health` reports synthetic mode and disconnected sponsors. The POST accepts `question`, optional `parent_run_id`, and `scenario`: `normal`, `insufficient`, or `tool_error`. The latter two are explicitly synthetic evaluation controls, available in the UI at `/?scenario=insufficient` and `/?scenario=tool_error`.
 
-## Pruebas
+## Tests and visual evidence
 
 ```powershell
 $env:PYTHONPATH='src'
@@ -23,17 +23,17 @@ python -m unittest discover -s tests -q
 node --test frontend/tests/*.test.mjs
 ```
 
-`tests/test_integration_api.py` invoca el manejador HTTP en proceso, sin socket, y comprueba que ejecuta el agente, adapta las cifras del núcleo, registra fases reales, se abstiene ante cobertura escasa/fallos y recupera el World Model en una nueva instancia. El cliente Node valida `investigation.v1`, trazas y pruebas de sponsor.
+`tests/test_integration_api.py` exercises the actual HTTP handler in process. It verifies that the agent runs, the response reflects core measurements, the trace records real phases, weak coverage and tool errors cause abstention, and a new server instance recovers persisted World Model state. `tests/test_english_copy.py` checks static UI text and returned agent copy across success, follow-up, and abstention states. Node tests validate `investigation.v1` provenance and disconnected sponsor status.
 
-Para capturas reales en Chrome sin instalar dependencias nuevas, si Playwright ya está disponible:
+If Playwright is already available, capture real Chrome desktop and mobile rendering without installing dependencies:
 
 ```powershell
-$env:PHIS_PLAYWRIGHT_MODULE='RUTA_ABSOLUTA_A_PLAYWRIGHT/index.mjs'
+$env:PHIS_PLAYWRIGHT_MODULE='ABSOLUTE_PATH_TO_PLAYWRIGHT/index.mjs'
 node frontend/tests/e2e_chrome.mjs
 ```
 
-La prueba abre Chrome de escritorio y móvil con un perfil temporal, usa los archivos reales del checkout e invoca el manejador Python real para cada POST mediante un puente sin socket. Cada petición crea un proceso Python nuevo, por lo que el seguimiento prueba recuperación de estado en disco. El transporte se intercepta porque el sandbox de esta ejecución bloquea conexiones a `127.0.0.1`; **no demuestra una conexión HTTP real desde Chrome**. Las capturas generadas están en `docs/evidence/rc-*.png`.
+This test uses the checkout's real frontend files and runs the Python API handler for every POST through a socketless bridge. Each POST starts a new Python process, so the follow-up checks disk persistence. The bridge intercepts transport because this sandbox blocks connections to `127.0.0.1`; **the test does not establish that Chrome reached the HTTP server over a real socket**. It checks English copy, desktop/mobile layout, keyboard access to source records, response states, and horizontal overflow. Screenshots are saved as `docs/evidence/en-*.png`.
 
-## Contrato y límites
+## Contract and limits
 
-Se mantiene `investigation.v1`. `tool_trace` añade campos opcionales `phase`, `reason_code` y `parent_event_id`, sin romper consumidores anteriores. La UI muestra únicamente herramientas que aparecen en la traza persistida; el gráfico usa puntos y huecos devueltos por Python. Las comparaciones son descriptivas. El umbral de 14 días observados por periodo es una regla operativa de completitud, no significancia científica. No hay inferencia causal, consejo médico ni integración oficial Meterless/Nemotron/Zetaris.
+`investigation.v1` remains unchanged. The UI renders only tools present in the persisted trace; chart values and missing days come from Python. Comparisons are descriptive. The gate of 14 observed days per period is an operational completeness rule, not statistical significance. The demo makes no causal, clinical, or medical advice claim, and there is no official Meterless, Nemotron, or Zetaris integration.

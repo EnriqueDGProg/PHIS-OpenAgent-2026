@@ -45,8 +45,10 @@ async function routeRequest(route) {
 
 async function submit(page) {
   await page.locator('#question-form button[type="submit"]').click();
-  await page.waitForFunction(() => /RESPUESTA RECIBIDA|ABSTENCIÓN|COBERTURA INSUFICIENTE|FALLO LOCAL/.test(
+  await page.waitForFunction(() => /RESPONSE RECEIVED|ABSTAINED|INSUFFICIENT COVERAGE|LOCAL FAILURE/.test(
     document.querySelector('#agent-phase')?.textContent || ''));
+  const visibleText = await page.locator('body').innerText();
+  assert.doesNotMatch(visibleText, /[¿¡áéíóúñÁÉÍÓÚÑ]|\b(?:días|registros|herramientas|evidencia|comparación|ejecución|seguimiento|abstención|fuentes|pregunta|resultado)\b/i);
 }
 
 try {
@@ -58,23 +60,37 @@ try {
   const pageErrors = [];
   page.on('pageerror', error => pageErrors.push(error.message));
   await page.goto(url);
+  assert.equal(await page.locator('html').getAttribute('lang'), 'en');
+  assert.equal(await page.getByRole('heading', { level: 1 }).count(), 1);
+  assert.equal(await page.getByRole('textbox', { name: /your question/i }).count(), 1);
+  assert.equal(await page.getByRole('button', { name: /investigate records/i }).count(), 1);
   await submit(page);
-  assert.equal(await page.locator('#status-label').textContent(), 'OBSERVACIÓN DISPONIBLE');
-  assert.match(await page.locator('#coverage-label').textContent(), /84 días/);
+  assert.equal(await page.locator('#status-label').textContent(), 'OBSERVATION AVAILABLE');
+  assert.match(await page.locator('#coverage-label').textContent(), /84 days/);
   assert.equal(await page.locator('.chart-point').count() > 50, true);
   assert.match(await page.locator('#trace-list').textContent(), /PLAN|plan/i);
-  await page.screenshot({ path: path.join(output, 'rc-desktop-pass.png'), fullPage: true });
+  const firstPoint = page.locator('.chart-point').first();
+  const sourceId = await firstPoint.getAttribute('data-source-id');
+  await firstPoint.focus();
+  await page.keyboard.press('Enter');
+  assert.equal(await page.getByRole('dialog', { name: 'Point provenance.' }).count(), 1);
+  assert.match(await page.locator('#dialog-content').textContent(), new RegExp(sourceId));
+  assert.match(await page.locator('#dialog-content').textContent(), /Disconnected in this demo/);
+  await page.screenshot({ path: path.join(output, 'en-desktop-evidence.png'), fullPage: true });
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('#evidence-dialog').evaluate(el => el.open), false);
+  await page.screenshot({ path: path.join(output, 'en-desktop-pass.png'), fullPage: true });
   const parentId = await page.locator('#run-id').textContent();
   // Every POST uses a fresh Python process; the next run must read JSONL from disk.
   await page.reload();
-  await page.getByRole('button', { name: 'Investigar sueño' }).click();
+  await page.getByRole('button', { name: 'Explore sleep' }).click();
   assert.match(await page.locator('#followup-context').textContent(), new RegExp(parentId));
   await submit(page);
-  assert.equal(await page.locator('#status-label').textContent(), 'OBSERVACIÓN DISPONIBLE');
+  assert.equal(await page.locator('#status-label').textContent(), 'OBSERVATION AVAILABLE');
   assert.match(await page.locator('#result-context').textContent(), /World Model/);
   assert.match(await page.locator('#trace-list').textContent(), /get_variable_coverage/);
   assert.notEqual(bridgePids[0], bridgePids[1]);
-  await page.screenshot({ path: path.join(output, 'rc-desktop-followup.png'), fullPage: true });
+  await page.screenshot({ path: path.join(output, 'en-desktop-followup.png'), fullPage: true });
 
   const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1,
     isMobile: true, hasTouch: true });
@@ -83,20 +99,26 @@ try {
   mobilePage.on('pageerror', error => pageErrors.push(error.message));
   await mobilePage.goto(url);
   await submit(mobilePage);
-  assert.equal(await mobilePage.locator('#status-label').textContent(), 'OBSERVACIÓN DISPONIBLE');
-  await mobilePage.screenshot({ path: path.join(output, 'rc-mobile-pass.png'), fullPage: true });
+  assert.equal(await mobilePage.locator('#status-label').textContent(), 'OBSERVATION AVAILABLE');
+  assert.equal(await mobilePage.locator('html').getAttribute('lang'), 'en');
+  await mobilePage.screenshot({ path: path.join(output, 'en-mobile-pass.png'), fullPage: true });
   assert.equal(await mobilePage.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
 
   await page.goto(url + '?scenario=insufficient');
   await submit(page);
-  assert.equal(await page.locator('#status-label').textContent(), 'EVIDENCIA INSUFICIENTE');
-  await page.screenshot({ path: path.join(output, 'rc-desktop-insufficient.png'), fullPage: true });
+  assert.equal(await page.locator('#status-label').textContent(), 'INSUFFICIENT EVIDENCE');
+  await page.screenshot({ path: path.join(output, 'en-desktop-insufficient.png'), fullPage: true });
   await page.goto(url + '?scenario=tool_error');
   await submit(page);
-  assert.equal(await page.locator('#status-label').textContent(), 'HERRAMIENTA NO DISPONIBLE');
-  await page.screenshot({ path: path.join(output, 'rc-desktop-error.png'), fullPage: true });
+  assert.equal(await page.locator('#status-label').textContent(), 'LOCAL TOOL UNAVAILABLE');
+  await page.screenshot({ path: path.join(output, 'en-desktop-error.png'), fullPage: true });
+  await page.goto(url);
+  await page.getByRole('button', { name: 'Clinical request' }).click();
+  await submit(page);
+  assert.equal(await page.locator('#status-label').textContent(), 'AGENT ABSTAINED');
+  await page.screenshot({ path: path.join(output, 'en-desktop-abstention.png'), fullPage: true });
   assert.deepEqual(pageErrors, []);
-  console.log('PASS Chrome desktop/mobile via socketless API handler, persisted follow-up, sparse and tool error; screenshots in docs/evidence');
+  console.log('PASS Chrome desktop/mobile, keyboard evidence, persisted follow-up, sparse, error, and abstention; screenshots in docs/evidence');
 } finally {
   await browser?.close();
 }
