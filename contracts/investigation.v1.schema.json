@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026/contracts/investigation.v1.schema.json",
+  "title": "PHIS investigation response v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract_version", "run_id", "parent_run_id", "dataset_id", "mode", "scenario", "status", "reason_code", "question", "timezone", "window", "summary", "coverage", "series", "comparison", "findings", "tool_trace", "sponsor_proofs"],
+  "properties": {
+    "contract_version": {"const": "investigation.v1"},
+    "run_id": {"type": "string", "minLength": 1},
+    "parent_run_id": {"type": ["string", "null"]},
+    "dataset_id": {"type": "string", "minLength": 1},
+    "mode": {"enum": ["SYNTHETIC_LOCAL_ONLY", "LIVE_SYNTHETIC_ZETARIS"]},
+    "scenario": {"enum": ["normal", "insufficient", "tool_error"]},
+    "status": {"enum": ["PASS", "EXECUTED_PARTIAL", "INSUFFICIENT_DATA", "BLOCKED", "ERROR"]},
+    "reason_code": {"type": ["string", "null"]},
+    "question": {"type": "string", "minLength": 1},
+    "timezone": {"const": "Europe/Madrid"},
+    "window": {"$ref": "#/$defs/window"},
+    "summary": {"type": "string"},
+    "coverage": {"type": "array", "items": {"$ref": "#/$defs/coverage"}},
+    "series": {"type": "array", "items": {"$ref": "#/$defs/series"}},
+    "comparison": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/comparison"}]},
+    "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+    "tool_trace": {"type": "array", "items": {"$ref": "#/$defs/trace"}},
+    "sponsor_proofs": {"type": "array", "items": {"$ref": "#/$defs/sponsor"}}
+  },
+  "$defs": {
+    "window": {
+      "type": "object", "additionalProperties": false,
+      "required": ["start", "end"],
+      "properties": {"start": {"type": "string", "format": "date"}, "end": {"type": "string", "format": "date"}}
+    },
+    "coverage": {
+      "type": "object", "additionalProperties": false,
+      "required": ["variable", "unit", "start", "end", "observed", "eligible", "source_record_ids"],
+      "properties": {
+        "variable": {"enum": ["energy", "sleep_hours"]},
+        "unit": {"type": "string"},
+        "start": {"type": "string", "format": "date"},
+        "end": {"type": "string", "format": "date"},
+        "observed": {"type": "integer", "minimum": 0},
+        "eligible": {"type": "integer", "minimum": 1},
+        "source_record_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+      }
+    },
+    "period": {
+      "type": "object", "additionalProperties": false,
+      "required": ["variable", "unit", "start", "end", "observed", "eligible", "source_record_ids", "mean"],
+      "properties": {
+        "variable": {"enum": ["energy", "sleep_hours"]},
+        "unit": {"type": "string"},
+        "start": {"type": "string", "format": "date"},
+        "end": {"type": "string", "format": "date"},
+        "observed": {"type": "integer", "minimum": 0},
+        "eligible": {"type": "integer", "minimum": 1},
+        "source_record_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "mean": {"type": "number"}
+      }
+    },
+    "series": {
+      "type": "object", "additionalProperties": false,
+      "required": ["variable", "unit", "points"],
+      "properties": {
+        "variable": {"enum": ["energy", "sleep_hours"]},
+        "unit": {"type": "string"},
+        "points": {"type": "array", "items": {"type": "object", "additionalProperties": false,
+          "required": ["local_date", "value", "source_record_id"],
+          "properties": {
+            "local_date": {"type": "string", "format": "date"},
+            "value": {"type": ["number", "null"]},
+            "source_record_id": {"type": ["string", "null"]}
+          }
+        }}
+      }
+    },
+    "comparison": {
+      "type": "object", "additionalProperties": false,
+      "required": ["variable", "unit", "method", "baseline", "comparison", "difference", "source_record_ids", "warning"],
+      "properties": {
+        "variable": {"enum": ["energy", "sleep_hours"]},
+        "unit": {"type": "string"},
+        "method": {"const": "arithmetic_mean_observed_days"},
+        "baseline": {"$ref": "#/$defs/period"},
+        "comparison": {"$ref": "#/$defs/period"},
+        "difference": {"type": "number"},
+        "source_record_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "warning": {"const": "Descriptive only; causality is not established."}
+      }
+    },
+    "finding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["finding_id", "kind", "title", "text", "source_record_ids"],
+      "properties": {
+        "finding_id": {"type": "string", "minLength": 1},
+        "kind": {"enum": ["observation", "association", "hypothesis", "uncertainty", "abstention"]},
+        "title": {"type": "string"},
+        "text": {"type": "string"},
+        "source_record_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "analysis_evidence_id": {"type": ["string", "null"]}
+      },
+      "if": {"properties": {"kind": {"const": "association"}}},
+      "then": {"required": ["analysis_evidence_id"], "properties": {"analysis_evidence_id": {"type": "string", "minLength": 1}}}
+    },
+    "trace": {
+      "type": "object", "additionalProperties": false,
+      "required": ["trace_id", "tool", "status", "detail", "source_record_ids"],
+      "properties": {
+        "trace_id": {"type": "string"},
+        "tool": {"type": "string"},
+        "status": {"enum": ["PASS", "BLOCKED", "ERROR"]},
+        "detail": {"type": "string"},
+        "source_record_ids": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "sponsor": {
+      "type": "object", "additionalProperties": false,
+      "required": ["sponsor", "status", "trace_id"],
+      "properties": {
+        "sponsor": {"enum": ["zetaris", "meterless_engine", "meterless_runtime", "nemotron"]},
+        "status": {"enum": ["NOT_CONNECTED", "VERIFIED", "FAILED"]},
+        "trace_id": {"type": ["string", "null"]}
+      },
+      "if": {"properties": {"status": {"const": "VERIFIED"}}},
+      "then": {"properties": {"trace_id": {"type": "string", "minLength": 1}}}
+    }
+  }
+}
