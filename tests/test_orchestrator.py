@@ -26,7 +26,7 @@ class AgentTests(unittest.TestCase):
         self.assertEqual([e["tool"] for e in energy["evidence"]],
                          ["trend", "coverage", "compare_periods", "coverage"])
         self.assertEqual([e["tool"] for e in sleep["evidence"]], ["trend", "coverage"])
-        self.assertIn("no establece una causa", energy["answer"])
+        self.assertIn("does not establish a cause", energy["answer"])
         self.assertTrue(all(c["source_record_ids"] for c in energy["claims"]))
         self.assertEqual(energy["sponsor_proofs"]["meterless_runtime"], "NOT_CONNECTED")
 

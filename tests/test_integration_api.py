@@ -35,7 +35,7 @@ class IntegrationApiTests(unittest.TestCase):
         return sent[0]
 
     def test_hero_is_agent_run_with_core_values_and_real_trace(self):
-        code, run = self.call({"question": "¿Por qué ha cambiado mi energía últimamente?"})
+        code, run = self.call({"question": "Why has my energy changed recently?"})
         core = compare_periods(generate_observations(), "energy", "2026-08-27", "2026-09-23",
                                "2026-09-24", "2026-10-21")
         self.assertEqual(code, 200)
@@ -54,9 +54,9 @@ class IntegrationApiTests(unittest.TestCase):
                             for point in run["series"][0]["points"]))
 
     def test_followup_recovers_world_model_after_server_restart(self):
-        _, parent = self.call({"question": "¿Por qué cambió mi energía?"})
+        _, parent = self.call({"question": "Why has my energy changed?"})
         self.server = SimpleNamespace(lock=Lock(), world_model=SyntheticRunWorldModel(self.state))
-        code, child = self.call({"question": "¿Y cómo cambió mi sueño en ese periodo?",
+        code, child = self.call({"question": "And how has my sleep changed over that period?",
                                  "parent_run_id": parent["run_id"]})
         self.assertEqual(code, 200)
         self.assertEqual(child["status"], "PASS")
@@ -68,28 +68,28 @@ class IntegrationApiTests(unittest.TestCase):
         self.assertEqual(child["window"], {"start": "2026-09-24", "end": "2026-10-21"})
 
     def test_abstention_sparse_and_tool_failure(self):
-        _, clinical = self.call({"question": "¿Debo cambiar mi medicación?"})
+        _, clinical = self.call({"question": "Should I change my medication?"})
         self.assertEqual(clinical["status"], "BLOCKED")
         self.assertEqual(clinical["series"], [])
-        _, causal = self.call({"question": "Demuestra que dormir poco causó mi cansancio"})
+        _, causal = self.call({"question": "Prove that poor sleep caused my fatigue"})
         self.assertEqual(causal["status"], "BLOCKED")
-        _, sparse = self.call({"question": "¿Cómo cambió mi energía?", "scenario": "insufficient"})
+        _, sparse = self.call({"question": "How has my energy changed?", "scenario": "insufficient"})
         self.assertEqual(sparse["status"], "INSUFFICIENT_DATA")
         self.assertIsNone(sparse["comparison"])
         self.assertEqual(sparse["tool_trace"][-1]["phase"], "ABSTAIN")
         self.assertEqual([t["tool"] for t in sparse["tool_trace"] if t["phase"] == "TOOLS"],
                          ["get_longitudinal_trend", "get_variable_coverage"])
-        _, failed = self.call({"question": "¿Cómo cambió mi energía?", "scenario": "tool_error"})
+        _, failed = self.call({"question": "How has my energy changed?", "scenario": "tool_error"})
         self.assertEqual(failed["status"], "ERROR")
         self.assertEqual((failed["coverage"], failed["series"], failed["comparison"]), ([], [], None))
         self.assertEqual([t["tool"] for t in failed["tool_trace"] if t["phase"] == "TOOLS"],
                          ["get_longitudinal_trend"])
-        self.assertIn("falló", failed["summary"])
+        self.assertIn("failed", failed["summary"])
 
     def test_invalid_request_and_unknown_parent(self):
-        self.assertEqual(self.call({"question": "energía", "unexpected": "SQL"})[0], 400)
-        self.assertEqual(self.call({"question": "energía", "parent_run_id": "unknown"})[0], 400)
-        _, unknown = self.call({"question": "¿Y el sueño?", "parent_run_id": "SYN-RUN-MISSING"})
+        self.assertEqual(self.call({"question": "energy", "unexpected": "SQL"})[0], 400)
+        self.assertEqual(self.call({"question": "energy", "parent_run_id": "unknown"})[0], 400)
+        _, unknown = self.call({"question": "And sleep?", "parent_run_id": "SYN-RUN-MISSING"})
         self.assertEqual(unknown["status"], "BLOCKED")
         self.assertEqual(unknown["tool_trace"][-1]["phase"], "ABSTAIN")
 
@@ -100,7 +100,7 @@ class IntegrationApiTests(unittest.TestCase):
         handler._send = lambda code, data, content_type="": sent.append((code, data, content_type))
         handler.do_GET()
         self.assertEqual(sent[0][0], 200)
-        self.assertIn(b"Demostraci", sent[0][1])
+        self.assertIn(b"Synthetic demo", sent[0][1])
         handler.path = "/api/health"
         handler.do_GET()
         self.assertEqual(sent[1][1]["sponsors"], "NOT_CONNECTED")
@@ -108,7 +108,7 @@ class IntegrationApiTests(unittest.TestCase):
     def test_payload_fits_v1_declared_top_level_and_trace_fields(self):
         schema_path = Path(__file__).resolve().parents[1] / "contracts" / "investigation.v1.schema.json"
         schema = json.loads(schema_path.read_text(encoding="utf-8"))
-        _, run = self.call({"question": "energía"})
+        _, run = self.call({"question": "energy"})
         self.assertEqual(set(run), set(schema["required"]))
         self.assertEqual(run["contract_version"], "investigation.v1")
         trace_keys = set(schema["$defs"]["trace"]["properties"])

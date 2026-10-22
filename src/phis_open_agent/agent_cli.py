@@ -10,9 +10,9 @@ from .synthetic import generate_observations
 
 
 QUESTIONS = {
-    "energy": "¿Por qué ha cambiado mi energía últimamente?",
-    "sleep": "¿Cómo va mi sueño?",
-    "followup": "¿Y el sueño?",
+    "energy": "Why has my energy changed recently?",
+    "sleep": "How has my sleep changed?",
+    "followup": "And how has my sleep changed over that period?",
 }
 
 
