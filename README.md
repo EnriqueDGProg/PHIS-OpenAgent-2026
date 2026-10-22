@@ -14,3 +14,5 @@ python -m phis_open_agent
 ```
 
 The emitted dataset and outputs are fictional. Descriptive comparisons do not establish a cause, clinical conclusion or statistical association. Zetaris, Meterless and Cursor remain unverified in this prototype.
+
+The [execution gate](docs/EXECUTION_GATE_2026-10-22.md) separates real page reads and local tests from blocked sponsor calls. The local run-state prototype follows selected [Meterless World Model](https://github.com/Meterless/Meterless/tree/main/engines/world-model) ideas (append-only events, stable IDs, provenance and a read surface), but is not Nightshift or a complete engine conformance claim. The proposed backend/frontend contract is in [contracts/investigation.v1.schema.json](contracts/investigation.v1.schema.json) with a matching TypeScript declaration.
