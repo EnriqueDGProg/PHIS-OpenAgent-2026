@@ -32,6 +32,7 @@ function renderTrace(steps) {
     const title = document.createElement('strong'); title.textContent = step.tool;
     const state = document.createElement('span'); state.className = 'trace-state';
     const phase = step.phase || 'TOOLS';
+    if (step.reason_code === 'source_error' && phase === 'TOOLS') title.textContent = 'Zetaris source check';
     state.textContent = step.status === 'ERROR' ? 'Failed' : step.status === 'BLOCKED' ? 'Blocked'
       : phase === 'PLAN' ? 'Planned' : phase === 'TOOLS' ? 'Executed'
       : phase === 'EVIDENCE' ? 'Recorded' : phase === 'VERIFY' ? 'Verified'
@@ -230,7 +231,8 @@ form.addEventListener('submit',async event=>{
       ? `Local Zetaris: ${zetaris?.status || 'NOT_CONNECTED'}. Meterless and Nemotron are disconnected. No medical advice.`
       : 'Local synthetic mode. Zetaris, Meterless, and Nemotron are disconnected. No medical advice.';
     $('.mode-pill').lastChild.textContent=currentRun.mode==='LIVE_SYNTHETIC_ZETARIS'
-      ? ' SYNTHETIC · LOCAL ZETARIS' : ' SYNTHETIC · LOCAL';
+      ? zetaris?.status==='VERIFIED' ? ' SYNTHETIC · ZETARIS VERIFIED' : ' ZETARIS REQUIRED · UNVERIFIED'
+      : ' SYNTHETIC · LOCAL';
     if(currentRun.status==='PASS' && currentRun.comparison) localStorage.setItem('phis.synthetic.lastRunId',currentRun.run_id);
     pendingParentRunId=null; updateFollowupContext();
     $('#window-label').textContent=`${formatDate(currentRun.window.start).toUpperCase()} — ${formatDate(currentRun.window.end).toUpperCase()} ${currentRun.window.end.slice(0,4)}`;
@@ -245,7 +247,9 @@ form.addEventListener('submit',async event=>{
     }[currentRun.status];
     $('#result-context').textContent=currentRun.parent_run_id
       ? `Follow-up to ${currentRun.parent_run_id} · decision retrieved from the World Model · run ${currentRun.run_id}`
-      : `Run ${currentRun.run_id} · ${currentRun.mode==='LIVE_SYNTHETIC_ZETARIS' ? 'synthetic rows queried from local Zetaris' : 'synthetic data from the Python core'}`;
+      : `Run ${currentRun.run_id} · ${currentRun.mode==='LIVE_SYNTHETIC_ZETARIS'
+        ? zetaris?.status==='VERIFIED' ? 'synthetic rows queried from local Zetaris' : 'Zetaris source unverified; no records published'
+        : 'synthetic data from the Python core'}`;
     evidenceButton.disabled=false;
     $('#main').focus();
   } catch(error) {

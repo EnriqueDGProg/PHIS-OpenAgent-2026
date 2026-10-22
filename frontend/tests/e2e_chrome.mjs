@@ -45,7 +45,7 @@ async function routeRequest(route) {
 
 async function submit(page) {
   await page.locator('#question-form button[type="submit"]').click();
-  await page.waitForFunction(() => /RESPONSE RECEIVED|ABSTAINED|INSUFFICIENT COVERAGE|LOCAL FAILURE/.test(
+  await page.waitForFunction(() => /RESPONSE RECEIVED|ABSTAINED|INSUFFICIENT COVERAGE|SOURCE OR TOOL FAILURE/.test(
     document.querySelector('#agent-phase')?.textContent || ''));
   const visibleText = await page.locator('body').innerText();
   assert.doesNotMatch(visibleText, /[¿¡áéíóúñÁÉÍÓÚÑ]|\b(?:días|registros|herramientas|evidencia|comparación|ejecución|seguimiento|abstención|fuentes|pregunta|resultado)\b/i);
