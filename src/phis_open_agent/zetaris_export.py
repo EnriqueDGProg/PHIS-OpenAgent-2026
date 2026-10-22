@@ -1,6 +1,7 @@
 """Export only allowlisted fictional observations for a future Zetaris query."""
 
 import csv
+import hashlib
 from pathlib import Path
 
 from .synthetic import generate_observations
@@ -18,4 +19,5 @@ def export_csv(path):
         writer = csv.DictWriter(handle, fieldnames=COLUMNS)
         writer.writeheader()
         writer.writerows({column: row[column] for column in COLUMNS} for row in rows)
-    return {"rows": len(rows), "path": str(target), "synthetic": True}
+    digest = hashlib.sha256(target.read_bytes()).hexdigest()
+    return {"rows": len(rows), "path": str(target), "sha256": digest, "synthetic": True}

@@ -71,3 +71,7 @@ After a Zetaris instance is running, the next automated gate is official preflig
 ### Local setup continuation
 
 On recheck, `wsl --status` still reports that WSL is not installed. The authenticated Gateway's **Run locally** page confirms the Windows/WSL prerequisite, a ~28 MB platform ZIP, ~4 GB of container images, `./preflight.sh`, `./verify.sh`, and JDBC `SELECT 1` at `localhost:10000`. A download attempt from that page returned **Unauthorized**; no `zetaris-platform.zip` appeared in Downloads. No bundle was unpacked, no container was started, and no SQL was sent. The account holder must restore Gateway download authorization if the page continues to reject the request. This is separate from the administrator action needed to enable WSL2.
+
+## Direct REST adapter preparation
+
+The [activation guide](ZETARIS_REST_ACTIVATION.md) records the official direct REST paths and file registration syntax used by the new adapter. The local `prepare` command emitted 156 fictional rows with SHA-256 `7f97f660600fa2fd592b70a707ddf4db94420b4af6ee3ab281b90ddbb61641a5`; the CSV is ignored by Git. The registration command was run **without** `--execute` and printed two CREATE statements for review. No Zetaris SQL was sent. The local preflight returned `BLOCKED` before any network request because `ZETARIS_REST_URL`, `ZETARIS_ORG_ID` and `ZETARIS_API_KEY` are absent. The full local suite now passes 15 tests; six new tests use a **simulated transport**, including a guard that refuses `VERIFIED` for a mock. This is code readiness, not sponsor integration proof.
