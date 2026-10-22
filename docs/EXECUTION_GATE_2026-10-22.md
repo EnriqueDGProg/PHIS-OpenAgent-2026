@@ -66,4 +66,8 @@ The [NVIDIA build site](https://build.nvidia.com/) displayed a login form and te
 2. **NVIDIA:** the account holder must sign in to build.nvidia.com, decide whether to accept its displayed Developer Program/Technology Access terms, and make an API key available through a local secret store or environment variable. Do not send the key in chat or commit it.
 3. **Cursor:** the account holder must sign in to the installed Cursor and carry out material build work there. Installation alone cannot prove the competition's use requirement.
 
-No other human action is required to interpret the present evidence. After a Zetaris instance is running, the next automated gate is official preflight, `SELECT 1`, registration of the fictional CSV, a bounded SQL query, and a sanitized row/trace record. Keep sponsor status BLOCKED until that call succeeds.
+After a Zetaris instance is running, the next automated gate is official preflight, `SELECT 1`, registration of the fictional CSV, a bounded SQL query, and a sanitized row/trace record. Keep sponsor status BLOCKED until that call succeeds.
+
+### Local setup continuation
+
+On recheck, `wsl --status` still reports that WSL is not installed. The authenticated Gateway's **Run locally** page confirms the Windows/WSL prerequisite, a ~28 MB platform ZIP, ~4 GB of container images, `./preflight.sh`, `./verify.sh`, and JDBC `SELECT 1` at `localhost:10000`. A download attempt from that page returned **Unauthorized**; no `zetaris-platform.zip` appeared in Downloads. No bundle was unpacked, no container was started, and no SQL was sent. The account holder must restore Gateway download authorization if the page continues to reject the request. This is separate from the administrator action needed to enable WSL2.
