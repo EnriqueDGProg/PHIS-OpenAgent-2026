@@ -20,7 +20,7 @@ INTENTS = frozenset({"energy", "sleep", "followup", "unsupported"})
 ACTIONS = frozenset({"coverage", "trend", "compare", "followup", "respond", "abstain", "none"})
 REASONS = frozenset({"planned", "tool_pass", "weak_coverage", "comparison_unavailable",
                      "parent_missing", "unsupported_question", "tool_error", "verified",
-                     "synthesis_rejected"})
+                     "synthesis_rejected", "source_verified", "source_error"})
 
 
 def _canonical(payload):

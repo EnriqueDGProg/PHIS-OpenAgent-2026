@@ -22,10 +22,11 @@ def _intent(question: str, parent_run_id: str | None = None) -> str:
     if not isinstance(question, str) or not question.strip():
         return "unsupported"
     q = question.casefold()
-    if any(word in q for word in ("medic", "diagnóst", "diagnost", "tratamiento", "fármaco", "farmaco", "dosis")):
+    if any(word in q for word in ("medic", "diagnóst", "diagnost", "tratamiento", "fármaco", "farmaco", "dosis",
+                                  "treatment", "prescription", "dosage", "dose")):
         return "unsupported"
-    if any(word in q for word in ("demuestra", "demostrar", "prueba", "probar")) and any(
-        word in q for word in ("caus", "provoc", "debido")
+    if any(word in q for word in ("demuestra", "demostrar", "prueba", "probar", "prove", "proof", "demonstrate")) and any(
+        word in q for word in ("caus", "provoc", "debido", "because", "due to")
     ):
         return "unsupported"
     if parent_run_id and any(word in q for word in ("sueño", "sueno", "sleep", "dormir")):
@@ -51,6 +52,29 @@ class SyntheticAgent:
         self.world_model = world_model
         self.toolset = toolset if toolset is not None else tools
         self.claim_selector = claim_selector
+
+    def source_failure(self, *, run_id: str, question: str) -> dict:
+        """Persist an external-source failure without constructing local observations."""
+        intent = _intent(question)
+        trace = []
+        for phase, status, action, reason in (
+            ("PLAN", "PASS", "none", "planned"),
+            ("TOOLS", "ERROR", "none", "source_error"),
+            ("ABSTAIN", "ERROR", "abstain", "source_error"),
+        ):
+            event = self.world_model.append(
+                run_id=run_id, kind="agent_state",
+                payload={"phase": phase, "status": status, "intent": intent,
+                         "action": action, "reason_code": reason, "parent_event_id": None},
+                source_record_ids=[],
+            )
+            trace.append({"phase": phase, "status": status, "action": action,
+                          "reason_code": reason, "event_id": event["event_id"],
+                          "parent_event_id": None, "source_record_ids": []})
+        return {"run_id": run_id, "synthetic": True, "status": "ERROR",
+                "intent": intent, "question": question, "trace": trace,
+                "evidence": [], "claims": [],
+                "answer": "The Zetaris source is unavailable or failed verification; no result is published."}
 
     def run(self, *, run_id: str, question: str, rows: list[dict], parent_run_id: str | None = None) -> dict:
         if not isinstance(run_id, str) or not re.fullmatch(r"SYN-RUN-[A-Za-z0-9_-]{1,64}", run_id):
@@ -99,9 +123,9 @@ class SyntheticAgent:
                     "intent": intent, "question": question, "trace": trace,
                     "evidence": evidence, "claims": claims,
                     "answer": " ".join(c["text"] for c in claims) if status == "PASS" else
-                              "Una herramienta local falló; no se publican resultados." if status == "ERROR" else
-                              "Esta pregunta o seguimiento queda fuera del alcance verificable." if status == "BLOCKED" else
-                              "No hay evidencia suficiente para responder con fiabilidad.",
+                              "A local tool failed; no result is published." if status == "ERROR" else
+                              "This question or follow-up is outside the verifiable scope." if status == "BLOCKED" else
+                              "There is insufficient evidence for a reliable answer.",
                     "sponsor_proofs": {"meterless_engine": "NOT_CONNECTED",
                                        "meterless_runtime": "NOT_CONNECTED",
                                        "nemotron": "NOT_CONNECTED", "zetaris": "NOT_CONNECTED"}}
@@ -161,9 +185,9 @@ class SyntheticAgent:
                     return finish("INSUFFICIENT_DATA", "weak_coverage")
                 if decision["tool"] == "get_variable_coverage":
                     use("trend", variable, start, end)
-                label = "sueño" if variable == "sleep_hours" else "energía"
+                label = "sleep" if variable == "sleep_hours" else "energy"
                 claims.append({"id": "followup-coverage", "text":
-                               f"En los últimos 28 días hay {result['coverage']['observed']} de 28 registros sintéticos de {label}.",
+                               f"In the last 28 days, {result['coverage']['observed']} of 28 synthetic {label} records are available.",
                                "source_record_ids": result["source_record_ids"]})
                 return finish("PASS", "verified")
 
@@ -176,9 +200,9 @@ class SyntheticAgent:
             recent = use("coverage", variable, recent_start, recent_end)
             if recent["coverage"]["observed"] < MIN_OBSERVED:
                 return finish("INSUFFICIENT_DATA", "weak_coverage")
-            label = "sueño" if variable == "sleep_hours" else "energía"
+            label = "sleep" if variable == "sleep_hours" else "energy"
             claims.append({"id": "recent-coverage", "text":
-                           f"Hay {recent['coverage']['observed']} de 28 registros sintéticos recientes de {label}; los huecos permanecen visibles.",
+                           f"{recent['coverage']['observed']} of 28 recent synthetic {label} records are available; missing days remain visible.",
                            "source_record_ids": recent["source_record_ids"]})
             if intent == "sleep":
                 return finish("PASS", "verified")
@@ -196,13 +220,13 @@ class SyntheticAgent:
             parent_event_id = event["event_id"]
             difference = comparison["difference_comparison_minus_baseline"]
             claims.append({"id": "energy-difference", "text":
-                           f"La diferencia descriptiva entre las dos ventanas de 28 días es {difference:.2f} puntos de escala 1–10; no establece una causa.",
+                           f"The descriptive difference between the two 28-day windows is {difference:.2f} points on the 1–10 scale; this does not establish a cause.",
                            "source_record_ids": comparison["source_record_ids"]})
             if difference < 0:  # A result changes the next tool, but never proves association.
                 sleep = use("coverage", "sleep_hours", recent_start, recent_end)
                 if sleep["coverage"]["observed"] >= MIN_OBSERVED:
                     claims.append({"id": "sleep-coverage", "text":
-                                   f"Hay {sleep['coverage']['observed']} de 28 registros sintéticos recientes de sueño para una revisión posterior.",
+                                   f"{sleep['coverage']['observed']} of 28 recent synthetic sleep records are available for follow-up.",
                                    "source_record_ids": sleep["source_record_ids"]})
             return finish("PASS", "verified")
         except (ValueError, TypeError, AttributeError, KeyError, RuntimeError, OSError):

@@ -1,21 +1,23 @@
-# PHIS · release candidate sintética
+# PHIS Open Agent · English-first integrated release candidate
 
-La UI de PR #4 consume `POST /api/investigations`. Esa ruta ejecuta `SyntheticAgent` de PR #5, que selecciona herramientas deterministas del núcleo Python según pregunta, cobertura y estado persistido. Los adaptadores opcionales de PR #3 están disponibles en el repositorio, pero esta demo no los llama ni acredita sponsors. Todos los registros son ficticios.
+The English-first demo calls `POST /api/investigations`. This route runs the Python `SyntheticAgent`, which chooses deterministic tools based on the question, coverage, and persisted World Model state. Two explicit modes are available: local synthetic fixtures and live reads of **synthetic** rows from Zetaris. A live result is shown only when Zetaris returns verified rows and matching query proof. All participant records are fictional. Meterless and Nemotron remain disconnected.
 
-## Ejecutar
+## Run
 
-Requiere Python 3.11+ y Node.js 20+. No hace falta instalar paquetes para la demo local.
+Requires Python 3.11+ and Node.js 20+. The local mode needs no package installation or external service.
 
 ```powershell
 $env:PYTHONPATH='src'
 python -m phis_open_agent.api
 ```
 
-Abre `http://127.0.0.1:4173`. También puedes ejecutar `npm start` desde `frontend/`; el lanzador inicia el mismo servidor Python. El estado sintético se guarda en `.local-state/agent-events.jsonl`, ignorado por Git. Para elegir otra ruta local, define `PHIS_SYNTHETIC_STATE_FILE`. Conserva ese archivo entre reinicios para que el seguimiento recupere decisiones anteriores. El navegador guarda solo el ID sintético de la última investigación comparable.
+Open `http://127.0.0.1:4173`. Alternatively, run `npm start` from `frontend/`; the launcher starts the same Python server. Synthetic state is stored in Git-ignored `.local-state/agent-events.jsonl`. Set `PHIS_SYNTHETIC_STATE_FILE` to choose another local path. Keep this file across restarts so follow-up investigations can recover previous decisions. The browser stores only the synthetic ID of the last comparable run.
 
-`GET /api/health` declara modo sintético y sponsors desconectados. El POST acepta `question`, `parent_run_id` opcional y `scenario`: `normal`, `insufficient` o `tool_error`. Los dos últimos son controles de evaluación explícitamente sintéticos; se activan en la UI con `/?scenario=insufficient` y `/?scenario=tool_error`.
+For live Zetaris, start the already provisioned local Zetaris service with the published synthetic CSV loaded. Set `PHIS_DATA_MODE=LIVE_SYNTHETIC_ZETARIS`, `ZETARIS_REST_URL`, `ZETARIS_ORG_ID`, and `ZETARIS_API_KEY` in the **PHIS API process environment** before starting the server. See [Zetaris activation](../docs/ZETARIS_REST_ACTIVATION.md) and [live orchestration](../docs/LIVE_ZETARIS_ORCHESTRATION_2026-10-22.md). Do not put real values in Git, browser URLs, test output, or screenshots. The current consolidation environment has no Zetaris configuration or reachable local endpoint; live success must be verified in a provisioned environment.
 
-## Pruebas
+`GET /api/health` reports the selected mode, not sponsor verification. The POST accepts `question`, optional `parent_run_id`, and `scenario`. The `insufficient` and `tool_error` scenarios are local-only evaluation controls at `/?scenario=insufficient` and `/?scenario=tool_error`; live mode rejects them. Missing configuration, failed HTTP, or invalid rows in live mode produce `source_error` and abstention with no local fixture fallback.
+
+## Tests and visual evidence
 
 ```powershell
 $env:PYTHONPATH='src'
@@ -23,17 +25,28 @@ python -m unittest discover -s tests -q
 node --test frontend/tests/*.test.mjs
 ```
 
-`tests/test_integration_api.py` invoca el manejador HTTP en proceso, sin socket, y comprueba que ejecuta el agente, adapta las cifras del núcleo, registra fases reales, se abstiene ante cobertura escasa/fallos y recupera el World Model en una nueva instancia. El cliente Node valida `investigation.v1`, trazas y pruebas de sponsor.
+`tests/test_integration_api.py` exercises the actual handler in process, including source failure without fallback. `tests/test_english_copy.py` checks static UI text and agent copy across success, follow-up, and abstention. The PR #8 adversarial suite runs within the Python discovery command; its standalone builder checks should not be mistaken for live Zetaris proof. Node tests validate `investigation.v1`, source IDs, and matching Zetaris query proof.
 
-Para capturas reales en Chrome sin instalar dependencias nuevas, si Playwright ya está disponible:
+If Playwright is already available, capture real Chrome desktop and mobile rendering without installing dependencies:
 
 ```powershell
-$env:PHIS_PLAYWRIGHT_MODULE='RUTA_ABSOLUTA_A_PLAYWRIGHT/index.mjs'
+$env:PHIS_PLAYWRIGHT_MODULE='ABSOLUTE_PATH_TO_PLAYWRIGHT/index.mjs'
 node frontend/tests/e2e_chrome.mjs
 ```
 
-La prueba abre Chrome de escritorio y móvil con un perfil temporal, usa los archivos reales del checkout e invoca el manejador Python real para cada POST mediante un puente sin socket. Cada petición crea un proceso Python nuevo, por lo que el seguimiento prueba recuperación de estado en disco. El transporte se intercepta porque el sandbox de esta ejecución bloquea conexiones a `127.0.0.1`; **no demuestra una conexión HTTP real desde Chrome**. Las capturas generadas están en `docs/evidence/rc-*.png`.
+The `e2e_chrome.mjs` test uses a socketless bridge to the actual Python API handler and covers keyboard evidence access and all local states. Its captures are `docs/evidence/en-*.png`.
 
-## Contrato y límites
+For **native HTTP** from Chrome to the Python server, run in an environment permitting loopback sockets:
 
-Se mantiene `investigation.v1`. `tool_trace` añade campos opcionales `phase`, `reason_code` y `parent_event_id`, sin romper consumidores anteriores. La UI muestra únicamente herramientas que aparecen en la traza persistida; el gráfico usa puntos y huecos devueltos por Python. Las comparaciones son descriptivas. El umbral de 14 días observados por periodo es una regla operativa de completitud, no significancia científica. No hay inferencia causal, consejo médico ni integración oficial Meterless/Nemotron/Zetaris.
+```powershell
+$env:PYTHONPATH='src'
+python tests/native_http_e2e.py
+$env:PHIS_PLAYWRIGHT_MODULE='ABSOLUTE_PATH_TO_PLAYWRIGHT/index.mjs'
+node frontend/tests/e2e_http_chrome.mjs
+```
+
+The native tests cover desktop/mobile, follow-up after an API restart, and live-mode source failure without fallback. `node frontend/tests/e2e_http_chrome.mjs --live` additionally requires a real, preconfigured Zetaris service and asserts a `VERIFIED` proof; it was **not run successfully in this environment**. Native HTTP captures are `docs/evidence/consolidated-http-*.png`.
+
+## Contract and limits
+
+`investigation.v1` adds optional query metadata fields and a distinct `LIVE_SYNTHETIC_ZETARIS` mode without changing the local response shape. The UI renders only tools present in the persisted trace; chart values and missing days come from Python. Comparisons are descriptive. The gate of 14 observed days per period is an operational completeness rule, not statistical significance. The demo makes no causal, clinical, or medical advice claim. Zetaris proof is per-run; Meterless and Nemotron are not connected.
