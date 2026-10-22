@@ -8,11 +8,19 @@ full Meterless World Model conformance.
 import hashlib
 import json
 import math
+import re
 from pathlib import Path
 
 
 SCHEMA = "synthetic-run-event-v1"
-ALLOWED_KINDS = frozenset({"energy_comparison"})
+ALLOWED_KINDS = frozenset({"energy_comparison", "agent_state"})
+PHASES = frozenset({"PLAN", "TOOLS", "EVIDENCE", "VERIFY", "RESPOND", "ABSTAIN"})
+STATES = frozenset({"PASS", "INSUFFICIENT_DATA", "BLOCKED", "ERROR"})
+INTENTS = frozenset({"energy", "sleep", "followup", "unsupported"})
+ACTIONS = frozenset({"coverage", "trend", "compare", "followup", "respond", "abstain", "none"})
+REASONS = frozenset({"planned", "tool_pass", "weak_coverage", "comparison_unavailable",
+                     "parent_missing", "unsupported_question", "tool_error", "verified",
+                     "synthesis_rejected"})
 
 
 def _canonical(payload):
@@ -26,16 +34,28 @@ class SyntheticRunWorldModel:
         self.path = Path(path)
 
     def append(self, *, run_id, kind, payload, source_record_ids):
-        if not run_id.startswith("SYN-RUN-") or kind not in ALLOWED_KINDS:
+        if not isinstance(run_id, str) or not re.fullmatch(r"SYN-RUN-[A-Za-z0-9_-]{1,64}", run_id) or kind not in ALLOWED_KINDS:
             raise ValueError("Only allowlisted synthetic run events are accepted")
-        if (not isinstance(payload, dict) or set(payload) != {"status", "difference"}
-                or payload["status"] not in {"PASS", "INSUFFICIENT_DATA"}
-                or (payload["difference"] is not None and
-                    (isinstance(payload["difference"], bool) or
-                     not isinstance(payload["difference"], (int, float)) or
-                     not math.isfinite(payload["difference"])))):
+        if kind == "energy_comparison":
+            valid_payload = (isinstance(payload, dict) and set(payload) == {"status", "difference"}
+                             and payload["status"] in {"PASS", "INSUFFICIENT_DATA"}
+                             and (payload["difference"] is None or
+                                  (not isinstance(payload["difference"], bool) and
+                                   isinstance(payload["difference"], (int, float)) and
+                                   math.isfinite(payload["difference"]))))
+        else:
+            valid_payload = (isinstance(payload, dict) and
+                             set(payload) == {"phase", "status", "intent", "action", "reason_code", "parent_event_id"}
+                             and payload["phase"] in PHASES and payload["status"] in STATES
+                             and payload["intent"] in INTENTS and payload["action"] in ACTIONS
+                             and payload["reason_code"] in REASONS
+                             and (payload["parent_event_id"] is None or
+                                  (isinstance(payload["parent_event_id"], str) and
+                                   len(payload["parent_event_id"]) == 64 and
+                                   all(c in "0123456789abcdef" for c in payload["parent_event_id"]))))
+        if not valid_payload:
             raise ValueError("Unexpected run-state payload")
-        if not source_record_ids or any(
+        if not isinstance(source_record_ids, (list, tuple)) or (kind == "energy_comparison" and not source_record_ids) or any(
             not isinstance(item, str) or not item.startswith("SYN-") for item in source_record_ids
         ):
             raise ValueError("Event requires synthetic source provenance")
@@ -53,7 +73,7 @@ class SyntheticRunWorldModel:
         return event
 
     def read(self, run_id):
-        if not run_id.startswith("SYN-RUN-"):
+        if not isinstance(run_id, str) or not re.fullmatch(r"SYN-RUN-[A-Za-z0-9_-]{1,64}", run_id):
             raise ValueError("Only synthetic run IDs are accepted")
         if not self.path.exists():
             return []

@@ -1,176 +1,126 @@
-"""HTTP-facing adapter over the public deterministic synthetic tools.
-
-All measurements and source IDs originate in ``tools.py``. This module only
-chooses bounded calls, formats their results, and marks unavailable science.
-"""
+"""investigation.v1 adapter for the bounded Python agent; no measurements here."""
 
 from __future__ import annotations
 
 import re
+from datetime import timedelta
 from uuid import uuid4
 
-from .synthetic import generate_observations
-from .tools import compare_periods, coverage, trend
+from . import tools
+from .orchestrator import SyntheticAgent
+from .synthetic import DAYS, START, generate_observations
 
-
-BASELINE = ("2026-08-27", "2026-09-23")
-RECENT = ("2026-09-24", "2026-10-21")
-WINDOW = {"start": BASELINE[0], "end": RECENT[1]}
 DATASET_ID = "PHIS-SYN-84D-v1"
-MIN_OBSERVED_PER_PERIOD = 14
+WINDOW = {"start": START.isoformat(), "end": (START + timedelta(days=DAYS - 1)).isoformat()}
+SPONSORS = ("zetaris", "meterless_engine", "meterless_runtime", "nemotron")
+DETAILS = {
+    "planned": "Primer paso elegido según la pregunta; los siguientes dependen de la evidencia.",
+    "tool_pass": "Herramienta local ejecutada con registros sintéticos trazables.",
+    "weak_coverage": "Cobertura inferior al umbral operativo; se omiten pasos posteriores.",
+    "comparison_unavailable": "No hay comparación previa verificada o cobertura para continuar.",
+    "parent_missing": "El seguimiento requiere una ejecución previa verificada.",
+    "unsupported_question": "La pregunta queda fuera del alcance descriptivo.",
+    "tool_error": "Falló una herramienta local; se abstiene sin publicar conclusión.",
+    "verified": "Respuesta limitada a afirmaciones respaldadas por herramientas ejecutadas.",
+    "synthesis_rejected": "Selección opcional no verificada; se usó el texto determinista.",
+}
+TOOL_NAMES = {"coverage": "get_variable_coverage", "trend": "get_longitudinal_trend",
+              "compare": "compare_periods"}
+FINDING_TITLES = {"recent-coverage": "Cobertura reciente", "energy-difference": "Cambio descriptivo",
+                  "sleep-coverage": "Sueño disponible para revisar", "followup-coverage": "Cobertura del seguimiento"}
 
 
-def _sponsor_proofs():
-    return [
-        {"sponsor": name, "status": "NOT_CONNECTED", "trace_id": None}
-        for name in ("zetaris", "meterless_engine", "nemotron")
-    ]
+def _coverage(item):
+    return {"variable": item["variable"], "unit": item["unit"],
+            "start": item["data_window"]["start"], "end": item["data_window"]["end"],
+            "observed": item["coverage"]["observed"], "eligible": item["coverage"]["eligible"],
+            "source_record_ids": item["source_record_ids"]}
 
 
-def _coverage(result):
-    return {
-        "variable": result["variable"], "unit": result["unit"],
-        "start": result["data_window"]["start"],
-        "end": result["data_window"]["end"],
-        "observed": result["coverage"]["observed"],
-        "eligible": result["coverage"]["eligible"],
-        "source_record_ids": result["source_record_ids"],
-    }
+class _FailingTools:
+    """Explicit synthetic error scenario; never a simulated sponsor."""
+
+    def __getattr__(self, name):
+        if name in {"coverage", "trend", "compare_periods"}:
+            def fail(*_):
+                raise RuntimeError("Synthetic evaluation tool failure")
+            return fail
+        raise AttributeError(name)
 
 
-def _trace(trace_id, tool, status, detail, source_record_ids=()):
-    return {"trace_id": trace_id, "tool": tool, "status": status,
-            "detail": detail, "source_record_ids": list(source_record_ids)}
-
-
-def _base(question, parent_run_id=None, scenario="normal"):
-    return {
-        "contract_version": "investigation.v1", "run_id": f"SYN-RUN-{uuid4().hex[:12]}",
-        "parent_run_id": parent_run_id, "dataset_id": DATASET_ID,
-        "mode": "SYNTHETIC_LOCAL_ONLY", "scenario": scenario,
-        "status": "BLOCKED", "reason_code": None, "question": question,
-        "timezone": "Europe/Madrid", "window": dict(WINDOW), "summary": "",
-        "coverage": [], "series": [], "comparison": None, "findings": [],
-        "tool_trace": [], "sponsor_proofs": _sponsor_proofs(),
-    }
-
-
-def _classify(question):
-    q = question.casefold()
-    if re.search(r"medicaci[oó]n|f[aá]rmaco|dosis|diagn[oó]stic|tratamiento", q):
-        return "CLINICAL_REQUEST", None
-    if re.search(r"demuestra|demostrar|prueba|probar", q) and re.search(r"caus|provoc|debido", q):
-        return "CAUSAL_REQUEST", None
-    if not re.search(r"energ|sue[nñ]|dorm|descans|cansan|fatig", q):
-        return "UNSUPPORTED_REQUEST", None
-    variable = "sleep_hours" if re.search(r"sue[nñ]|dorm|descans", q) and not re.search(r"energ|cansan|fatig", q) else "energy"
-    return None, variable
-
-
-def investigate(question, *, parent_run_id=None, scenario="normal", known_runs=None):
-    """Return one honest investigation.v1 payload; never calls external services.
-
-    ``scenario`` is a clearly labelled synthetic evaluation control, not a
-    simulated sponsor integration.
-    """
+def investigate(question, *, world_model, parent_run_id=None, scenario="normal"):
     if not isinstance(question, str) or not question.strip() or len(question) > 240:
         raise ValueError("Question must contain 1–240 characters")
     if scenario not in {"normal", "insufficient", "tool_error"}:
         raise ValueError("Unknown synthetic evaluation scenario")
-    if parent_run_id is not None and (not isinstance(parent_run_id, str) or parent_run_id not in (known_runs or {})):
-        raise ValueError("Unknown parent run")
-    result = _base(question.strip(), parent_run_id, scenario)
-    reason, variable = _classify(question)
-    result["tool_trace"].append(_trace("plan", "classify_intent", "PASS" if not reason else "BLOCKED",
-                                        "Pregunta acotada a energía/sueño." if not reason else f"Alcance bloqueado: {reason}."))
-    if reason:
-        result["reason_code"] = reason
-        result["summary"] = "Esta pregunta supera el alcance de la investigación descriptiva."
-        result["findings"].append({"finding_id": "ABSTAIN-01", "kind": "abstention",
-                                   "title": "No se puede concluir", "text": result["summary"],
-                                   "source_record_ids": []})
-        return result
-
+    if parent_run_id is not None and (not isinstance(parent_run_id, str) or
+                                      not re.fullmatch(r"SYN-RUN-[A-Za-z0-9_-]{1,64}", parent_run_id)):
+        raise ValueError("Invalid synthetic parent run ID")
     rows = generate_observations()
     if scenario == "insufficient":
-        # Keep just six observations of the selected variable in the recent window. The response
-        # identifies this as a separate synthetic evaluation scenario.
-        recent_selected = [row for row in rows if row["variable"] == variable and RECENT[0] <= row["local_date"] <= RECENT[1]]
-        keep = {row["source_record_id"] for row in recent_selected[:6]}
-        rows = [row for row in rows if row["variable"] != variable or row["local_date"] < RECENT[0] or row["source_record_id"] in keep]
-        result["dataset_id"] += "-SPARSE-EVAL"
-
-    if scenario == "tool_error":
-        result["status"] = "ERROR"
-        result["reason_code"] = "TOOL_UNAVAILABLE"
-        result["summary"] = "La herramienta local de cobertura no está disponible en este escenario de evaluación."
-        result["tool_trace"].append(_trace("coverage", "get_variable_coverage", "ERROR", "Fallo de herramienta de prueba; no se publican mediciones."))
-        result["findings"].append({"finding_id": "ABSTAIN-TOOL", "kind": "abstention", "title": "Resultado no disponible",
-                                   "text": result["summary"], "source_record_ids": []})
-        return result
-
-    try:
-        for name in (variable, "sleep_hours" if variable == "energy" else "energy"):
-            cov = coverage(rows, name, *WINDOW.values())
-            result["coverage"].append(_coverage(cov))
-            result["tool_trace"].append(_trace(f"coverage-{name}", "get_variable_coverage", "PASS",
-                                                f"{cov['coverage']['observed']} de {cov['coverage']['eligible']} días con {name}.",
-                                                cov["source_record_ids"]))
-        trend_result = trend(rows, variable, *WINDOW.values())
-        result["series"].append({"variable": variable, "unit": trend_result["unit"], "points": trend_result["points"]})
-        result["tool_trace"].append(_trace("trend", "get_longitudinal_trend", "PASS",
-                                            "Serie diaria con ausencias nulas, sin interpolación.", trend_result["source_record_ids"]))
-        baseline = coverage(rows, variable, *BASELINE)
-        recent = coverage(rows, variable, *RECENT)
-        if min(baseline["coverage"]["observed"], recent["coverage"]["observed"]) < MIN_OBSERVED_PER_PERIOD:
-            result["status"] = "INSUFFICIENT_DATA"
-            result["reason_code"] = "LOW_PERIOD_COVERAGE"
-            result["summary"] = "No hay suficientes registros en ambos periodos para una comparación responsable."
-            result["tool_trace"].append(_trace("compare", "compare_periods", "BLOCKED",
-                                                f"Se requieren {MIN_OBSERVED_PER_PERIOD} observaciones por periodo; no se calculó comparación."))
-            result["findings"].append({"finding_id": "ABSTAIN-COVERAGE", "kind": "abstention",
-                                       "title": "Evidencia insuficiente", "text": result["summary"],
-                                       "source_record_ids": baseline["source_record_ids"] + recent["source_record_ids"]})
-            return result
-        comparison = compare_periods(rows, variable, *BASELINE, *RECENT)
-        if comparison["status"] != "PASS":
-            raise ValueError("Core comparison did not pass")
-        result["comparison"] = {
-            "variable": variable, "unit": comparison["unit"],
-            "method": "arithmetic_mean_observed_days",
-            "baseline": {**_coverage(comparison["baseline"]), "mean": comparison["baseline_mean"]},
-            "comparison": {**_coverage(comparison["comparison"]), "mean": comparison["comparison_mean"]},
-            "difference": comparison["difference_comparison_minus_baseline"],
-            "source_record_ids": comparison["source_record_ids"],
-            "warning": "Descriptive only; causality is not established.",
-        }
-        result["tool_trace"].append(_trace("compare", "compare_periods", "PASS",
-                                            "Medias descriptivas calculadas por el núcleo Python.", comparison["source_record_ids"]))
-        result["status"] = "PASS"
-        unit_name = "energía" if variable == "energy" else "sueño"
-        result["summary"] = (f"En este fixture sintético, la media registrada de {unit_name} fue "
-                             f"{comparison['baseline_mean']:.1f} en el periodo anterior y "
-                             f"{comparison['comparison_mean']:.1f} en el reciente. La causa no está establecida.")
-        other_variable = "sleep_hours" if variable == "energy" else "energy"
-        other_label = "sueño" if other_variable == "sleep_hours" else "energía"
-        result["findings"] = [
-            {"finding_id": "OBS-01", "kind": "observation", "title": "Cambio observado",
-             "text": result["summary"], "source_record_ids": comparison["source_record_ids"]},
-            {"finding_id": "HYP-01", "kind": "hypothesis", "title": "Factor para explorar",
-             "text": f"Hay registros de {other_label} en el mismo intervalo. La asociación estadística no se ha evaluado.",
-             "source_record_ids": next(c["source_record_ids"] for c in result["coverage"] if c["variable"] == other_variable)},
-            {"finding_id": "UNC-01", "kind": "uncertainty", "title": "Límite de la evidencia",
-             "text": "Esta comparación descriptiva no identifica causas ni equivale a un análisis clínico.",
-             "source_record_ids": []},
-        ]
-        result["tool_trace"].append(_trace("discovery", "run_predeclared_discovery", "BLOCKED",
-                                            "Motor científico no conectado; no se emiten asociaciones."))
-        return result
-    except (ValueError, KeyError, TypeError) as exc:
-        # Keep an error response free from partial numbers if a core tool fails.
-        result.update(status="ERROR", reason_code="TOOL_FAILURE", summary="La investigación no pudo completarse.",
-                      coverage=[], series=[], comparison=None,
-                      findings=[{"finding_id": "ABSTAIN-ERROR", "kind": "abstention", "title": "Resultado no disponible",
-                                 "text": "Un fallo de herramienta impide presentar resultados.", "source_record_ids": []}])
-        result["tool_trace"].append(_trace("error", "investigation_adapter", "ERROR", type(exc).__name__))
-        return result
+        # Keep six days per variable in the recent period.
+        threshold = START + timedelta(days=DAYS - 28)
+        rows = [row for row in rows if row["local_date"] < threshold.isoformat() or
+                int(row["source_record_id"].split("-")[1]) < DAYS - 22]
+    execution = SyntheticAgent(world_model, toolset=_FailingTools() if scenario == "tool_error" else tools).run(
+        run_id=f"SYN-RUN-{uuid4().hex[:12]}", question=question.strip(), rows=rows,
+        parent_run_id=parent_run_id)
+    status, evidence = execution["status"], execution["evidence"]
+    coverages, series, comparison, seen = [], [], None, set()
+    for item in evidence:
+        if item["tool"] in {"coverage", "trend"}:
+            cov = _coverage(item)
+            key = (cov["variable"], cov["start"], cov["end"])
+            if key not in seen:
+                coverages.append(cov)
+                seen.add(key)
+            if item["tool"] == "trend":
+                series.append({"variable": item["variable"], "unit": item["unit"],
+                               "points": item["points"]})
+        elif item["tool"] == "compare_periods" and status == "PASS":
+            comparison = {"variable": item["variable"], "unit": item["unit"],
+                          "method": "arithmetic_mean_observed_days",
+                          "baseline": {**_coverage(item["baseline"]), "mean": item["baseline_mean"]},
+                          "comparison": {**_coverage(item["comparison"]), "mean": item["comparison_mean"]},
+                          "difference": item["difference_comparison_minus_baseline"],
+                          "source_record_ids": item["source_record_ids"],
+                          "warning": "Descriptive only; causality is not established."}
+    if status == "ERROR":
+        coverages, series, comparison = [], [], None
+    if series:
+        first_window = (series[0]["points"][0]["local_date"], series[0]["points"][-1]["local_date"])
+    elif coverages:
+        first_window = (coverages[0]["start"], coverages[0]["end"])
+    else:
+        first_window = (WINDOW["start"], WINDOW["end"])
+    if status == "PASS":
+        findings = [{"finding_id": claim["id"], "kind": "observation",
+                     "title": FINDING_TITLES.get(claim["id"], "Observación trazable"),
+                     "text": claim["text"], "source_record_ids": claim["source_record_ids"]}
+                    for claim in execution["claims"]]
+        findings.append({"finding_id": "LIMIT-01", "kind": "uncertainty", "title": "Límite de la evidencia",
+                         "text": "Esta lectura descriptiva no identifica causas ni equivale a un análisis clínico.",
+                         "source_record_ids": []})
+    else:
+        findings = [{"finding_id": "ABSTAIN-01", "kind": "abstention", "title": "No se puede concluir",
+                     "text": execution["answer"], "source_record_ids": []}]
+    trace = []
+    for step in execution["trace"]:
+        phase, action = step["phase"], step["action"]
+        trace.append({"trace_id": step["event_id"],
+                      "tool": TOOL_NAMES.get(action, action) if phase == "TOOLS" else f"{phase} · {action}",
+                      "status": "BLOCKED" if step["status"] == "INSUFFICIENT_DATA" else step["status"],
+                      "detail": DETAILS[step["reason_code"]], "source_record_ids": step["source_record_ids"],
+                      "phase": phase, "reason_code": step["reason_code"],
+                      "parent_event_id": step["parent_event_id"]})
+    return {"contract_version": "investigation.v1", "run_id": execution["run_id"],
+            "parent_run_id": parent_run_id,
+            "dataset_id": DATASET_ID + ("-SPARSE-EVAL" if scenario == "insufficient" else ""),
+            "mode": "SYNTHETIC_LOCAL_ONLY", "scenario": scenario, "status": status,
+            "reason_code": execution["trace"][-1]["reason_code"] if status != "PASS" else None,
+            "question": question.strip(), "timezone": "Europe/Madrid",
+            "window": {"start": first_window[0], "end": first_window[1]},
+            "summary": execution["answer"], "coverage": coverages, "series": series,
+            "comparison": comparison, "findings": findings, "tool_trace": trace,
+            "sponsor_proofs": [{"sponsor": name, "status": "NOT_CONNECTED", "trace_id": None}
+                               for name in SPONSORS]}

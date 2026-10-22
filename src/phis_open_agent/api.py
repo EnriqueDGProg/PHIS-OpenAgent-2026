@@ -10,6 +10,7 @@ from threading import Lock
 from urllib.parse import urlsplit
 
 from .investigation import investigate
+from .run_world_model import SyntheticRunWorldModel
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -25,9 +26,10 @@ MAX_BODY = 4096
 class DemoServer(ThreadingHTTPServer):
     daemon_threads = True
 
-    def __init__(self, address, handler=BaseHTTPRequestHandler):
+    def __init__(self, address, handler=BaseHTTPRequestHandler, *, state_path=None):
         super().__init__(address, handler)
-        self.runs = {}
+        self.world_model = SyntheticRunWorldModel(
+            state_path if state_path is not None else ROOT / ".local-state" / "agent-events.jsonl")
         self.lock = Lock()
 
 
@@ -74,11 +76,13 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError("Unexpected request fields")
             with self.server.lock:
                 result = investigate(payload.get("question"), parent_run_id=payload.get("parent_run_id"),
-                                     scenario=payload.get("scenario", "normal"), known_runs=self.server.runs)
-                self.server.runs[result["run_id"]] = {"window": result["window"], "dataset_id": result["dataset_id"]}
+                                     scenario=payload.get("scenario", "normal"),
+                                     world_model=self.server.world_model)
             self._send(200, result)
         except (ValueError, TypeError, json.JSONDecodeError) as exc:
             self._send(400, {"error": str(exc)})
+        except OSError:
+            self._send(503, {"error": "Synthetic state store unavailable"})
 
     def log_message(self, format, *args):
         # No question text or records in access logs.
@@ -87,7 +91,8 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     port = int(os.environ.get("PORT", "4173"))
-    server = DemoServer(("127.0.0.1", port), Handler)
+    server = DemoServer(("127.0.0.1", port), Handler,
+                        state_path=os.environ.get("PHIS_SYNTHETIC_STATE_FILE"))
     print(f"PHIS synthetic demo: http://127.0.0.1:{port}", flush=True)
     try:
         server.serve_forever()

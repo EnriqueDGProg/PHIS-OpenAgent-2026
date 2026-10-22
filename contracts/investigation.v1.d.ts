@@ -5,7 +5,7 @@ export type Period = Coverage & { mean: number };
 export type Series = { variable: Variable; unit: string; points: { local_date: string; value: number | null; source_record_id: string | null }[] };
 export type Comparison = { variable: Variable; unit: string; method: 'arithmetic_mean_observed_days'; baseline: Period; comparison: Period; difference: number; source_record_ids: string[]; warning: 'Descriptive only; causality is not established.' };
 export type Finding = { finding_id: string; kind: 'observation' | 'association' | 'hypothesis' | 'uncertainty' | 'abstention'; title: string; text: string; source_record_ids: string[]; analysis_evidence_id?: string | null };
-export type ToolTrace = { trace_id: string; tool: string; status: 'PASS' | 'BLOCKED' | 'ERROR'; detail: string; source_record_ids: string[] };
+export type ToolTrace = { trace_id: string; tool: string; status: 'PASS' | 'BLOCKED' | 'ERROR'; detail: string; source_record_ids: string[]; phase?: 'PLAN' | 'TOOLS' | 'EVIDENCE' | 'VERIFY' | 'RESPOND' | 'ABSTAIN'; reason_code?: string; parent_event_id?: string | null };
 export type SponsorProof = { sponsor: 'zetaris' | 'meterless_engine' | 'meterless_runtime' | 'nemotron'; status: 'NOT_CONNECTED' | 'VERIFIED' | 'FAILED'; trace_id: string | null };
 export type InvestigationV1 = {
   contract_version: 'investigation.v1'; run_id: string; parent_run_id: string | null;

@@ -54,3 +54,11 @@ test('client sends follow-up and rejects HTTP errors', async () => {
   assert.equal(sent.parent_run_id,'SYN-RUN-previous');
   await assert.rejects(fetchInvestigation('error',{fetcher:async()=>({ok:false,status:503,json:async()=>({error:'No disponible'})})}),/No disponible/);
 });
+
+test('client accepts agent phases and rejects fabricated phase', () => {
+  const run=base(); run.tool_trace=[{trace_id:'a'.repeat(64),tool:'PLAN · trend',status:'PASS',
+    detail:'Planificado',source_record_ids:[],phase:'PLAN',reason_code:'planned',parent_event_id:null}];
+  assert.equal(validateInvestigation(run).tool_trace[0].phase,'PLAN');
+  run.tool_trace[0].phase='SPONSOR_VERIFIED';
+  assert.throws(()=>validateInvestigation(run),/Traza/);
+});

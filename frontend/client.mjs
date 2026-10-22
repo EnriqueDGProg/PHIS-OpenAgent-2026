@@ -16,7 +16,9 @@ export function validateInvestigation(value) {
     }
   }
   if (value.findings.some(finding => !['observation','association','hypothesis','uncertainty','abstention'].includes(finding.kind))) throw new Error('Hallazgo desconocido');
-  if (value.tool_trace.some(step => !['PASS','BLOCKED','ERROR'].includes(step.status))) throw new Error('Traza desconocida');
+  if (value.tool_trace.some(step => !['PASS','BLOCKED','ERROR'].includes(step.status)
+    || (step.phase && !['PLAN','TOOLS','EVIDENCE','VERIFY','RESPOND','ABSTAIN'].includes(step.phase))
+    || !Array.isArray(step.source_record_ids))) throw new Error('Traza desconocida');
   if (value.comparison) {
     const c = value.comparison;
     if (!Number.isFinite(c.baseline?.mean) || !Number.isFinite(c.comparison?.mean) || !Number.isFinite(c.difference)) throw new Error('Comparación inválida');

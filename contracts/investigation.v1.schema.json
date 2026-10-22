@@ -110,7 +110,10 @@
         "tool": {"type": "string"},
         "status": {"enum": ["PASS", "BLOCKED", "ERROR"]},
         "detail": {"type": "string"},
-        "source_record_ids": {"type": "array", "items": {"type": "string"}}
+        "source_record_ids": {"type": "array", "items": {"type": "string"}},
+        "phase": {"enum": ["PLAN", "TOOLS", "EVIDENCE", "VERIFY", "RESPOND", "ABSTAIN"]},
+        "reason_code": {"type": "string"},
+        "parent_event_id": {"type": ["string", "null"]}
       }
     },
     "sponsor": {

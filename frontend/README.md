@@ -1,54 +1,39 @@
-# PHIS · demo integrada con núcleo Python
+# PHIS · release candidate sintética
 
-La interfaz consume `POST /api/investigations` del núcleo público Python. Los 84 días son **exclusivamente sintéticos** y las cifras se calculan una sola vez en `src/phis_open_agent/tools.py`. Zetaris, Meterless y Nemotron figuran como `NOT_CONNECTED`; esta rama no acredita la integración obligatoria de patrocinadores.
+La UI de PR #4 consume `POST /api/investigations`. Esa ruta ejecuta `SyntheticAgent` de PR #5, que selecciona herramientas deterministas del núcleo Python según pregunta, cobertura y estado persistido. Los adaptadores opcionales de PR #3 están disponibles en el repositorio, pero esta demo no los llama ni acredita sponsors. Todos los registros son ficticios.
 
 ## Ejecutar
 
-Requiere Python 3.11+ y Node.js 20+; no instala paquetes ni crea recursos de pago.
-
-```powershell
-cd frontend
-npm start
-```
-
-El lanzador inicia el servidor Python en `http://127.0.0.1:4173`, que sirve la UI y la API en el mismo origen. Alternativamente, desde la raíz:
+Requiere Python 3.11+ y Node.js 20+. No hace falta instalar paquetes para la demo local.
 
 ```powershell
 $env:PYTHONPATH='src'
 python -m phis_open_agent.api
 ```
 
-`GET /api/health` confirma el modo sintético. El endpoint solo acepta `question`, `parent_run_id` opcional y `scenario` de evaluación (`normal`, `insufficient`, `tool_error`). Las URLs `/?scenario=insufficient` y `/?scenario=tool_error` ensayan estados de error explícitamente sintéticos. «¿Debería cambiar mi medicación?» y «Demuestra que dormir poco causó mi cansancio» generan abstención. El chip «¿Y el sueño?» conserva el ID de la ejecución previa, usa la misma ventana y ejecuta herramientas Python nuevas.
+Abre `http://127.0.0.1:4173`. También puedes ejecutar `npm start` desde `frontend/`; el lanzador inicia el mismo servidor Python. El estado sintético se guarda en `.local-state/agent-events.jsonl`, ignorado por Git. Para elegir otra ruta local, define `PHIS_SYNTHETIC_STATE_FILE`. Conserva ese archivo entre reinicios para que el seguimiento recupere decisiones anteriores. El navegador guarda solo el ID sintético de la última investigación comparable.
+
+`GET /api/health` declara modo sintético y sponsors desconectados. El POST acepta `question`, `parent_run_id` opcional y `scenario`: `normal`, `insufficient` o `tool_error`. Los dos últimos son controles de evaluación explícitamente sintéticos; se activan en la UI con `/?scenario=insufficient` y `/?scenario=tool_error`.
 
 ## Pruebas
 
-Desde la raíz:
-
 ```powershell
 $env:PYTHONPATH='src'
-python -m unittest discover -s tests -v
-cd frontend
-npm test
+python -m unittest discover -s tests -q
+node --test frontend/tests/*.test.mjs
 ```
 
-`tests/test_integration_api.py` levanta el servidor real en un puerto efímero y comprueba que comparación, fuente, huecos, abstención, seguimiento, errores y contenidos servidos coinciden con el núcleo. `frontend/tests/client.test.mjs` protege la frontera de respuesta que entra en la UI.
+`tests/test_integration_api.py` invoca el manejador HTTP en proceso, sin socket, y comprueba que ejecuta el agente, adapta las cifras del núcleo, registra fases reales, se abstiene ante cobertura escasa/fallos y recupera el World Model en una nueva instancia. El cliente Node valida `investigation.v1`, trazas y pruebas de sponsor.
+
+Para capturas reales en Chrome sin instalar dependencias nuevas, si Playwright ya está disponible:
+
+```powershell
+$env:PHIS_PLAYWRIGHT_MODULE='RUTA_ABSOLUTA_A_PLAYWRIGHT/index.mjs'
+node frontend/tests/e2e_chrome.mjs
+```
+
+La prueba abre Chrome de escritorio y móvil con un perfil temporal, usa los archivos reales del checkout e invoca el manejador Python real para cada POST mediante un puente sin socket. Cada petición crea un proceso Python nuevo, por lo que el seguimiento prueba recuperación de estado en disco. El transporte se intercepta porque el sandbox de esta ejecución bloquea conexiones a `127.0.0.1`; **no demuestra una conexión HTTP real desde Chrome**. Las capturas generadas están en `docs/evidence/rc-*.png`.
 
 ## Contrato y límites
 
-`contracts/investigation.v1.schema.json` y `.d.ts` fijan ejecución, `dataset_id`, ventana, cobertura, serie con nulos, medias del núcleo, hallazgos, traza y pruebas de patrocinadores. El frontend no importa `fixture.mjs` ni `tools.mjs`; esos módulos se eliminan en esta rama. La API clasifica solo preguntas acotadas de energía/sueño mediante reglas explícitas. No hay LLM, PHIS privado, análisis de asociación o consejo médico. El umbral de 14 observaciones por periodo es una política de presentación descriptiva del adaptador; queda identificado como bloqueo cuando falla.
-
-Las fuentes de Google Fonts son opcionales y el CSS tiene fuentes de sistema de reserva. El panel de evidencias no muestra trazas de sponsor como verificadas sin llamada real.
-
-## Revisión visual del PR #4
-
-La [captura anterior de escritorio](../docs/evidence/result-desktop.jpg) y la [captura anterior móvil](../docs/evidence/result-mobile.jpg) se compararon con capturas **reales de Chrome** tomadas contra el servidor Python local:
-
-| Después | Recorrido |
-| --- | --- |
-| [Resultado de escritorio](evidence/after-desktop.jpg) | Pregunta prioritaria, traza completa, periodos visibles y hallazgos con origen. |
-| [Origen de un punto](evidence/after-evidence.jpg) | Fecha, valor e ID sintético seleccionados desde el gráfico; servicios externos desconectados. |
-| [Seguimiento móvil](evidence/after-followup-mobile.jpg) | Nueva ejecución de sueño con `parent_run_id`; gráfico adaptado a 390 px. |
-| [Cobertura insuficiente](evidence/after-insufficient.jpg) | Serie con huecos; sin medias ni inferencia. |
-| [Fallo de herramienta](evidence/after-tool-error.jpg) | Sin serie, cobertura ni cifras de una ejecución anterior. |
-
-En móvil, la pregunta comienza a 267 px del borde superior en una ventana de 390 × 844; la anchura del documento es 375 px y no hay desbordamiento horizontal. La actividad en curso se inspeccionó en navegador antes de recibir la respuesta. Una solicitud clínica muestra abstención sin comparación. Estas comprobaciones visuales no sustituyen una auditoría con lector de pantalla, pruebas en varios navegadores ni un estudio con usuarios. Los IDs verifican la procedencia **dentro del fixture sintético**, no un origen externo o clínico.
+Se mantiene `investigation.v1`. `tool_trace` añade campos opcionales `phase`, `reason_code` y `parent_event_id`, sin romper consumidores anteriores. La UI muestra únicamente herramientas que aparecen en la traza persistida; el gráfico usa puntos y huecos devueltos por Python. Las comparaciones son descriptivas. El umbral de 14 días observados por periodo es una regla operativa de completitud, no significancia científica. No hay inferencia causal, consejo médico ni integración oficial Meterless/Nemotron/Zetaris.

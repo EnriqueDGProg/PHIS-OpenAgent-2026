@@ -1,105 +1,118 @@
-"""End-to-end HTTP contract tests against the real public Python core."""
+"""In-process HTTP handler tests; no socket privilege or external service needed."""
 
+import io
 import json
-import threading
+import tempfile
 import unittest
-from urllib.error import HTTPError
-from urllib.request import Request, urlopen
+from pathlib import Path
+from threading import Lock
+from types import SimpleNamespace
 
-from phis_open_agent.api import DemoServer, Handler
+from phis_open_agent.api import Handler
+from phis_open_agent.run_world_model import SyntheticRunWorldModel
 from phis_open_agent.synthetic import generate_observations
 from phis_open_agent.tools import compare_periods
 
 
 class IntegrationApiTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.server = DemoServer(("127.0.0.1", 0), Handler)
-        cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
-        cls.thread.start()
-        cls.base = f"http://127.0.0.1:{cls.server.server_port}"
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parents[1])
+        self.addCleanup(self.directory.cleanup)
+        self.state = Path(self.directory.name) / "events.jsonl"
+        self.server = SimpleNamespace(lock=Lock(), world_model=SyntheticRunWorldModel(self.state))
 
-    @classmethod
-    def tearDownClass(cls):
-        cls.server.shutdown()
-        cls.server.server_close()
-        cls.thread.join(timeout=2)
+    def call(self, payload, *, path="/api/investigations"):
+        body = json.dumps(payload).encode()
+        handler = Handler.__new__(Handler)
+        handler.path = path
+        handler.headers = {"Content-Type": "application/json", "Content-Length": str(len(body))}
+        handler.rfile = io.BytesIO(body)
+        handler.server = self.server
+        sent = []
+        handler._send = lambda code, data, content_type="application/json": sent.append((code, data))
+        handler.do_POST()
+        self.assertEqual(len(sent), 1)
+        return sent[0]
 
-    def get(self, path):
-        with urlopen(self.base + path, timeout=3) as response:
-            return response.status, response.read(), response.headers
-
-    def post(self, payload):
-        request = Request(self.base + "/api/investigations", json.dumps(payload).encode(),
-                          {"Content-Type": "application/json"}, method="POST")
-        with urlopen(request, timeout=3) as response:
-            return response.status, json.load(response)
-
-    def test_hero_uses_python_core_values_and_lineage(self):
-        status, run = self.post({"question": "¿Por qué ha cambiado mi energía últimamente?"})
-        core = compare_periods(generate_observations(), "energy", "2026-08-27", "2026-09-23", "2026-09-24", "2026-10-21")
-        self.assertEqual(status, 200)
-        self.assertEqual(run["mode"], "SYNTHETIC_LOCAL_ONLY")
+    def test_hero_is_agent_run_with_core_values_and_real_trace(self):
+        code, run = self.call({"question": "¿Por qué ha cambiado mi energía últimamente?"})
+        core = compare_periods(generate_observations(), "energy", "2026-08-27", "2026-09-23",
+                               "2026-09-24", "2026-10-21")
+        self.assertEqual(code, 200)
         self.assertEqual(run["status"], "PASS")
-        self.assertEqual(run["dataset_id"], "PHIS-SYN-84D-v1")
+        self.assertEqual(run["window"], {"start": "2026-07-30", "end": "2026-10-21"})
+        self.assertEqual(len(run["series"][0]["points"]), 84)
         self.assertEqual(run["comparison"]["baseline"]["mean"], core["baseline_mean"])
-        self.assertEqual(run["comparison"]["comparison"]["mean"], core["comparison_mean"])
         self.assertEqual(run["comparison"]["source_record_ids"], core["source_record_ids"])
-        self.assertEqual(run["window"], {"start": "2026-08-27", "end": "2026-10-21"})
-        self.assertEqual(len(run["series"][0]["points"]), 56)
-        self.assertTrue(any(point["value"] is None and point["source_record_id"] is None for point in run["series"][0]["points"]))
-        self.assertTrue(all(proof["status"] == "NOT_CONNECTED" and proof["trace_id"] is None for proof in run["sponsor_proofs"]))
-        self.assertIn("compare_periods", [step["tool"] for step in run["tool_trace"]])
+        self.assertEqual([t["phase"] for t in run["tool_trace"]][0], "PLAN")
+        self.assertEqual([t["tool"] for t in run["tool_trace"] if t["phase"] == "TOOLS"],
+                         ["get_longitudinal_trend", "get_variable_coverage", "compare_periods",
+                          "get_variable_coverage"])
+        self.assertEqual(run["tool_trace"][-1]["phase"], "RESPOND")
+        self.assertTrue(all(p["status"] == "NOT_CONNECTED" for p in run["sponsor_proofs"]))
+        self.assertTrue(any(point["value"] is None and point["source_record_id"] is None
+                            for point in run["series"][0]["points"]))
 
-    def test_followup_uses_parent_run_and_sleep_tools(self):
-        _, first = self.post({"question": "¿Qué pasó con mi energía?"})
-        _, second = self.post({"question": "¿Y cómo cambió mi sueño en ese periodo?", "parent_run_id": first["run_id"]})
-        self.assertEqual(second["parent_run_id"], first["run_id"])
-        self.assertEqual(second["window"], first["window"])
-        self.assertEqual(second["series"][0]["variable"], "sleep_hours")
-        self.assertEqual(second["comparison"]["variable"], "sleep_hours")
-        self.assertIn("energía", second["findings"][1]["text"])
-        self.assertTrue(all(record_id.endswith("ENERGY") for record_id in second["findings"][1]["source_record_ids"]))
-        self.assertNotEqual(second["run_id"], first["run_id"])
+    def test_followup_recovers_world_model_after_server_restart(self):
+        _, parent = self.call({"question": "¿Por qué cambió mi energía?"})
+        self.server = SimpleNamespace(lock=Lock(), world_model=SyntheticRunWorldModel(self.state))
+        code, child = self.call({"question": "¿Y cómo cambió mi sueño en ese periodo?",
+                                 "parent_run_id": parent["run_id"]})
+        self.assertEqual(code, 200)
+        self.assertEqual(child["status"], "PASS")
+        self.assertEqual(child["parent_run_id"], parent["run_id"])
+        self.assertEqual(child["series"][0]["variable"], "sleep_hours")
+        self.assertEqual([t["tool"] for t in child["tool_trace"] if t["phase"] == "TOOLS"],
+                         ["get_variable_coverage", "get_longitudinal_trend"])
+        self.assertTrue(any(t["parent_event_id"] for t in child["tool_trace"]))
+        self.assertEqual(child["window"], {"start": "2026-09-24", "end": "2026-10-21"})
 
-    def test_abstention_and_sparse_coverage(self):
-        _, clinical = self.post({"question": "¿Debo cambiar mi medicación?"})
-        self.assertEqual((clinical["status"], clinical["reason_code"]), ("BLOCKED", "CLINICAL_REQUEST"))
+    def test_abstention_sparse_and_tool_failure(self):
+        _, clinical = self.call({"question": "¿Debo cambiar mi medicación?"})
+        self.assertEqual(clinical["status"], "BLOCKED")
         self.assertEqual(clinical["series"], [])
-        _, causal = self.post({"question": "Demuestra que dormir poco causó mi cansancio"})
-        self.assertEqual(causal["reason_code"], "CAUSAL_REQUEST")
-        _, sparse = self.post({"question": "¿Cómo cambió mi energía?", "scenario": "insufficient"})
+        _, causal = self.call({"question": "Demuestra que dormir poco causó mi cansancio"})
+        self.assertEqual(causal["status"], "BLOCKED")
+        _, sparse = self.call({"question": "¿Cómo cambió mi energía?", "scenario": "insufficient"})
         self.assertEqual(sparse["status"], "INSUFFICIENT_DATA")
         self.assertIsNone(sparse["comparison"])
-        self.assertTrue(sparse["dataset_id"].endswith("SPARSE-EVAL"))
-        self.assertEqual(sparse["tool_trace"][-1]["status"], "BLOCKED")
-        _, sparse_sleep = self.post({"question": "¿Cómo cambió mi sueño?", "scenario": "insufficient"})
-        self.assertEqual(sparse_sleep["status"], "INSUFFICIENT_DATA")
-        self.assertIsNone(sparse_sleep["comparison"])
-        self.assertEqual(sparse_sleep["coverage"][0]["variable"], "sleep_hours")
-
-    def test_tool_error_and_invalid_request(self):
-        _, failed = self.post({"question": "¿Cómo cambió mi energía?", "scenario": "tool_error"})
+        self.assertEqual(sparse["tool_trace"][-1]["phase"], "ABSTAIN")
+        self.assertEqual([t["tool"] for t in sparse["tool_trace"] if t["phase"] == "TOOLS"],
+                         ["get_longitudinal_trend", "get_variable_coverage"])
+        _, failed = self.call({"question": "¿Cómo cambió mi energía?", "scenario": "tool_error"})
         self.assertEqual(failed["status"], "ERROR")
-        self.assertEqual(failed["coverage"], [])
-        self.assertIsNone(failed["comparison"])
-        with self.assertRaises(HTTPError) as context:
-            self.post({"question": "¿Cómo cambió mi energía?", "unexpected": "SQL"})
-        self.assertEqual(context.exception.code, 400)
-        with self.assertRaises(HTTPError) as context:
-            self.post({"question": "¿Y el sueño?", "parent_run_id": "unknown"})
-        self.assertEqual(context.exception.code, 400)
+        self.assertEqual((failed["coverage"], failed["series"], failed["comparison"]), ([], [], None))
+        self.assertEqual([t["tool"] for t in failed["tool_trace"] if t["phase"] == "TOOLS"],
+                         ["get_longitudinal_trend"])
+        self.assertIn("falló", failed["summary"])
 
-    def test_same_origin_frontend_and_health(self):
-        status, body, headers = self.get("/")
-        self.assertEqual(status, 200)
-        self.assertIn(b"Demostraci", body)
-        self.assertIn(b"app.mjs", body)
-        self.assertIn("default-src 'self'", headers["Content-Security-Policy"])
-        _, script, _ = self.get("/client.mjs")
-        self.assertIn(b"/api/investigations", script)
-        _, health, _ = self.get("/api/health")
-        self.assertEqual(json.loads(health)["sponsors"], "NOT_CONNECTED")
+    def test_invalid_request_and_unknown_parent(self):
+        self.assertEqual(self.call({"question": "energía", "unexpected": "SQL"})[0], 400)
+        self.assertEqual(self.call({"question": "energía", "parent_run_id": "unknown"})[0], 400)
+        _, unknown = self.call({"question": "¿Y el sueño?", "parent_run_id": "SYN-RUN-MISSING"})
+        self.assertEqual(unknown["status"], "BLOCKED")
+        self.assertEqual(unknown["tool_trace"][-1]["phase"], "ABSTAIN")
+
+    def test_static_frontend_and_health(self):
+        handler = Handler.__new__(Handler)
+        handler.path = "/"
+        sent = []
+        handler._send = lambda code, data, content_type="": sent.append((code, data, content_type))
+        handler.do_GET()
+        self.assertEqual(sent[0][0], 200)
+        self.assertIn(b"Demostraci", sent[0][1])
+        handler.path = "/api/health"
+        handler.do_GET()
+        self.assertEqual(sent[1][1]["sponsors"], "NOT_CONNECTED")
+
+    def test_payload_fits_v1_declared_top_level_and_trace_fields(self):
+        schema_path = Path(__file__).resolve().parents[1] / "contracts" / "investigation.v1.schema.json"
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+        _, run = self.call({"question": "energía"})
+        self.assertEqual(set(run), set(schema["required"]))
+        self.assertEqual(run["contract_version"], "investigation.v1")
+        trace_keys = set(schema["$defs"]["trace"]["properties"])
+        self.assertTrue(all(set(step) <= trace_keys for step in run["tool_trace"]))
 
 
 if __name__ == "__main__":

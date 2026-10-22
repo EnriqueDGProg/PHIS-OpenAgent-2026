@@ -31,7 +31,11 @@ function renderTrace(steps) {
     const li = document.createElement('li'); li.className = step.status.toLowerCase();
     const title = document.createElement('strong'); title.textContent = step.tool;
     const state = document.createElement('span'); state.className = 'trace-state';
-    state.textContent = step.status === 'PASS' ? 'Ejecutada' : step.status === 'BLOCKED' ? 'Bloqueada' : 'Falló';
+    const phase = step.phase || 'TOOLS';
+    state.textContent = step.status === 'ERROR' ? 'Falló' : step.status === 'BLOCKED' ? 'Detenida'
+      : phase === 'PLAN' ? 'Planificado' : phase === 'TOOLS' ? 'Ejecutada'
+      : phase === 'EVIDENCE' ? 'Registrada' : phase === 'VERIFY' ? 'Verificada'
+      : phase === 'RESPOND' ? 'Respondió' : 'Finalizada';
     const detail = document.createElement('small'); detail.textContent = step.detail;
     li.append(title, state, detail); list.append(li);
   }
@@ -52,7 +56,7 @@ function chartSvg(series, comparison, width) {
   const grid = [0,2,4,6,8,10].map(v => `<line class="chart-grid" x1="${left}" y1="${y(v)}" x2="${width-right}" y2="${y(v)}"/><text class="chart-axis" x="0" y="${y(v)+3}">${v}</text>`).join('');
   const gaps = data.map((p,i) => p.value === null ? `<rect class="chart-gap" x="${x(i)-3}" y="${top}" width="6" height="${plotH}" rx="2"/>` : '').join('');
   const boundaryIndex = comparison ? data.findIndex(p => p.local_date === comparison.comparison.start) : -1;
-  const boundary = boundaryIndex > 0 ? `<line class="chart-boundary" x1="${x(boundaryIndex)-6}" y1="${top}" x2="${x(boundaryIndex)-6}" y2="${top+plotH}"/><text class="chart-period" x="${left}" y="13">PERIODO ANTERIOR</text><text class="chart-period" x="${x(boundaryIndex)+5}" y="13">PERIODO RECIENTE</text>` : '';
+  const boundary = boundaryIndex > 0 ? `<line class="chart-boundary" x1="${x(boundaryIndex)-6}" y1="${top}" x2="${x(boundaryIndex)-6}" y2="${top+plotH}"/><text class="chart-period" x="${left}" y="13">HISTORIAL PREVIO</text><text class="chart-period" x="${x(boundaryIndex)+5}" y="13">PERIODO RECIENTE</text>` : '';
   const lines = groups.map(points => `<polyline class="chart-line" points="${points.map(p => `${x(p.index)},${y(p.value)}`).join(' ')}"/>`).join('');
   const points = groups.flat().map(p => `<circle class="chart-point" cx="${x(p.index)}" cy="${y(p.value)}" r="3" tabindex="0" role="button" aria-label="${p.local_date}: ${p.value} ${series.unit}, registro ${p.source_record_id}. Abrir origen" data-source-id="${p.source_record_id}" data-chart-label="${p.local_date} · ${p.value} ${series.unit} · ${p.source_record_id}"/>`).join('');
   const tickIndexes = [...new Set([0,Math.floor((data.length-1)/4),Math.floor((data.length-1)/2),Math.floor(3*(data.length-1)/4),data.length-1])];
@@ -97,12 +101,14 @@ function renderChart(run) {
 }
 
 function renderPeriod(run) {
+  $('#period-title').textContent = run.comparison ? 'Dos periodos de 28 días' : 'Sin comparación entre periodos';
   const values = $('#period-values').querySelectorAll('strong');
   values[0].textContent = run.comparison ? run.comparison.baseline.mean.toFixed(1) : '—';
   values[1].textContent = run.comparison ? run.comparison.comparison.mean.toFixed(1) : '—';
   $('#period-description').textContent = run.comparison
     ? `${run.comparison.baseline.observed} y ${run.comparison.comparison.observed} días observados. La comparación es descriptiva; no demuestra una causa.`
-    : 'No hay comparación válida para esta ejecución. Consulta el estado y su motivo.';
+    : run.status === 'PASS' ? 'El agente consultó los registros de seguimiento sin calcular una diferencia entre periodos.'
+      : 'No hay comparación válida para esta ejecución. Consulta el estado y su motivo.';
   $('#period-footnote').textContent = run.comparison
     ? `Media de días observados · ${run.comparison.unit === 'hours' ? 'horas' : 'escala 1–10'} · fuente en evidencias`
     : 'Sin cifra que comparar';
@@ -162,7 +168,7 @@ function renderEvidence(run, findingId = null, sourceId = null) {
   method.append(methodText); content.append(method);
   const trace=disclosure('Plan y herramientas devueltos por Python');
   const list=document.createElement('ol'); list.className='trace-detail';
-  for (const step of run.tool_trace) { const li=document.createElement('li'); const strong=document.createElement('strong'); strong.textContent=`${step.tool} · ${step.status}`; const detail=document.createElement('span'); detail.textContent=step.detail; li.append(strong,detail); list.append(li); }
+  for (const step of run.tool_trace) { const li=document.createElement('li'); const strong=document.createElement('strong'); strong.textContent=`${step.phase || 'TOOLS'} · ${step.tool} · ${step.status}`; const detail=document.createElement('span'); detail.textContent=step.detail; li.append(strong,detail); if(step.source_record_ids.length){const origin=document.createElement('small');origin.textContent=`${step.source_record_ids.length} registros sintéticos · evento ${step.trace_id.slice(0,12)}`;li.append(origin);} if(step.parent_event_id){const parent=document.createElement('small');parent.textContent=`Decisión basada en evento previo ${step.parent_event_id.slice(0,12)}`;li.append(parent);} list.append(li); }
   trace.append(list); content.append(trace);
 }
 
@@ -178,7 +184,7 @@ dialog.addEventListener('click',event=>{if(event.target===dialog) dialog.close()
 function updateFollowupContext() {
   const context=$('#followup-context');
   context.hidden=!pendingParentRunId;
-  context.textContent=pendingParentRunId ? `Seguimiento de ${pendingParentRunId} · se consultará la misma ventana con nuevas herramientas Python.` : '';
+  context.textContent=pendingParentRunId ? `Seguimiento de ${pendingParentRunId} · el agente recuperará la decisión persistida y elegirá nuevas herramientas.` : '';
 }
 function clearPresentation(message) {
   currentRun=null;
@@ -201,7 +207,7 @@ function clearPresentation(message) {
 questionInput.addEventListener('input',()=>{pendingParentRunId=null;updateFollowupContext();});
 for (const button of document.querySelectorAll('[data-question]')) button.addEventListener('click',()=>{
   questionInput.value=button.dataset.question;
-  pendingParentRunId=button.dataset.question.includes('sueño') ? currentRun?.run_id || null : null;
+  pendingParentRunId=button.dataset.question.includes('sueño') ? currentRun?.run_id || localStorage.getItem('phis.synthetic.lastRunId') : null;
   updateFollowupContext();
   questionInput.focus();
 });
@@ -218,7 +224,9 @@ form.addEventListener('submit',async event=>{
   setStatus('busy','CONSULTA EN CURSO','Esperando la ejecución local; todavía no hay resultados ni trazas confirmados.','EN CURSO');
   try {
     const scenario=new URLSearchParams(location.search).get('scenario') || 'normal';
-    currentRun=await fetchInvestigation(question,{scenario,parentRunId}); pendingParentRunId=null; updateFollowupContext();
+    currentRun=await fetchInvestigation(question,{scenario,parentRunId});
+    if(currentRun.status==='PASS' && currentRun.comparison) localStorage.setItem('phis.synthetic.lastRunId',currentRun.run_id);
+    pendingParentRunId=null; updateFollowupContext();
     $('#window-label').textContent=`${formatDate(currentRun.window.start).toUpperCase()} — ${formatDate(currentRun.window.end).toUpperCase()} ${currentRun.window.end.slice(0,4)}`;
     renderTrace(currentRun.tool_trace); renderChart(currentRun); renderPeriod(currentRun); renderFindings(currentRun);
     const states={PASS:['','OBSERVACIÓN DISPONIBLE'],EXECUTED_PARTIAL:['warning','RESULTADO PARCIAL'],INSUFFICIENT_DATA:['warning','EVIDENCIA INSUFICIENTE'],BLOCKED:['warning','ABSTENCIÓN RESPONSABLE'],ERROR:['error','HERRAMIENTA NO DISPONIBLE']};
@@ -230,7 +238,7 @@ form.addEventListener('submit',async event=>{
       INSUFFICIENT_DATA:'COBERTURA INSUFICIENTE',BLOCKED:'ABSTENCIÓN',ERROR:'FALLO LOCAL'
     }[currentRun.status];
     $('#result-context').textContent=currentRun.parent_run_id
-      ? `Seguimiento de ${currentRun.parent_run_id} · misma ventana · nueva ejecución ${currentRun.run_id}`
+      ? `Seguimiento de ${currentRun.parent_run_id} · decisión recuperada del World Model · ejecución ${currentRun.run_id}`
       : `Ejecución ${currentRun.run_id} · datos sintéticos del núcleo Python`;
     evidenceButton.disabled=false;
     $('#main').focus();
