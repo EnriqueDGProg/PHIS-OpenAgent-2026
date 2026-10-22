@@ -62,3 +62,28 @@ test('client accepts agent phases and rejects fabricated phase', () => {
   run.tool_trace[0].phase='SPONSOR_VERIFIED';
   assert.throws(()=>validateInvestigation(run),/trace/);
 });
+
+test('live mode requires a Zetaris query matching the verified proof', () => {
+  const run=base(); run.mode='LIVE_SYNTHETIC_ZETARIS';
+  const ids=Array.from({length:156},(_,i)=>`SYN-${String(i).padStart(3,'0')}-ENERGY`);
+  run.sponsor_proofs[0]={sponsor:'zetaris',status:'VERIFIED',trace_id:'real-request-id'};
+  run.tool_trace=[{trace_id:'real-request-id',tool:'zetaris.synthetic_query',status:'PASS',
+    detail:'Verified query',source_record_ids:ids,phase:'EVIDENCE',reason_code:'source_verified',parent_event_id:null,
+    query_id:'test-query-id',sql_sha256:'a'.repeat(64)}];
+  assert.equal(validateInvestigation(run).mode,'LIVE_SYNTHETIC_ZETARIS');
+  run.sponsor_proofs[0].trace_id='invented-request-id';
+  assert.throws(()=>validateInvestigation(run),/Untraceable Zetaris proof/);
+  run.sponsor_proofs[0].trace_id='real-request-id';
+  run.sponsor_proofs.push({sponsor:'meterless_runtime',status:'VERIFIED',trace_id:'fake'});
+  assert.throws(()=>validateInvestigation(run),/sponsor proof/);
+});
+
+test('live source failure has no result or sponsor verification', () => {
+  const run=base(); run.mode='LIVE_SYNTHETIC_ZETARIS'; run.status='ERROR';
+  run.reason_code='source_error';
+  run.series=[]; run.comparison=null;
+  run.sponsor_proofs[0]={sponsor:'zetaris',status:'FAILED',trace_id:null};
+  assert.equal(validateInvestigation(run).status,'ERROR');
+  run.series=base().series;
+  assert.throws(()=>validateInvestigation(run),/Zetaris failure/);
+});

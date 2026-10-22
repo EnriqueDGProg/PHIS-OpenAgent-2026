@@ -3,6 +3,7 @@
 import re
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from phis_open_agent.investigation import investigate
@@ -43,8 +44,12 @@ class EnglishCopyTests(unittest.TestCase):
                 investigate("Why has my energy changed recently?", world_model=model,
                             scenario="tool_error"),
             ]
+            with patch.dict("os.environ", {"ZETARIS_REST_URL": "", "ZETARIS_ORG_ID": "",
+                                            "ZETARIS_API_KEY": ""}):
+                runs.append(investigate("Why has my energy changed recently?", world_model=model,
+                                        mode="LIVE_SYNTHETIC_ZETARIS"))
             self.assertEqual([run["status"] for run in runs],
-                             ["PASS", "PASS", "BLOCKED", "BLOCKED", "INSUFFICIENT_DATA", "ERROR"])
+                             ["PASS", "PASS", "BLOCKED", "BLOCKED", "INSUFFICIENT_DATA", "ERROR", "ERROR"])
             for run in runs:
                 with self.subTest(status=run["status"]):
                     for value in [run["summary"], *[
@@ -56,6 +61,8 @@ class EnglishCopyTests(unittest.TestCase):
                                         for proof in run["sponsor_proofs"]))
                     if run["status"] != "PASS":
                         self.assertIsNone(run["comparison"])
+            self.assertEqual(runs[-1]["reason_code"], "source_error")
+            self.assertEqual(runs[-1]["series"], [])
 
 
 if __name__ == "__main__":

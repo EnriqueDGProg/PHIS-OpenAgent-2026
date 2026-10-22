@@ -158,7 +158,7 @@ function renderEvidence(run, findingId = null, sourceId = null) {
   content.append(lead);
   const sponsor=block('EXTERNAL SERVICES');
   const sponsorText=document.createElement('p'); sponsorText.className='sponsor-warning';
-  sponsorText.textContent=`Disconnected in this demo: ${run.sponsor_proofs.map(item => item.sponsor).join(', ')}. No external query is claimed.`;
+  sponsorText.textContent=`Status for this run: ${run.sponsor_proofs.map(item => `${item.sponsor}: ${item.status}${item.trace_id ? ` · request ${item.trace_id}` : ''}`).join('; ')}.`;
   sponsor.append(sponsorText); content.append(sponsor);
   const origin=disclosure('Provenance, window, and coverage');
   origin.append(description([['Dataset',run.dataset_id],['Mode',run.mode],['Scenario',run.scenario],['Window',`${run.window.start} to ${run.window.end}`],['Time zone',run.timezone],['Current run',run.run_id],['Previous run',run.parent_run_id || 'None'],...run.coverage.map(c=>[`Coverage: ${c.variable}`,`${c.observed} of ${c.eligible} days`])])); content.append(origin);
@@ -225,21 +225,27 @@ form.addEventListener('submit',async event=>{
   try {
     const scenario=new URLSearchParams(location.search).get('scenario') || 'normal';
     currentRun=await fetchInvestigation(question,{scenario,parentRunId});
+    const zetaris=currentRun.sponsor_proofs.find(proof=>proof.sponsor==='zetaris');
+    $('#demo-sponsor-status').textContent=currentRun.mode==='LIVE_SYNTHETIC_ZETARIS'
+      ? `Local Zetaris: ${zetaris?.status || 'NOT_CONNECTED'}. Meterless and Nemotron are disconnected. No medical advice.`
+      : 'Local synthetic mode. Zetaris, Meterless, and Nemotron are disconnected. No medical advice.';
+    $('.mode-pill').lastChild.textContent=currentRun.mode==='LIVE_SYNTHETIC_ZETARIS'
+      ? ' SYNTHETIC · LOCAL ZETARIS' : ' SYNTHETIC · LOCAL';
     if(currentRun.status==='PASS' && currentRun.comparison) localStorage.setItem('phis.synthetic.lastRunId',currentRun.run_id);
     pendingParentRunId=null; updateFollowupContext();
     $('#window-label').textContent=`${formatDate(currentRun.window.start).toUpperCase()} — ${formatDate(currentRun.window.end).toUpperCase()} ${currentRun.window.end.slice(0,4)}`;
     renderTrace(currentRun.tool_trace); renderChart(currentRun); renderPeriod(currentRun); renderFindings(currentRun);
-    const states={PASS:['','OBSERVATION AVAILABLE'],EXECUTED_PARTIAL:['warning','PARTIAL RESULT'],INSUFFICIENT_DATA:['warning','INSUFFICIENT EVIDENCE'],BLOCKED:['warning','AGENT ABSTAINED'],ERROR:['error','LOCAL TOOL UNAVAILABLE']};
+    const states={PASS:['','OBSERVATION AVAILABLE'],EXECUTED_PARTIAL:['warning','PARTIAL RESULT'],INSUFFICIENT_DATA:['warning','INSUFFICIENT EVIDENCE'],BLOCKED:['warning','AGENT ABSTAINED'],ERROR:['error',currentRun.reason_code==='source_error' ? 'ZETARIS SOURCE UNAVAILABLE' : 'LOCAL TOOL UNAVAILABLE']};
     setStatus(states[currentRun.status][0],states[currentRun.status][1],
       currentRun.status === 'PASS' ? 'A descriptive reading is available below. The cause has not been established.' : currentRun.summary,
       currentRun.run_id);
     $('#agent-phase').textContent={
       PASS:'RESPONSE RECEIVED',EXECUTED_PARTIAL:'PARTIAL RESULT',
-      INSUFFICIENT_DATA:'INSUFFICIENT COVERAGE',BLOCKED:'ABSTAINED',ERROR:'LOCAL FAILURE'
+      INSUFFICIENT_DATA:'INSUFFICIENT COVERAGE',BLOCKED:'ABSTAINED',ERROR:'SOURCE OR TOOL FAILURE'
     }[currentRun.status];
     $('#result-context').textContent=currentRun.parent_run_id
       ? `Follow-up to ${currentRun.parent_run_id} · decision retrieved from the World Model · run ${currentRun.run_id}`
-      : `Run ${currentRun.run_id} · synthetic data from the Python core`;
+      : `Run ${currentRun.run_id} · ${currentRun.mode==='LIVE_SYNTHETIC_ZETARIS' ? 'synthetic rows queried from local Zetaris' : 'synthetic data from the Python core'}`;
     evidenceButton.disabled=false;
     $('#main').focus();
   } catch(error) {

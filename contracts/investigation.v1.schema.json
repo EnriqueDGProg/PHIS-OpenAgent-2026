@@ -113,7 +113,9 @@
         "source_record_ids": {"type": "array", "items": {"type": "string"}},
         "phase": {"enum": ["PLAN", "TOOLS", "EVIDENCE", "VERIFY", "RESPOND", "ABSTAIN"]},
         "reason_code": {"type": "string"},
-        "parent_event_id": {"type": ["string", "null"]}
+        "parent_event_id": {"type": ["string", "null"]},
+        "query_id": {"type": "string", "minLength": 1},
+        "sql_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
       }
     },
     "sponsor": {

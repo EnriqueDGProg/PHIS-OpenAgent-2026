@@ -146,7 +146,8 @@ class ZetarisClient:
             traces.append(trace)
         return traces
 
-    def query_synthetic(self):
+    def read_synthetic_rows(self):
+        """Return only rows that passed full readback verification from this transport."""
         if not self._preflight_passed:
             raise ZetarisBlocked("Run preflight before the synthetic query")
         rows, trace = self.query(synthetic_query(), limit=200)
@@ -163,7 +164,19 @@ class ZetarisClient:
             "sponsor_proof": {"sponsor": "zetaris",
                               "status": "VERIFIED" if self.is_live_transport else "NOT_CONNECTED",
                               "trace_id": trace_id if self.is_live_transport else None},
+            "rows": [{"schema_version": "synthetic-observation-v1",
+                      "participant_id": row[0], "local_date": row[1],
+                      "variable": row[2], "value": float(row[3]),
+                      "unit": row[4], "source_type": row[5],
+                      "source_record_id": row[6], "synthetic": True}
+                     for row in rows],
         }
+
+    def query_synthetic(self):
+        """Public proof-only result; never expose raw rows through the CLI."""
+        result = self.read_synthetic_rows()
+        result.pop("rows")
+        return result
 
 
 def registration_sql(server_path):

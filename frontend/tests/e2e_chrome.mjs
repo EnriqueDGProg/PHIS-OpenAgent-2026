@@ -20,7 +20,7 @@ async function routeRequest(route) {
   if (pathname === '/api/investigations' && request.method() === 'POST') {
     const child = spawnSync(process.env.PHIS_PYTHON || 'python', ['tests/api_bridge_cli.py'], {
       cwd: root, input: request.postData(), encoding: 'utf8', windowsHide: true,
-      env: { ...process.env, PYTHONPATH: 'src', PYTHONIOENCODING: 'utf-8',
+      env: { ...process.env, PYTHONPATH: 'src', PYTHONIOENCODING: 'utf-8', PHIS_DATA_MODE: 'SYNTHETIC_LOCAL_ONLY',
         PHIS_SYNTHETIC_STATE_FILE: path.join(root, '.local-state', 'e2e-events.jsonl') },
     });
     if (child.status !== 0) throw new Error(`Python bridge failed: ${child.stderr}`);
@@ -75,7 +75,7 @@ try {
   await page.keyboard.press('Enter');
   assert.equal(await page.getByRole('dialog', { name: 'Point provenance.' }).count(), 1);
   assert.match(await page.locator('#dialog-content').textContent(), new RegExp(sourceId));
-  assert.match(await page.locator('#dialog-content').textContent(), /Disconnected in this demo/);
+  assert.match(await page.locator('#dialog-content').textContent(), /zetaris: NOT_CONNECTED/);
   await page.screenshot({ path: path.join(output, 'en-desktop-evidence.png'), fullPage: true });
   await page.keyboard.press('Escape');
   assert.equal(await page.locator('#evidence-dialog').evaluate(el => el.open), false);

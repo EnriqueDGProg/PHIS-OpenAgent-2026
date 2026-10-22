@@ -4,6 +4,8 @@ import io
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
+import os
 from pathlib import Path
 from threading import Lock
 from types import SimpleNamespace
@@ -12,6 +14,8 @@ from phis_open_agent.api import Handler
 from phis_open_agent.run_world_model import SyntheticRunWorldModel
 from phis_open_agent.synthetic import generate_observations
 from phis_open_agent.tools import compare_periods
+from phis_open_agent.investigation import investigate
+from phis_open_agent.zetaris import ZetarisClient, ZetarisConfig
 
 
 class IntegrationApiTests(unittest.TestCase):
@@ -96,6 +100,7 @@ class IntegrationApiTests(unittest.TestCase):
     def test_static_frontend_and_health(self):
         handler = Handler.__new__(Handler)
         handler.path = "/"
+        handler.server = self.server
         sent = []
         handler._send = lambda code, data, content_type="": sent.append((code, data, content_type))
         handler.do_GET()
@@ -104,6 +109,41 @@ class IntegrationApiTests(unittest.TestCase):
         handler.path = "/api/health"
         handler.do_GET()
         self.assertEqual(sent[1][1]["sponsors"], "NOT_CONNECTED")
+
+    def test_live_mode_missing_credentials_abstains_without_local_fallback(self):
+        self.server.data_mode = "LIVE_SYNTHETIC_ZETARIS"
+        with patch.dict(os.environ, {"ZETARIS_REST_URL": "", "ZETARIS_ORG_ID": "",
+                                     "ZETARIS_API_KEY": ""}):
+            code, run = self.call({"question": "Why has my energy changed?"})
+        self.assertEqual(code, 200)
+        self.assertEqual(run["mode"], "LIVE_SYNTHETIC_ZETARIS")
+        self.assertEqual(run["status"], "ERROR")
+        self.assertEqual((run["coverage"], run["series"], run["comparison"]), ([], [], None))
+        self.assertEqual(run["sponsor_proofs"][0],
+                         {"sponsor": "zetaris", "status": "NOT_CONNECTED", "trace_id": None})
+        self.assertEqual(run["tool_trace"][-1]["reason_code"], "source_error")
+        self.assertFalse(any(step["tool"] == "zetaris.synthetic_query" for step in run["tool_trace"]))
+        self.assertFalse(any(event["kind"] == "energy_comparison" for event in
+                             self.server.world_model.read(run["run_id"])))
+
+    def test_live_mode_rejects_local_evaluation_scenarios(self):
+        self.server.data_mode = "LIVE_SYNTHETIC_ZETARIS"
+        self.assertEqual(self.call({"question": "energy", "scenario": "insufficient"})[0], 400)
+
+    def test_simulated_zetaris_transport_cannot_authorize_live_agent(self):
+        class NoNetworkTransport:
+            def send(self, *_):
+                raise AssertionError("Simulated transport must not be called in live mode")
+
+        config = ZetarisConfig.from_env({"ZETARIS_REST_URL": "http://localhost:8888/api/v1.0",
+                                         "ZETARIS_ORG_ID": "1", "ZETARIS_API_KEY": "test-only"})
+        run = investigate("energy", world_model=self.server.world_model,
+                          mode="LIVE_SYNTHETIC_ZETARIS",
+                          zetaris_client=ZetarisClient(config, NoNetworkTransport()))
+        self.assertEqual(run["status"], "ERROR")
+        self.assertEqual(run["sponsor_proofs"][0]["status"], "NOT_CONNECTED")
+        self.assertEqual(run["coverage"], [])
+        self.assertEqual(run["series"], [])
 
     def test_payload_fits_v1_declared_top_level_and_trace_fields(self):
         schema_path = Path(__file__).resolve().parents[1] / "contracts" / "investigation.v1.schema.json"
