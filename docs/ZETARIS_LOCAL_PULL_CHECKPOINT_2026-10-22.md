@@ -1,6 +1,6 @@
 # Zetaris local pull checkpoint — 22 October 2026
 
-**State: BLOCKED pending image download and a real SQL response.** This checkpoint supersedes the earlier registry-login failure in [the live-probe audit](SPONSOR_LIVE_PROBE_STATUS_2026-10-22.md). The user completed `docker login` privately; the Docker config contains an entry for the official registry, and the vendor `preflight.sh` now passes every required check. No images were reported complete, no containers were started, and neither `SELECT 1` nor a synthetic query has been sent. The user reports the image download is still in progress. The interrupted Codex turn did not capture its final exit code; **do not start another pull until the existing download's outcome is known**.
+**Historical checkpoint, superseded by [live SQL evidence](ZETARIS_LOCAL_SQL_EVIDENCE_2026-10-22.md).** At this point the image download was pending and the vendor `preflight.sh` had passed its required checks. The later local stack and 156-row query are verified in the linked record.
 
 ## Proven local prerequisites
 

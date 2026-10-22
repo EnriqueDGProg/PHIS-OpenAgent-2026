@@ -1,6 +1,6 @@
 # Zetaris direct REST activation — synthetic data only
 
-**State: BLOCKED.** This branch contains a direct REST client and simulated transport tests. There is no Zetaris instance, API response, `SELECT 1` result, registered table, or real query trace from this environment. Do not label a unit-test response as sponsor proof.
+**State: VERIFIED on the official local stack on 22 October 2026.** The direct REST client returned `SELECT 1` and all 156 fictional CSV rows through production HTTP transport. See [sanitized live evidence](ZETARIS_LOCAL_SQL_EVIDENCE_2026-10-22.md). The unit tests below remain simulated and are not sponsor proof; this status does not imply that a separate remote Zetaris deployment is connected.
 
 ## Documented interface
 
