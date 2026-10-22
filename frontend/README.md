@@ -1,42 +1,40 @@
-# PHIS · Evidence UI demo
+# PHIS · demo integrada con núcleo Python
 
-Frontend autónomo para una sola investigación longitudinal de energía. **Todo el contenido de datos es sintético**. La rama ejecuta funciones locales deterministas y no afirma conectar Zetaris, Meterless, Nemotron ni el backend PHIS.
+La interfaz consume `POST /api/investigations` del núcleo público Python. Los 84 días son **exclusivamente sintéticos** y las cifras se calculan una sola vez en `src/phis_open_agent/tools.py`. Zetaris, Meterless y Nemotron figuran como `NOT_CONNECTED`; esta rama no acredita la integración obligatoria de patrocinadores.
 
 ## Ejecutar
 
-Requiere Node.js 20 o posterior; no necesita instalar paquetes.
+Requiere Python 3.11+ y Node.js 20+; no instala paquetes ni crea recursos de pago.
 
 ```powershell
 cd frontend
 npm start
 ```
 
-Abrir http://127.0.0.1:4173. `npm test` ejecuta los estados principales. Los escenarios de evaluación se activan en `/?scenario=insufficient` y `/?scenario=error`; envía la pregunta con **Explorar evidencia**. Una petición clínica como «¿Debería cambiar mi medicación?» muestra abstención.
+El lanzador inicia el servidor Python en `http://127.0.0.1:4173`, que sirve la UI y la API en el mismo origen. Alternativamente, desde la raíz:
 
-## Qué es real en esta rama
+```powershell
+$env:PYTHONPATH='src'
+python -m phis_open_agent.api
+```
 
-- `fixture.mjs` genera 42 días de registros ficticios y tipados mediante JSDoc, con ausencias explícitas.
-- `tools.mjs` ejecuta cobertura, serie temporal y comparación descriptiva sobre esos registros. La interfaz deriva cada cifra de esas respuestas locales.
-- `app.mjs` muestra resultado, huecos temporales, trazas locales, procedencia, incertidumbre, abstención y fallo.
-- Ningún resultado estadístico, asociación, diagnóstico o prueba causal se simula. El paso de Discovery está marcado como bloqueado.
+`GET /api/health` confirma el modo sintético. El endpoint solo acepta `question`, `parent_run_id` opcional y `scenario` de evaluación (`normal`, `insufficient`, `tool_error`). Las URLs `/?scenario=insufficient` y `/?scenario=tool_error` ensayan estados de error explícitamente sintéticos. «¿Debería cambiar mi medicación?» y «Demuestra que dormir poco causó mi cansancio» generan abstención. El chip «¿Y el sueño?» conserva el ID de la ejecución previa, usa la misma ventana y ejecuta herramientas Python nuevas.
 
-## Contratos de integración necesarios
+## Pruebas
 
-La capa visual consume un objeto de investigación. Un adaptador posterior deberá validar el esquema y convertir las respuestas reales sin alterar los contratos del backend:
+Desde la raíz:
 
-| Contrato requerido | Campos mínimos |
-| --- | --- |
-| Estado de ejecución | `run_id`, `question`, `status`, inicio/fin, modo real o local |
-| Cobertura | ventana/zonahoraria, días elegibles y observados por variable, unidades, ausencias y frescura |
-| Serie | fecha local, valor o `null`, unidad, ID de registro y fuente; ausencia sin interpolación |
-| Comparación | definición de periodos, N por periodo, método, resultados numéricos validados e IDs de evidencia |
-| Discovery | `EXECUTED_FULL`/`EXECUTED_PARTIAL`/`BLOCKED`/`INSUFFICIENT_DATA`, asociaciones solo si validadas, denominadores, corrección, CI y advertencias cuando existan |
-| Hallazgos | ID estable, clase observación/asociación/hipótesis/incertidumbre/abstención, texto fundamentado, IDs de evidencia |
-| Trazabilidad | plan, herramienta permitida, estado, duración, ID de traza saneado, error público y referencias a resultados |
-| Patrocinadores | evidencia auténtica y saneada de consulta Zetaris, memoria Meterless y modelo Nemotron; estado indisponible si no hubo llamada |
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest discover -s tests -v
+cd frontend
+npm test
+```
 
-El adaptador debe rechazar cifras sin fuente, estados desconocidos y resultados parciales presentados como completos. Las preguntas de seguimiento deben transportar `run_id` y ventana anterior y ejecutar herramientas nuevas cuando proceda.
+`tests/test_integration_api.py` levanta el servidor real en un puerto efímero y comprueba que comparación, fuente, huecos, abstención, seguimiento, errores y contenidos servidos coinciden con el núcleo. `frontend/tests/client.test.mjs` protege la frontera de respuesta que entra en la UI.
 
-## Accesibilidad y límites
+## Contrato y límites
 
-Hay flujo de teclado, foco visible, descripción de la gráfica, puntos enfocables, diálogo nativo, etiquetas textuales de estado y diseño adaptable. El fixture sirve para ensayar la experiencia; la aceptación de una demo final exige integraciones y análisis científicos auténticos. Las fuentes tipográficas externas tienen sustitutos del sistema si no están disponibles.
+`contracts/investigation.v1.schema.json` y `.d.ts` fijan ejecución, `dataset_id`, ventana, cobertura, serie con nulos, medias del núcleo, hallazgos, traza y pruebas de patrocinadores. El frontend no importa `fixture.mjs` ni `tools.mjs`; esos módulos se eliminan en esta rama. La API clasifica solo preguntas acotadas de energía/sueño mediante reglas explícitas. No hay LLM, PHIS privado, análisis de asociación o consejo médico. El umbral de 14 observaciones por periodo es una política de presentación descriptiva del adaptador; queda identificado como bloqueo cuando falla.
+
+Las fuentes de Google Fonts son opcionales y el CSS tiene fuentes de sistema de reserva. El panel de evidencias no muestra trazas de sponsor como verificadas sin llamada real.

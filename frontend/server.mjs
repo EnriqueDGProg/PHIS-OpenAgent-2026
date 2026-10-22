@@ -1,15 +1,14 @@
-import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { resolve, dirname, extname } from 'node:path';
 
-const root = dirname(fileURLToPath(import.meta.url));
-const types = { '.html':'text/html; charset=utf-8', '.css':'text/css; charset=utf-8', '.mjs':'text/javascript; charset=utf-8' };
-const port = Number(process.env.PORT || 4173);
-createServer(async (request,response) => {
-  const path = new URL(request.url,'http://localhost').pathname;
-  const file = path === '/' ? 'index.html' : decodeURIComponent(path).slice(1);
-  if (!['index.html','styles.css','app.mjs','tools.mjs','fixture.mjs'].includes(file)) { response.writeHead(404); response.end('Not found'); return; }
-  try { const body = await readFile(resolve(root,file)); response.writeHead(200,{'Content-Type':types[extname(file)],'Cache-Control':'no-store'}); response.end(body); }
-  catch { response.writeHead(404); response.end('Not found'); }
-}).listen(port,'127.0.0.1',() => console.log(`PHIS UI demo: http://127.0.0.1:${port}`));
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const command = process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
+const child = spawn(command, ['-m', 'phis_open_agent.api'], {
+  cwd: root,
+  env: { ...process.env, PYTHONPATH: resolve(root, 'src') },
+  stdio: 'inherit',
+});
+child.on('error', error => { console.error(`No se pudo iniciar Python: ${error.message}`); process.exitCode = 1; });
+child.on('exit', code => { process.exitCode = code ?? 1; });
+for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => child.kill(signal));
