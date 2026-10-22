@@ -158,7 +158,7 @@ function renderEvidence(run, findingId = null, sourceId = null) {
   content.append(lead);
   const sponsor=block('SERVICIOS EXTERNOS');
   const sponsorText=document.createElement('p'); sponsorText.className='sponsor-warning';
-  sponsorText.textContent=`Desconectados en esta demo: ${run.sponsor_proofs.map(item => item.sponsor).join(', ')}. Ninguna consulta externa está acreditada.`;
+  sponsorText.textContent=`Estado en esta ejecución: ${run.sponsor_proofs.map(item => `${item.sponsor}: ${item.status}${item.trace_id ? ` · solicitud ${item.trace_id}` : ''}`).join('; ')}.`;
   sponsor.append(sponsorText); content.append(sponsor);
   const origin=disclosure('Origen, ventana y cobertura');
   origin.append(description([['Dataset',run.dataset_id],['Modo',run.mode],['Escenario',run.scenario],['Ventana',`${run.window.start} a ${run.window.end}`],['Zona horaria',run.timezone],['Ejecución actual',run.run_id],['Ejecución previa',run.parent_run_id || 'Ninguna'],...run.coverage.map(c=>[`Cobertura ${c.variable}`,`${c.observed} de ${c.eligible} días`])])); content.append(origin);
@@ -225,6 +225,12 @@ form.addEventListener('submit',async event=>{
   try {
     const scenario=new URLSearchParams(location.search).get('scenario') || 'normal';
     currentRun=await fetchInvestigation(question,{scenario,parentRunId});
+    const zetaris=currentRun.sponsor_proofs.find(proof=>proof.sponsor==='zetaris');
+    $('#demo-sponsor-status').textContent=currentRun.mode==='LIVE_SYNTHETIC_ZETARIS'
+      ? `Zetaris local: ${zetaris?.status || 'NOT_CONNECTED'}. Meterless y Nemotron no conectados. Sin consejo médico.`
+      : 'Modo sintético local. Zetaris, Meterless y Nemotron no conectados. Sin consejo médico.';
+    $('.mode-pill').lastChild.textContent=currentRun.mode==='LIVE_SYNTHETIC_ZETARIS'
+      ? ' SINTÉTICO · ZETARIS LOCAL' : ' SINTÉTICO · LOCAL';
     if(currentRun.status==='PASS' && currentRun.comparison) localStorage.setItem('phis.synthetic.lastRunId',currentRun.run_id);
     pendingParentRunId=null; updateFollowupContext();
     $('#window-label').textContent=`${formatDate(currentRun.window.start).toUpperCase()} — ${formatDate(currentRun.window.end).toUpperCase()} ${currentRun.window.end.slice(0,4)}`;
@@ -235,11 +241,11 @@ form.addEventListener('submit',async event=>{
       currentRun.run_id);
     $('#agent-phase').textContent={
       PASS:'RESPUESTA RECIBIDA',EXECUTED_PARTIAL:'RESULTADO PARCIAL',
-      INSUFFICIENT_DATA:'COBERTURA INSUFICIENTE',BLOCKED:'ABSTENCIÓN',ERROR:'FALLO LOCAL'
+      INSUFFICIENT_DATA:'COBERTURA INSUFICIENTE',BLOCKED:'ABSTENCIÓN',ERROR:'FUENTE O HERRAMIENTA NO DISPONIBLE'
     }[currentRun.status];
     $('#result-context').textContent=currentRun.parent_run_id
       ? `Seguimiento de ${currentRun.parent_run_id} · decisión recuperada del World Model · ejecución ${currentRun.run_id}`
-      : `Ejecución ${currentRun.run_id} · datos sintéticos del núcleo Python`;
+      : `Ejecución ${currentRun.run_id} · ${currentRun.mode==='LIVE_SYNTHETIC_ZETARIS' ? 'filas sintéticas consultadas en Zetaris local' : 'datos sintéticos del núcleo Python'}`;
     evidenceButton.disabled=false;
     $('#main').focus();
   } catch(error) {
