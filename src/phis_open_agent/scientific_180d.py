@@ -221,7 +221,8 @@ def investigate_scientific(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY"
         findings.append({"finding_id": "CONF-01", "kind": "uncertainty", "title": "Confounding limit",
                          "text": "These are pairwise exploratory associations. Stress, sleep and caffeine may overlap; no adjusted or causal effect was estimated.",
                          "source_record_ids": []})
-        candidate_ids = [item["signal_id"] for item in candidates]
+        candidate_ids = [item["signal_id"] for item in package["signals"]
+                         if item["classification"] == "candidate_signal"]
         evidence_event = world_model.append(
             run_id=run_id, kind="scientific_evidence_180d",
             payload={"status": "PASS", "family": family,
