@@ -1,267 +1,1074 @@
+/**
+ * PHIS Open Agent — Premium Investigation UI
+ * Renders only data returned by the Python core. No scientific findings hardcoded.
+ * Supports 84-day (v1) and 180-day (PR #21 offline benchmark) windows dynamically.
+ */
 import { fetchInvestigation } from './client.mjs';
 
-const $ = selector => document.querySelector(selector);
-const form = $('#question-form');
-const questionInput = $('#question');
-const askButton = form.querySelector('button[type="submit"]');
-const dialog = $('#evidence-dialog');
+// ─── DOM helpers ──────────────────────────────────────────────────────────────
+const $ = sel => document.querySelector(sel);
+const $$ = sel => [...document.querySelectorAll(sel)];
+
+// ─── State ────────────────────────────────────────────────────────────────────
 let currentRun = null;
 let pendingParentRunId = null;
-const evidenceButton = $('#evidence-button');
+let runCount = 0;
 
+// ─── Element refs ─────────────────────────────────────────────────────────────
+const form          = $('#question-form');
+const questionInput = $('#question');
+const askButton     = $('#ask-button');
+const evidenceBtn   = $('#evidence-button');
+const dialog        = $('#evidence-dialog');
+const traceList     = $('#trace-list');
+const agentPhase    = $('#agent-phase');
+
+// ─── Utilities ────────────────────────────────────────────────────────────────
+function formatDate(iso) {
+  return new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-GB', {
+    day: 'numeric', month: 'short', timeZone: 'UTC',
+  });
+}
+
+function setTitle(subject) {
+  document.title = subject
+    ? `PHIS — ${subject} investigation`
+    : 'PHIS — Personal Health Intelligence System';
+}
+
+function windowDays(run) {
+  if (run?.coverage?.length) return run.coverage[0].eligible ?? 84;
+  if (run?.window_days) return run.window_days;
+  // Infer from window span
+  if (run?.window?.start && run?.window?.end) {
+    const ms = new Date(run.window.end) - new Date(run.window.start);
+    return Math.round(ms / 86_400_000) + 1;
+  }
+  return 84;
+}
+
+function isBenchmarkRun(run) {
+  // PR #21 offline benchmark indicator: engine field present and 180-day window
+  return (
+    run?.scientific_evidence?.engine === 'authentic-local-PHIS-Discovery-v1.1'
+    && windowDays(run) >= 150
+  );
+}
+
+// ─── Status strip ─────────────────────────────────────────────────────────────
 function setStatus(kind, label, message, id = 'NO RUN') {
-  $('.status-strip').className = `status-strip ${kind}`;
+  const strip = $('.status-strip');
+  strip.className = `status-strip ${kind}`;
   $('#status-label').textContent = label;
-  $('#status-copy').textContent = message;
+  $('#status-copy').textContent  = message;
   $('#run-id').textContent = id;
 }
 
-function formatDate(value) {
-  return new Date(`${value}T12:00:00Z`).toLocaleDateString('en-GB', { day:'numeric', month:'short', timeZone:'UTC' });
+// ─── Run counter ──────────────────────────────────────────────────────────────
+function incrementRunCounter() {
+  runCount++;
+  $('#rail-run-counter').textContent = `${String(runCount).padStart(2, '0')} / ${String(runCount).padStart(2, '0')}`;
 }
 
-function renderTrace(steps) {
-  const list = $('#trace-list'); list.replaceChildren();
-  if (!steps.length) {
-    const empty = document.createElement('li'); empty.className = 'trace-empty';
-    empty.textContent = 'No tool call was confirmed.';
-    list.append(empty); return;
-  }
-  for (const step of steps) {
-    const li = document.createElement('li'); li.className = step.status.toLowerCase();
-    const title = document.createElement('strong'); title.textContent = step.tool;
-    const state = document.createElement('span'); state.className = 'trace-state';
-    const phase = step.phase || 'TOOLS';
-    state.textContent = step.status === 'ERROR' ? 'Failed' : step.status === 'BLOCKED' ? 'Blocked'
-      : phase === 'PLAN' ? 'Planned' : phase === 'TOOLS' ? 'Executed'
-      : phase === 'EVIDENCE' ? 'Recorded' : phase === 'VERIFY' ? 'Verified'
-      : phase === 'RESPOND' ? 'Responded' : 'Finished';
-    const detail = document.createElement('small'); detail.textContent = step.detail;
-    li.append(title, state, detail); list.append(li);
+// ─── Trajectory strip ─────────────────────────────────────────────────────────
+function renderTrajectory(run) {
+  const strip = $('#trajectory-strip');
+  if (!run.comparison) { strip.hidden = true; return; }
+
+  const { baseline, comparison, difference, unit } = run.comparison;
+  const unitLabel = unit === 'hours' ? ' h' : '/10';
+  const dirEl  = $('#trajectory-direction');
+  const deltaEl = $('#trajectory-delta');
+  const labelEl = $('#trajectory-label');
+  const bValEl  = $('#trajectory-baseline-value');
+
+  const diff = typeof difference === 'number' ? difference : (comparison.mean - baseline.mean);
+  const absDiff = Math.abs(diff).toFixed(2);
+
+  dirEl.textContent = diff < -0.05 ? '▼' : diff > 0.05 ? '▲' : '→';
+  dirEl.className = 'trajectory-direction ' + (diff < -0.05 ? 'down' : diff > 0.05 ? 'up' : 'flat');
+  deltaEl.textContent = `${diff < 0 ? '−' : diff > 0 ? '+' : ''}${absDiff}${unitLabel}`;
+  labelEl.textContent = `change in the most recent 28-day period vs. the prior 28 days`;
+  bValEl.textContent  = `${baseline.mean?.toFixed(1) ?? '—'}${unitLabel} (earlier period mean)`;
+
+  strip.hidden = false;
+}
+
+// ─── Period card ──────────────────────────────────────────────────────────────
+function renderPeriod(run) {
+  const hasCmp = !!run.comparison;
+  $('#period-title').textContent = hasCmp ? 'Two 28-day periods' : 'No period comparison';
+
+  const earlierEl = $('#period-earlier');
+  const recentEl  = $('#period-recent');
+  const diffEl    = $('#period-diff');
+  const diffVal   = $('#period-diff-value');
+  const footnote  = $('#period-footnote');
+
+  if (hasCmp) {
+    const { baseline, comparison, difference, unit } = run.comparison;
+    const unitLabel = unit === 'hours' ? ' h' : '/10';
+    earlierEl.textContent = `${baseline.mean?.toFixed(1) ?? '—'}${unitLabel}`;
+    recentEl.textContent  = `${comparison.mean?.toFixed(1) ?? '—'}${unitLabel}`;
+
+    const diff = typeof difference === 'number' ? difference : (comparison.mean - baseline.mean);
+    diffVal.textContent = `${diff >= 0 ? '+' : ''}${diff.toFixed(2)}${unitLabel}`;
+    diffVal.className   = 'diff-value ' + (diff < -0.05 ? 'negative' : diff > 0.05 ? 'positive' : 'neutral');
+    diffEl.hidden = false;
+    $('#period-description').textContent =
+      `${baseline.observed} and ${comparison.observed} observed days respectively. ` +
+      `The numerical difference is descriptive — it does not establish a cause.`;
+    footnote.textContent = `Arithmetic mean of observed days · ${unit === 'hours' ? 'hours' : 'scale 1–10'} · source IDs in evidence`;
+  } else {
+    earlierEl.textContent = '—';
+    recentEl.textContent  = '—';
+    diffEl.hidden = true;
+    $('#period-description').textContent = run.status === 'PASS'
+      ? 'The agent reviewed follow-up records without computing a period difference.'
+      : `No valid comparison for this run. See the status and reason: ${run.reason_code || 'no comparable result'}.`;
+    footnote.textContent = 'No figure to compare';
   }
 }
 
+// ─── Chart SVG ────────────────────────────────────────────────────────────────
 function chartSvg(series, comparison, width) {
-  const data = series.points;
-  const height = 240, left = 30, right = 8, top = 29, bottom = 30;
-  const plotW = width - left - right, plotH = height - top - bottom;
+  const data   = series.points;
+  const height = 248, left = 32, right = 10, top = 28, bottom = 32;
+  const plotW  = width - left - right;
+  const plotH  = height - top - bottom;
+
+  // Scale to variable range — sleep: 0–12, energy: 0–10
+  const isHours  = series.unit === 'hours';
+  const maxVal   = isHours ? 12 : 10;
   const x = i => left + i * plotW / Math.max(1, data.length - 1);
-  const y = v => top + (10 - v) * plotH / 10;
+  const y = v => top + (maxVal - v) * plotH / maxVal;
+
+  // Split into contiguous groups (gaps = null values)
   const groups = []; let group = [];
   for (let i = 0; i < data.length; i++) {
-    if (data[i].value === null) { if (group.length) groups.push(group); group = []; }
-    else group.push({ index:i, ...data[i] });
+    if (data[i].value === null) {
+      if (group.length) { groups.push(group); group = []; }
+    } else {
+      group.push({ index: i, ...data[i] });
+    }
   }
   if (group.length) groups.push(group);
-  const grid = [0,2,4,6,8,10].map(v => `<line class="chart-grid" x1="${left}" y1="${y(v)}" x2="${width-right}" y2="${y(v)}"/><text class="chart-axis" x="0" y="${y(v)+3}">${v}</text>`).join('');
-  const gaps = data.map((p,i) => p.value === null ? `<rect class="chart-gap" x="${x(i)-3}" y="${top}" width="6" height="${plotH}" rx="2"/>` : '').join('');
-  const boundaryIndex = comparison ? data.findIndex(p => p.local_date === comparison.comparison.start) : -1;
-  const boundary = boundaryIndex > 0 ? `<line class="chart-boundary" x1="${x(boundaryIndex)-6}" y1="${top}" x2="${x(boundaryIndex)-6}" y2="${top+plotH}"/><text class="chart-period" x="${left}" y="13">EARLIER HISTORY</text><text class="chart-period" x="${x(boundaryIndex)+5}" y="13">RECENT PERIOD</text>` : '';
-  const lines = groups.map(points => `<polyline class="chart-line" points="${points.map(p => `${x(p.index)},${y(p.value)}`).join(' ')}"/>`).join('');
-  const points = groups.flat().map(p => `<circle class="chart-point" cx="${x(p.index)}" cy="${y(p.value)}" r="3" tabindex="0" role="button" aria-label="${p.local_date}: ${p.value} ${series.unit}, record ${p.source_record_id}. Open source" data-source-id="${p.source_record_id}" data-chart-label="${p.local_date} · ${p.value} ${series.unit} · ${p.source_record_id}"/>`).join('');
-  const tickIndexes = [...new Set([0,Math.floor((data.length-1)/4),Math.floor((data.length-1)/2),Math.floor(3*(data.length-1)/4),data.length-1])];
-  const ticks = tickIndexes.map(i => `<text class="chart-axis" x="${x(i)}" y="${height-6}" text-anchor="middle">${formatDate(data[i].local_date)}</text>`).join('');
-  return `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" role="group" aria-labelledby="chart-svg-title chart-svg-description"><title id="chart-svg-title">Synthetic daily series for ${series.variable}</title><desc id="chart-svg-description">Missing days break the line. Each point opens its source record.</desc>${grid}${gaps}${boundary}${lines}${points}${ticks}</svg>`;
+
+  // Descriptive mean for baseline line
+  const observed = data.filter(p => p.value !== null).map(p => p.value);
+  const mean = observed.length ? observed.reduce((a, b) => a + b, 0) / observed.length : null;
+
+  // Grid lines
+  const gridVals = isHours ? [0, 3, 6, 9, 12] : [0, 2, 4, 6, 8, 10];
+  const grid = gridVals.map(v =>
+    `<line class="chart-grid" x1="${left}" y1="${y(v)}" x2="${width - right}" y2="${y(v)}"/>` +
+    `<text class="chart-axis" x="0" y="${y(v) + 3}">${v}</text>`
+  ).join('');
+
+  // Gap rectangles
+  const gaps = data.map((p, i) =>
+    p.value === null
+      ? `<rect class="chart-gap" x="${x(i) - 3}" y="${top}" width="6" height="${plotH}" rx="2"/>`
+      : ''
+  ).join('');
+
+  // Period shading and boundary
+  let boundary = '';
+  if (comparison && data.length > 0) {
+    const bndIdx = data.findIndex(p => p.local_date === comparison.comparison.start);
+    if (bndIdx > 0) {
+      const bx = x(bndIdx) - 6;
+      boundary =
+        `<rect class="chart-shade" x="${bx}" y="${top}" width="${width - right - bx}" height="${plotH}"/>` +
+        `<line class="chart-boundary" x1="${bx}" y1="${top}" x2="${bx}" y2="${top + plotH}"/>` +
+        `<text class="chart-period-label" x="${left + 4}" y="${top - 6}">EARLIER PERIOD</text>` +
+        `<text class="chart-period-label" x="${bx + 5}" y="${top - 6}">RECENT PERIOD</text>`;
+    }
+  }
+
+  // Baseline mean line
+  const baseline = mean !== null
+    ? `<line class="chart-baseline" x1="${left}" y1="${y(mean)}" x2="${width - right}" y2="${y(mean)}"/>`
+    : '';
+
+  // Polylines and points
+  const lines  = groups.map(pts =>
+    `<polyline class="chart-line" points="${pts.map(p => `${x(p.index)},${y(p.value)}`).join(' ')}"/>`
+  ).join('');
+
+  const points = groups.flat().map(p =>
+    `<circle class="chart-point" cx="${x(p.index)}" cy="${y(p.value)}" r="3.5"
+      tabindex="0" role="button"
+      aria-label="${p.local_date}: ${p.value} ${series.unit}, record ${p.source_record_id}. Activate to open source"
+      data-source-id="${p.source_record_id}"
+      data-chart-label="${p.local_date} · ${p.value} ${series.unit} · ${p.source_record_id}"/>`
+  ).join('');
+
+  // X-axis date ticks (5 spread evenly)
+  const tickIdxs = [...new Set([
+    0,
+    Math.floor((data.length - 1) * 0.25),
+    Math.floor((data.length - 1) * 0.5),
+    Math.floor((data.length - 1) * 0.75),
+    data.length - 1,
+  ])];
+  const ticks = tickIdxs.map(i =>
+    `<text class="chart-axis" x="${x(i)}" y="${height - 6}" text-anchor="middle">${formatDate(data[i].local_date)}</text>`
+  ).join('');
+
+  return `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet"
+    role="group" aria-labelledby="chart-svg-title chart-svg-desc">
+    <title id="chart-svg-title">Synthetic daily series for ${series.variable}</title>
+    <desc id="chart-svg-desc">Missing days break the line. Each point is a real synthetic record. Baseline mean shown as a dashed line.</desc>
+    ${grid}${gaps}${boundary}${baseline}${lines}${points}${ticks}
+  </svg>`;
 }
 
 function renderChart(run) {
   const container = $('#chart-container');
-  const series = run.series[0];
-  const variable = series?.variable || run.coverage[0]?.variable || 'energy';
-  const label = variable === 'sleep_hours' ? 'Sleep' : 'Energy';
-  $('.page-title').innerHTML = variable === 'energy' || variable === 'energy_central' ? 'What changed in my <em>energy?</em>' : 'What changed in my <em>sleep?</em>';
+  const series    = run.series[0];
+  const variable  = series?.variable || run.coverage[0]?.variable || 'energy';
+  const label     = variable === 'sleep_hours' ? 'Sleep' : 'Energy';
+  const isEnergy  = variable !== 'sleep_hours';
+
+  // Update page heading
+  const pageTitle  = $('#page-title');
+  pageTitle.innerHTML = isEnergy
+    ? 'What changed in my <em>energy?</em>'
+    : 'What changed in my <em>sleep?</em>';
   $('#breadcrumb-subject').textContent = label.toUpperCase();
-  const coverage = run.coverage.find(item => item.variable === variable);
-  $('#chart-title').textContent = variable === 'energy' || variable === 'energy_central' ? 'Energy over time' : 'Sleep over time';
-  $('#chart-unit').textContent = series?.unit === 'hours' ? 'HOURS' : 'SCALE 1–10';
-  $('#legend-label').textContent = variable === 'energy' || variable === 'energy_central' ? 'Recorded energy' : 'Recorded sleep';
-  $('#coverage-label').textContent = coverage ? `${coverage.observed} / ${coverage.eligible} days` : 'NO COVERAGE';
+  setTitle(`${label} investigation`);
+
+  // Coverage
+  const coverage = run.coverage.find(c => c.variable === variable);
+  const days     = windowDays(run);
+  $('#chart-title').textContent = isEnergy ? 'Energy over time' : 'Sleep over time';
+  $('#chart-unit').textContent  = series?.unit === 'hours' ? 'HOURS' : 'SCALE 1–10';
+  $('#legend-label').textContent = isEnergy ? 'Recorded energy' : 'Recorded sleep';
+  $('#coverage-label').textContent = coverage
+    ? `${coverage.observed} / ${days} days`
+    : 'NO COVERAGE';
+  $('#window-badge').textContent  = `${days} DAYS`;
+
+  // No series case
   if (!series?.points.length) {
     $('.chart-footer').classList.add('no-series');
-    $('.page-title').textContent = run.status === 'BLOCKED' ? 'Question outside scope' : 'Result unavailable';
+    pageTitle.textContent = run.status === 'BLOCKED' ? 'Question outside scope' : 'Result unavailable';
     $('#breadcrumb-subject').textContent = run.status === 'BLOCKED' ? 'LIMIT' : 'NO RESULT';
     $('#chart-title').textContent = 'No series published';
-    $('#chart-unit').textContent = '—';
-    container.innerHTML = '<div class="chart-placeholder"><strong>No series available</strong><span>No line is shown without traceable records.</span></div>';
-    $('#chart-help').textContent = 'No points to inspect in this run.';
+    $('#chart-unit').textContent  = '—';
+    container.innerHTML = `<div class="chart-placeholder">
+      <span class="placeholder-icon" aria-hidden="true">⬡</span>
+      <strong>No series available</strong>
+      <span>No line is drawn without traceable records.</span>
+    </div>`;
+    $('#chart-help').textContent = 'No data points to inspect in this run.';
     return;
   }
+
   $('.chart-footer').classList.remove('no-series');
-  container.innerHTML = chartSvg(series, run.comparison, Math.max(300,container.clientWidth));
+  container.innerHTML = chartSvg(series, run.comparison, Math.max(280, container.clientWidth || 400));
   $('#chart-help').textContent = 'Activate a point to see its date, value, and synthetic record ID.';
-  const tooltip = document.createElement('div'); tooltip.className = 'chart-tooltip'; tooltip.hidden = true; container.append(tooltip);
-  for (const point of container.querySelectorAll('.chart-point')) {
-    const show = () => { tooltip.textContent = point.dataset.chartLabel; tooltip.hidden = false; const box = point.getBoundingClientRect(), parent = container.getBoundingClientRect(); tooltip.style.left = `${box.left-parent.left+box.width/2}px`; tooltip.style.top = `${box.top-parent.top-5}px`; };
+
+  // Tooltip
+  const tooltip = document.createElement('div');
+  tooltip.className = 'chart-tooltip';
+  tooltip.hidden = true;
+  container.append(tooltip);
+
+  for (const pt of container.querySelectorAll('.chart-point')) {
+    const show = () => {
+      tooltip.textContent = pt.dataset.chartLabel;
+      tooltip.hidden = false;
+      const box = pt.getBoundingClientRect(), parent = container.getBoundingClientRect();
+      tooltip.style.left = `${box.left - parent.left + box.width / 2}px`;
+      tooltip.style.top  = `${box.top - parent.top - 6}px`;
+    };
     const hide = () => { tooltip.hidden = true; };
-    point.addEventListener('mouseenter',show); point.addEventListener('focus',show);
-    point.addEventListener('mouseleave',hide); point.addEventListener('blur',hide);
-    point.addEventListener('click',() => openEvidence(null,point.dataset.sourceId));
-    point.addEventListener('keydown',event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openEvidence(null,point.dataset.sourceId); } });
+    pt.addEventListener('mouseenter', show);
+    pt.addEventListener('focus', show);
+    pt.addEventListener('mouseleave', hide);
+    pt.addEventListener('blur', hide);
+    pt.addEventListener('click', () => openEvidence(null, pt.dataset.sourceId));
+    pt.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openEvidence(null, pt.dataset.sourceId); }
+    });
   }
 }
 
-function renderPeriod(run) {
-  $('#period-title').textContent = run.comparison ? 'Two 28-day periods' : 'No period comparison';
-  const values = $('#period-values').querySelectorAll('strong');
-  values[0].textContent = run.comparison ? run.comparison.baseline.mean.toFixed(1) : '—';
-  values[1].textContent = run.comparison ? run.comparison.comparison.mean.toFixed(1) : '—';
-  $('#period-description').textContent = run.comparison
-    ? `${run.comparison.baseline.observed} and ${run.comparison.comparison.observed} observed days. The comparison is descriptive and does not establish a cause.`
-    : run.status === 'PASS' ? 'The agent reviewed follow-up records without calculating a period difference.'
-      : 'No valid comparison for this run. See the status and reason.';
-  $('#period-footnote').textContent = run.comparison
-    ? `Mean of observed days · ${run.comparison.unit === 'hours' ? 'hours' : 'scale 1–10'} · source in evidence`
-    : 'No figure to compare';
+// ─── Agent trace ──────────────────────────────────────────────────────────────
+function renderTrace(steps) {
+  traceList.replaceChildren();
+  if (!steps.length) {
+    const li = document.createElement('li');
+    li.className = 'trace-empty';
+    li.textContent = 'No tool call was confirmed in this run.';
+    traceList.append(li);
+    return;
+  }
+
+  const phaseLabels = {
+    PLAN: 'Planned', TOOLS: 'Executed', EVIDENCE: 'Recorded',
+    VERIFY: 'Verified', RESPOND: 'Responded', ABSTAIN: 'Abstained',
+  };
+
+  for (const step of steps) {
+    const li = document.createElement('li');
+    li.className = step.status.toLowerCase();
+
+    const header = document.createElement('div');
+    header.className = 'trace-step-header';
+
+    const name = document.createElement('strong');
+    name.textContent = step.tool;
+
+    const state = document.createElement('span');
+    state.className = 'trace-state';
+    state.textContent = step.status === 'ERROR' ? 'Failed'
+      : step.status === 'BLOCKED' ? 'Blocked'
+      : phaseLabels[step.phase] ?? 'Executed';
+
+    const phase = step.phase || 'TOOLS';
+    const phasePill = document.createElement('span');
+    phasePill.className = `trace-phase-pill ${phase.toLowerCase()}`;
+    phasePill.textContent = phase;
+
+    header.append(name, state, phasePill);
+
+    const detail = document.createElement('small');
+    detail.textContent = step.detail || '';
+
+    li.append(header, detail);
+
+    if (step.source_record_ids?.length) {
+      const ids = document.createElement('small');
+      ids.textContent = `${step.source_record_ids.length} synthetic record IDs · event ${(step.trace_id || '').slice(0, 12)}`;
+      li.append(ids);
+    }
+    if (step.engine_event_id) {
+      const eid = document.createElement('small');
+      eid.textContent = `Meterless Engine event: ${step.engine_event_id.slice(0, 20)}…`;
+      li.append(eid);
+    }
+    if (step.parent_event_id) {
+      const pid = document.createElement('small');
+      pid.textContent = `Decision based on prior event: ${step.parent_event_id.slice(0, 20)}…`;
+      li.append(pid);
+    }
+
+    traceList.append(li);
+  }
 }
+
+// ─── Finding cards ────────────────────────────────────────────────────────────
+const KIND_LABELS = {
+  observation:           'OBSERVATION',
+  association:           'ASSOCIATION',
+  hypothesis:            'HYPOTHESIS',
+  candidate_contributor: 'QUALIFIED SIGNAL',
+  unsupported_hypothesis:'NO EVIDENCE',
+  uncertainty:           'CONFOUNDING LIMIT',
+  abstention:            'ABSTAINED',
+};
 
 function renderFindings(run) {
-  const grid = $('#findings'); grid.replaceChildren();
+  const grid = $('#findings');
+  grid.replaceChildren();
+
   $('#finding-count').textContent = `${run.findings.length} ${run.findings.length === 1 ? 'FINDING' : 'FINDINGS'}`;
-  const kinds = {observation:'OBSERVATION',association:'ASSOCIATION',hypothesis:'HYPOTHESIS',candidate_contributor:'CANDIDATE',unsupported_hypothesis:'UNSUPPORTED HYPOTHESIS',uncertainty:'UNCERTAINTY',abstention:'ABSTENTION'};
-  for (const [index,finding] of run.findings.entries()) {
-    const card = document.createElement('article'); card.className = `finding-card ${finding.kind}`;
-    const label = document.createElement('span'); label.className = 'finding-index'; label.textContent = `${String(index+1).padStart(2,'0')} / ${kinds[finding.kind]}`;
-    const title = document.createElement('h4'); title.textContent = finding.title;
-    const body = document.createElement('p'); body.textContent = finding.text;
-    const provenance = document.createElement('span'); provenance.className = 'finding-provenance';
-    provenance.textContent = finding.source_record_ids.length
-      ? `${finding.source_record_ids.length} synthetic source IDs`
-      : 'No records: limit or abstention';
-    const link = document.createElement('button'); link.type = 'button';
-    link.textContent = finding.source_record_ids.length ? 'Inspect records ↗' : 'Examine limit ↗';
-    link.setAttribute('aria-label', `${link.textContent}: ${finding.title}`);
-    link.addEventListener('click',() => openEvidence(finding.finding_id));
-    card.append(label,title,body,provenance,link); grid.append(card);
+  const tierLegend = $('#evidence-tier-legend');
+  tierLegend.hidden = run.findings.length === 0;
+
+  if (!run.findings.length) {
+    const empty = document.createElement('article');
+    empty.className = 'finding-card empty-card';
+    empty.setAttribute('role', 'listitem');
+    empty.innerHTML = `<span class="finding-index">01 / OBSERVATION</span>
+      <h4>No findings for this run.</h4>
+      <p>The agent did not produce a promotable result. See the status and agent trace for the reason.</p>`;
+    grid.append(empty);
+    return;
+  }
+
+  for (const [idx, finding] of run.findings.entries()) {
+    const card = document.createElement('article');
+    card.className = `finding-card ${finding.kind}`;
+    card.setAttribute('role', 'listitem');
+
+    const idxEl = document.createElement('span');
+    idxEl.className = 'finding-index';
+    idxEl.textContent = `${String(idx + 1).padStart(2, '0')} / ${KIND_LABELS[finding.kind] ?? finding.kind.toUpperCase()}`;
+
+    const title = document.createElement('h4');
+    title.textContent = finding.title;
+
+    const body = document.createElement('p');
+    body.textContent = finding.text;
+
+    const prov = document.createElement('span');
+    prov.className = 'finding-provenance';
+    prov.textContent = finding.source_record_ids?.length
+      ? `${finding.source_record_ids.length} synthetic source ID${finding.source_record_ids.length > 1 ? 's' : ''}`
+      : 'No records — limit or abstention';
+
+    const actions = document.createElement('div');
+    actions.className = 'finding-actions';
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = finding.source_record_ids?.length ? 'Inspect records ↗' : 'Examine limit ↗';
+    btn.setAttribute('aria-label', `${btn.textContent}: ${finding.title}`);
+    btn.addEventListener('click', () => openEvidence(finding.finding_id));
+    actions.append(btn);
+
+    // Show signal detail link for scientific findings
+    if (finding.evidence_signal_id && currentRun?.scientific_evidence?.signals) {
+      const sigBtn = document.createElement('button');
+      sigBtn.type = 'button';
+      sigBtn.textContent = 'Signal detail ↗';
+      sigBtn.setAttribute('aria-label', `Signal detail for ${finding.title}`);
+      sigBtn.addEventListener('click', () => openEvidenceTab('tab-signals', finding.finding_id));
+      actions.append(sigBtn);
+    }
+
+    card.append(idxEl, title, body, prov, actions);
+    grid.append(card);
   }
 }
 
-function block(title) { const section=document.createElement('section'); section.className='evidence-block'; const h=document.createElement('h3'); h.textContent=title; section.append(h); return section; }
-function disclosure(title, open = false) { const details=document.createElement('details'); details.className='evidence-disclosure'; details.open=open; const summary=document.createElement('summary'); summary.textContent=title; details.append(summary); return details; }
-function description(items) { const dl=document.createElement('dl'); for (const [key,value] of items) { const dt=document.createElement('dt'); dt.textContent=key; const dd=document.createElement('dd'); dd.textContent=String(value); dl.append(dt,dd); } return dl; }
-function renderEvidence(run, findingId = null, sourceId = null) {
-  const content = $('#dialog-content'); content.replaceChildren();
-  const selected = run.findings.find(item => item.finding_id === findingId) || run.findings[0];
-  const point = sourceId ? run.series.flatMap(item => item.points.map(p => ({...p,unit:item.unit}))).find(p => p.source_record_id === sourceId) : null;
-  const lead = block(sourceId ? 'SELECTED CHART RECORD' : 'SELECTED FINDING');
-  const heading = document.createElement('h4'); heading.textContent = point ? `${point.local_date} · ${point.value} ${point.unit}` : selected?.title || 'No finding available';
-  const summary = document.createElement('p'); summary.textContent = point
-    ? 'Point returned by the Python core. Its ID identifies a synthetic fixture record.'
-    : selected?.text || run.summary;
-  lead.append(heading,summary);
-  if (point) { const code=document.createElement('code'); code.className='selected-source'; code.textContent=point.source_record_id; lead.append(code); }
-  else if (selected?.source_record_ids.length) {
-    const records=disclosure(`Show ${selected.source_record_ids.length} synthetic record IDs`);
-    const ids=document.createElement('div'); ids.className='source-list';
-    for (const id of selected.source_record_ids) { const code=document.createElement('code'); code.textContent=id; ids.append(code); }
-    records.append(ids); lead.append(records);
-  } else { const note=document.createElement('p'); note.className='evidence-limit'; note.textContent='This limit statement is not attributed to a measured record.'; lead.append(note); }
-  content.append(lead);
-  const sponsor=block('SPONSOR SERVICES');
-  const sponsorText=document.createElement('p'); sponsorText.className='sponsor-warning';
-  sponsorText.textContent=`Status in this run: ${run.sponsor_proofs.map(item => `${item.sponsor}: ${item.status}${item.trace_id ? ` · request ${item.trace_id}` : ''}`).join('; ')}.`;
-  sponsor.append(sponsorText); content.append(sponsor);
-  const origin=disclosure('Source, window, and coverage');
-  origin.append(description([['Dataset',run.dataset_id],['Mode',run.mode],['Scenario',run.scenario],['Window',`${run.window.start} to ${run.window.end}`],['Time zone',run.timezone],['Current run',run.run_id],['Previous run',run.parent_run_id || 'None'],...run.coverage.map(c=>[`Coverage ${c.variable}`,`${c.observed} of ${c.eligible} days`])])); content.append(origin);
-  const method=disclosure('Method and limits');
-  const methodText=document.createElement('p');
-  methodText.textContent=run.comparison ? `${run.comparison.method}: ${run.comparison.baseline.start}–${run.comparison.baseline.end} (N=${run.comparison.baseline.observed}) versus ${run.comparison.comparison.start}–${run.comparison.comparison.end} (N=${run.comparison.comparison.observed}). Missing days remain null. No proof of association or causality.` : `No comparison was run. Reason: ${run.reason_code || 'no comparable result'}.`;
-  method.append(methodText); content.append(method);
-  const trace=disclosure('Plan and tools returned by Python');
-  const list=document.createElement('ol'); list.className='trace-detail';
-  for (const step of run.tool_trace) { const li=document.createElement('li'); const strong=document.createElement('strong'); strong.textContent=`${step.phase || 'TOOLS'} · ${step.tool} · ${step.status}`; const detail=document.createElement('span'); detail.textContent=step.detail; li.append(strong,detail); if(step.source_record_ids.length){const origin=document.createElement('small');origin.textContent=`${step.source_record_ids.length} synthetic records · event ${step.trace_id.slice(0,12)}`;li.append(origin);} if(step.parent_event_id){const parent=document.createElement('small');parent.textContent=`Decision based on prior event ${step.parent_event_id.slice(0,12)}`;li.append(parent);} list.append(li); }
-  trace.append(list); content.append(trace);
+// ─── Sponsor proof bar ────────────────────────────────────────────────────────
+const SPONSOR_LABELS = {
+  zetaris:           'Zetaris',
+  meterless_engine:  'Meterless Engine',
+  meterless_runtime: 'Meterless Runtime',
+  nemotron:          'NVIDIA Nemotron',
+};
+
+function renderSponsorBar(run) {
+  const bar = $('#sponsor-proof-bar');
+  if (!run.sponsor_proofs?.length) { bar.hidden = true; return; }
+
+  const container = $('#proof-badges');
+  container.replaceChildren();
+
+  for (const proof of run.sponsor_proofs) {
+    const badge = document.createElement('div');
+    const statusClass = proof.status === 'VERIFIED' ? 'verified'
+      : proof.status === 'FAILED' ? 'failed' : 'not-connected';
+    badge.className = `proof-badge ${statusClass}`;
+    badge.title = proof.trace_id ? `Trace ID: ${proof.trace_id}` : 'No trace ID';
+
+    const dot = document.createElement('span');
+    dot.className = 'badge-dot';
+    dot.setAttribute('aria-hidden', 'true');
+
+    const label = document.createElement('span');
+    label.textContent = `${SPONSOR_LABELS[proof.sponsor] ?? proof.sponsor}: ${proof.status.replace('_', ' ')}`;
+
+    badge.append(dot, label);
+    container.append(badge);
+  }
+
+  bar.hidden = false;
 }
 
+// ─── Clear presentation ───────────────────────────────────────────────────────
+function clearPresentation(message) {
+  currentRun = null;
+  evidenceBtn.disabled = true;
+  $('#page-title').innerHTML = 'Waiting for results…';
+  $('#breadcrumb-subject').textContent = 'PENDING';
+  $('#result-context').textContent = message;
+  $('#chart-title').textContent = 'Daily series';
+  $('#chart-unit').textContent = '—';
+  $('#coverage-label').textContent = 'NO COVERAGE';
+  $('#window-badge').textContent = '— DAYS';
+  $('.chart-footer').classList.add('no-series');
+  $('#chart-help').textContent = 'The series appears after a valid Python response.';
+  $('#chart-container').innerHTML = `<div class="chart-placeholder">
+    <span class="placeholder-icon" aria-hidden="true">⬡</span>
+    <strong>No current result</strong>
+    <span>No figures from a prior run are retained.</span>
+  </div>`;
+  $('#trajectory-strip').hidden = true;
+  $('#period-earlier').textContent = '—';
+  $('#period-recent').textContent  = '—';
+  $('#period-diff').hidden = true;
+  $('#period-description').textContent = 'Awaiting a valid comparison.';
+  $('#period-footnote').textContent = 'No figure to compare';
+  $('#findings').replaceChildren();
+  $('#finding-count').textContent = 'NO CURRENT FINDINGS';
+  $('#evidence-tier-legend').hidden = true;
+  $('#sponsor-proof-bar').hidden = true;
+  $('#followup-actions').hidden  = true;
+  setTitle(null);
+}
+
+// ─── Follow-up context ────────────────────────────────────────────────────────
+function updateFollowupBanner() {
+  const banner = $('#followup-banner');
+  const detail = $('#followup-detail');
+  if (pendingParentRunId) {
+    detail.textContent = `Continuing from run ${pendingParentRunId.slice(0, 20)} — reading prior World Model decision`;
+    banner.hidden = false;
+  } else {
+    banner.hidden = true;
+  }
+}
+
+// ─── Question suggestions ─────────────────────────────────────────────────────
+for (const chip of $$('[data-fill]')) {
+  chip.addEventListener('click', () => {
+    questionInput.value = chip.dataset.fill;
+    pendingParentRunId = null;
+    updateFollowupBanner();
+    questionInput.focus();
+  });
+}
+
+// ─── Follow-up action chips (post-result) ─────────────────────────────────────
+function wireFollowupChips(run) {
+  for (const chip of $$('#followup-actions [data-question]')) {
+    chip.onclick = null;
+    chip.addEventListener('click', () => {
+      const q = chip.dataset.question;
+      questionInput.value = q;
+      // Chips that continue the same investigation carry parent run ID
+      if (chip.id === 'chip-sleep' || chip.id === 'chip-next') {
+        pendingParentRunId = run.run_id;
+      } else {
+        pendingParentRunId = null;
+      }
+      updateFollowupBanner();
+      questionInput.focus();
+    });
+  }
+}
+
+// ─── Evidence dialog ──────────────────────────────────────────────────────────
 function openEvidence(findingId = null, sourceId = null) {
   if (!currentRun) return;
-  renderEvidence(currentRun,findingId,sourceId);
-  $('#dialog-title').textContent = sourceId ? 'Point source.' : findingId ? 'Finding evidence.' : 'Sources and limits.';
+  activateTab('tab-finding');
+  renderEvidenceContent(currentRun, findingId, sourceId);
+  $('#dialog-title').textContent = sourceId ? 'Point source record.'
+    : findingId ? 'Finding evidence.' : 'Sources and limits.';
   dialog.showModal();
 }
-evidenceButton.addEventListener('click',() => openEvidence());
-$('#dialog-close').addEventListener('click',()=>dialog.close());
-dialog.addEventListener('click',event=>{if(event.target===dialog) dialog.close();});
-function updateFollowupContext() {
-  const context=$('#followup-context');
-  context.hidden=!pendingParentRunId;
-  context.textContent=pendingParentRunId ? `Follow-up to ${pendingParentRunId} · the agent will read the persisted decision and choose the next tools.` : '';
-}
-function clearPresentation(message) {
-  currentRun=null;
-  evidenceButton.disabled=true;
-  $('.page-title').textContent='Result pending';
-  $('#breadcrumb-subject').textContent='PENDING';
-  $('#result-context').textContent=message;
-  $('#chart-title').textContent='Daily series';
-  $('#chart-unit').textContent='—';
-  $('#coverage-label').textContent='NO COVERAGE';
-  $('.chart-footer').classList.add('no-series');
-  $('#chart-help').textContent='The series appears after a valid Python response.';
-  $('#chart-container').innerHTML='<div class="chart-placeholder"><strong>No current result</strong><span>No figures from a prior run are retained.</span></div>';
-  $('#period-values').querySelectorAll('strong').forEach(value=>{value.textContent='—';});
-  $('#period-description').textContent='Awaiting a valid comparison.';
-  $('#period-footnote').textContent='No figure to compare';
-  $('#findings').replaceChildren();
-  $('#finding-count').textContent='NO CURRENT FINDINGS';
-}
-questionInput.addEventListener('input',()=>{pendingParentRunId=null;updateFollowupContext();});
-for (const button of document.querySelectorAll('[data-question]')) button.addEventListener('click',()=>{
-  questionInput.value=button.dataset.question;
-  pendingParentRunId=button.dataset.question.includes('sleep') || button.dataset.question.includes('next')
-    ? currentRun?.run_id || localStorage.getItem('phis.synthetic.lastRunId') : null;
-  updateFollowupContext();
-  questionInput.focus();
-});
 
-form.addEventListener('submit',async event=>{
-  event.preventDefault(); const question=questionInput.value.trim(); if(!question){questionInput.focus();return;}
-  const parentRunId=pendingParentRunId;
-  clearPresentation('Querying synthetic data.');
-  askButton.disabled=true; askButton.querySelector('span').textContent='Querying Python';
-  for (const button of document.querySelectorAll('[data-question]')) button.disabled=true;
-  $('#main').setAttribute('aria-busy','true');
-  $('#agent-phase').textContent='IN PROGRESS';
-  $('#trace-list').innerHTML='<li class="trace-empty">Waiting for the Python core. No tools are confirmed yet.</li>';
-  setStatus('busy','CONSULTA IN PROGRESS','Waiting for the local run; no results or traces are confirmed yet.','IN PROGRESS');
+function openEvidenceTab(tabId, findingId = null) {
+  if (!currentRun) return;
+  activateTab(tabId);
+  renderEvidenceContent(currentRun, findingId, null);
+  dialog.showModal();
+}
+
+evidenceBtn.addEventListener('click', () => openEvidence());
+$('#dialog-close').addEventListener('click', () => dialog.close());
+dialog.addEventListener('click', e => { if (e.target === dialog) dialog.close(); });
+dialog.addEventListener('keydown', e => { if (e.key === 'Escape') dialog.close(); });
+
+// ─── Tab switching ────────────────────────────────────────────────────────────
+function activateTab(tabId) {
+  for (const tab of $$('.dialog-tab')) {
+    const active = tab.id === tabId;
+    tab.classList.toggle('active', active);
+    tab.setAttribute('aria-selected', String(active));
+  }
+  renderEvidenceContent(currentRun, null, null, tabId);
+}
+
+for (const tab of $$('.dialog-tab')) {
+  tab.addEventListener('click', () => {
+    activateTab(tab.id);
+    renderEvidenceContent(currentRun, null, null, tab.id);
+  });
+}
+
+// ─── Evidence drawer rendering ────────────────────────────────────────────────
+function el(tag, attrs = {}, text = null) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === 'className') e.className = v;
+    else e.setAttribute(k, v);
+  }
+  if (text !== null) e.textContent = text;
+  return e;
+}
+
+function mkBlock(title) {
+  const s = el('div', { className: 'evidence-block' });
+  const h = el('h3', {}, title);
+  s.append(h);
+  return s;
+}
+
+function mkDisclosure(label, open = false) {
+  const d = el('details', { className: 'evidence-disclosure' });
+  if (open) d.open = true;
+  const summary = el('summary', {}, label);
+  d.append(summary);
+  return d;
+}
+
+function mkDl(pairs) {
+  const dl = el('dl', { className: 'evidence-dl' });
+  for (const [key, val] of pairs) {
+    dl.append(el('dt', {}, key), el('dd', {}, String(val ?? '—')));
+  }
+  return dl;
+}
+
+function renderEvidenceContent(run, findingId = null, sourceId = null, activeTab = 'tab-finding') {
+  const content = $('#dialog-content');
+  content.replaceChildren();
+
+  if (!run) {
+    content.append(el('p', {}, 'Start an investigation to inspect records and tool outputs.'));
+    return;
+  }
+
+  const days = windowDays(run);
+
+  switch (activeTab) {
+    case 'tab-finding':  renderFindingTab(run, findingId, sourceId, days); break;
+    case 'tab-signals':  renderSignalsTab(run, findingId); break;
+    case 'tab-trace':    renderTraceTab(run); break;
+    case 'tab-sponsors': renderSponsorsTab(run); break;
+    case 'tab-meta':     renderMetaTab(run, days); break;
+    default:             renderFindingTab(run, findingId, sourceId, days);
+  }
+}
+
+// Tab: Finding / source record
+function renderFindingTab(run, findingId, sourceId, days) {
+  const content = $('#dialog-content');
+
+  // Offline benchmark badge
+  if (isBenchmarkRun(run)) {
+    const badge = el('div', { className: 'benchmark-badge' });
+    badge.innerHTML = `⚗ OFFLINE SCIENTIFIC EXHIBIT &nbsp;·&nbsp; ${days}-DAY SYNTHETIC BENCHMARK &nbsp;·&nbsp; NOT A LIVE RESULT`;
+    content.append(badge);
+  }
+
+  const selected = run.findings.find(f => f.finding_id === findingId) || run.findings[0];
+  const point    = sourceId
+    ? run.series?.flatMap(s => s.points.map(p => ({ ...p, unit: s.unit }))).find(p => p.source_record_id === sourceId)
+    : null;
+
+  // Lead block
+  const lead = mkBlock(sourceId ? 'SELECTED CHART RECORD' : 'SELECTED FINDING');
+  const heading = el('h4', {}, point
+    ? `${point.local_date} · ${point.value} ${point.unit}`
+    : selected?.title || 'No finding available');
+  const summary = el('p', {}, point
+    ? 'This data point was returned by the Python core. The ID identifies a typed synthetic fixture record.'
+    : (selected?.text || run.summary));
+  lead.append(heading, summary);
+
+  if (point) {
+    lead.append(el('code', { className: 'selected-source' }, point.source_record_id));
+  } else if (selected?.source_record_ids?.length) {
+    const disc = mkDisclosure(`Show ${selected.source_record_ids.length} synthetic record IDs`);
+    const ids = el('div', { className: 'source-list' });
+    for (const id of selected.source_record_ids) ids.append(el('code', {}, id));
+    disc.append(ids); lead.append(disc);
+  } else {
+    lead.append(el('p', { className: 'evidence-limit' },
+      'This limit statement is not attributed to a measured record.'));
+  }
+  content.append(lead);
+
+  // Evidence kind explanation
+  if (selected?.kind) {
+    const kindBlock = mkBlock('EVIDENCE TIER');
+    const kindMap = {
+      candidate_contributor: 'QUALIFIED SIGNAL — passed all predeclared temporal, block-bootstrap and multiple-testing gates.',
+      association:           'UNQUALIFIED ASSOCIATION — raw correlation did not pass every gate. Do not interpret as a cause.',
+      hypothesis:            'HYPOTHESIS — exploratory. Requires further investigation and preregistration.',
+      unsupported_hypothesis:'NO EVIDENCE — no tested factor met the required gates for this outcome.',
+      uncertainty:           'CONFOUNDING LIMIT — overlapping explanations exist; no adjusted or causal effect was estimated.',
+      abstention:            'RESPONSIBLE ABSTENTION — the question or evidence falls outside the verifiable scope.',
+      observation:           'OBSERVATION — a descriptive measurement, no association tested.',
+    };
+    kindBlock.append(el('p', {}, kindMap[selected.kind] ?? selected.kind));
+    content.append(kindBlock);
+  }
+}
+
+// Tab: Scientific signals
+function renderSignalsTab(run, findingId) {
+  const content = $('#dialog-content');
+
+  if (!run.scientific_evidence?.signals?.length) {
+    // v1 route: no signal table
+    const note = mkBlock('SCIENTIFIC SIGNALS');
+    note.append(el('p', {}, 'Scientific signal detail is available in the v2 analysis route (local PHIS Discovery required). The current run used the v1 descriptive route.'));
+    content.append(note);
+    return;
+  }
+
+  const { signals, plan_sha256, record_digest_sha256, hypothesis_count, engine } = run.scientific_evidence;
+
+  // Benchmark badge
+  if (isBenchmarkRun(run)) {
+    const badge = el('div', { className: 'benchmark-badge' });
+    badge.innerHTML = `⚗ OFFLINE BENCHMARK SIGNALS &nbsp;·&nbsp; ${windowDays(run)}-DAY WINDOW &nbsp;·&nbsp; SEED NOT LIVE-CONNECTED`;
+    content.append(badge);
+  }
+
+  const intro = mkBlock(`${hypothesis_count} PREDECLARED CHILDREN · FULL FAMILY`);
+  intro.append(el('p', {},
+    `These ${hypothesis_count} tests form the complete predeclared family. ` +
+    `All children are retained, including those that did not pass gates. ` +
+    `No post-hoc selection was made.`));
+  intro.append(mkDl([
+    ['Engine', engine ?? '—'],
+    ['Plan SHA-256', (plan_sha256 ?? '—').slice(0, 24) + '…'],
+    ['Record digest SHA-256', (record_digest_sha256 ?? '—').slice(0, 24) + '…'],
+  ]));
+  content.append(intro);
+
+  // Signal table
+  const tableBlock = mkBlock('SIGNAL RESULTS (N / r / CI / p / q / gates)');
+  tableBlock.append(el('p', { className: 'evidence-limit' },
+    'These are unadjusted pairwise observational associations in fictional synthetic data. Not causal or clinical claims.'));
+
+  const table = el('table', { className: 'signal-table' });
+  const thead = el('thead');
+  thead.innerHTML = `<tr>
+    <th>Exposure → Outcome</th>
+    <th>Lag</th>
+    <th>r</th>
+    <th>N</th>
+    <th>95% CI</th>
+    <th>p</th>
+    <th>q child (BY)</th>
+    <th>Class</th>
+    <th>Temporal</th>
+  </tr>`;
+  const tbody = el('tbody');
+
+  const selected = findingId
+    ? signals.find(s => s.signal_id === findingId)
+    : null;
+
+  for (const sig of signals) {
+    const tr = el('tr');
+    tr.className = sig.classification;
+    if (sig.signal_id === (selected?.signal_id ?? signals[0]?.signal_id)) {
+      tr.style.background = '#f0f8f0';
+    }
+
+    const pill = el('span', { className: `sig-class-pill ${sig.classification}` },
+      sig.classification.replace('_', ' '));
+
+    const ci = sig.ci95 ? `[${sig.ci95[0]?.toFixed(3)}, ${sig.ci95[1]?.toFixed(3)}]` : '—';
+    const temporal = sig.temporal_state ?? (sig.temporal_reasons?.length ? sig.temporal_reasons.join(', ') : '—');
+
+    tr.innerHTML = `
+      <td>${(sig.exposure ?? '—').replace(/_/g, ' ')} → ${(sig.outcome ?? '—').replace(/_/g, ' ')}</td>
+      <td>${sig.lag_days ?? '—'} d</td>
+      <td>${typeof sig.effect === 'number' ? sig.effect.toFixed(3) : '—'}</td>
+      <td>${sig.raw_n ?? '—'}</td>
+      <td>${ci}</td>
+      <td>${typeof sig.p_primary === 'number' ? sig.p_primary.toFixed(4) : '—'}</td>
+      <td>${typeof sig.q_selection_child_by === 'number' ? sig.q_selection_child_by.toFixed(4) : '—'}</td>
+      <td></td>
+      <td>${temporal}</td>
+    `;
+    tr.cells[7].append(pill);
+    tbody.append(tr);
+  }
+  table.append(thead, tbody);
+  tableBlock.append(table);
+  content.append(tableBlock);
+}
+
+// Tab: Tool trace
+function renderTraceTab(run) {
+  const content = $('#dialog-content');
+  const block = mkBlock('AGENT TOOL TRACE — EVERY STEP');
+  block.append(el('p', {},
+    'Every tool call returned by the Python core. Blocked steps are explicitly recorded, never silently dropped.'));
+
+  if (!run.tool_trace?.length) {
+    block.append(el('p', {}, 'No tool trace for this run.'));
+    content.append(block);
+    return;
+  }
+
+  const list = el('ol', { className: 'trace-detail' });
+  for (const step of run.tool_trace) {
+    const li = el('li');
+    const header = el('div', { className: 'td-header' });
+    const name   = el('strong', {}, step.tool);
+    const status = el('span', { className: `td-status ${step.status.toLowerCase()}` }, step.status);
+
+    if (step.phase) {
+      const pp = el('span', { className: `trace-phase-pill ${step.phase.toLowerCase()}` }, step.phase);
+      header.append(name, status, pp);
+    } else {
+      header.append(name, status);
+    }
+
+    const detail = el('span', {}, step.detail || '');
+    li.append(header, detail);
+
+    if (step.source_record_ids?.length) {
+      li.append(el('small', {}, `${step.source_record_ids.length} synthetic record IDs · event ${(step.trace_id || '').slice(0, 16)}`));
+    }
+    if (step.engine_event_id) {
+      li.append(el('small', {}, `Meterless Engine event ID: ${step.engine_event_id}`));
+    }
+    if (step.query_id) {
+      li.append(el('small', {}, `Zetaris query ID: ${step.query_id}`));
+    }
+    if (step.parent_event_id) {
+      li.append(el('small', {}, `Based on prior Engine event: ${step.parent_event_id}`));
+    }
+    list.append(li);
+  }
+  block.append(list);
+  content.append(block);
+}
+
+// Tab: Sponsor proofs
+function renderSponsorsTab(run) {
+  const content = $('#dialog-content');
+
+  const intro = mkBlock('SPONSOR SERVICE CONNECTIONS');
+  intro.append(el('p', {},
+    'Status is determined each run. A VERIFIED status means a real round-trip was traced. ' +
+    'NOT_CONNECTED means the service is not wired in this run. ' +
+    'No mock result is presented as a live sponsor connection.'));
+  content.append(intro);
+
+  for (const proof of (run.sponsor_proofs ?? [])) {
+    const block = mkBlock(`${SPONSOR_LABELS[proof.sponsor] ?? proof.sponsor}`);
+    const cls   = proof.status === 'VERIFIED' ? 'sponsor-proof-verified' : '';
+    const sb    = el('div', { className: `sponsor-block ${cls}` });
+    sb.append(el('p', {}, `Status: ${proof.status.replace('_', ' ')}`));
+
+    if (proof.trace_id) {
+      sb.append(el('p', {}, `Trace ID: ${proof.trace_id}`));
+    }
+    if (proof.status === 'NOT_CONNECTED') {
+      sb.append(el('p', {}, 'This service was not contacted in this run. No call was made and no result was fabricated.'));
+    }
+    block.append(sb);
+    content.append(block);
+  }
+
+  // Hardcoded absent sponsors for transparency
+  const present = (run.sponsor_proofs ?? []).map(p => p.sponsor);
+  for (const [key, label] of Object.entries(SPONSOR_LABELS)) {
+    if (!present.includes(key)) {
+      const block = mkBlock(label);
+      const sb    = el('div', { className: 'sponsor-block' });
+      sb.append(el('p', {}, 'Status: NOT_CONNECTED — not wired in this run.'));
+      block.append(sb);
+      content.append(block);
+    }
+  }
+}
+
+// Tab: Run metadata
+function renderMetaTab(run, days) {
+  const content = $('#dialog-content');
+  const block = mkBlock('RUN METADATA');
+
+  const isBenchmark = isBenchmarkRun(run);
+  if (isBenchmark) {
+    const badge = el('div', { className: 'benchmark-badge' });
+    badge.innerHTML = `⚗ OFFLINE BENCHMARK &nbsp;·&nbsp; ${days}-DAY SYNTHETIC WINDOW &nbsp;·&nbsp; NOT CONNECTED TO LIVE ZETARIS`;
+    block.append(badge);
+  }
+
+  block.append(mkDl([
+    ['Dataset',           run.dataset_id ?? '—'],
+    ['Contract version',  run.contract_version ?? '—'],
+    ['Mode',              run.mode ?? '—'],
+    ['Scenario',          run.scenario ?? '—'],
+    ['Analysis window',   `${run.window?.start ?? '—'} to ${run.window?.end ?? '—'} (${days} days)`],
+    ['Time zone',         run.timezone ?? '—'],
+    ['Run ID',            run.run_id ?? '—'],
+    ['Parent run ID',     run.parent_run_id ?? 'None'],
+    ['Status',            run.status ?? '—'],
+    ['Reason code',       run.reason_code ?? '—'],
+    ...( run.coverage?.map(c => [`Coverage: ${c.variable}`, `${c.observed} of ${c.eligible} days (${(100 * c.observed / c.eligible).toFixed(0)}%)`]) ?? []),
+  ]));
+
+  if (run.comparison) {
+    const { baseline, comparison, method } = run.comparison;
+    const cmpBlock = mkBlock('PERIOD COMPARISON METHOD');
+    cmpBlock.append(el('p', {},
+      `${method}: ${baseline.start}–${baseline.end} (N=${baseline.observed}) ` +
+      `versus ${comparison.start}–${comparison.end} (N=${comparison.observed}). ` +
+      `Missing days remain null. No proof of association or causality.`));
+    content.append(cmpBlock);
+  }
+
+  content.append(block);
+}
+
+// ─── Window label ─────────────────────────────────────────────────────────────
+function updateWindowLabel(run) {
+  const wl = $('#window-label');
+  if (run.window?.start && run.window?.end) {
+    wl.textContent = `${formatDate(run.window.start).toUpperCase()} — ${formatDate(run.window.end).toUpperCase()} ${run.window.end.slice(0, 4)}`;
+    wl.setAttribute('aria-label', `Analysis window: ${formatDate(run.window.start)} to ${formatDate(run.window.end)}`);
+  }
+}
+
+// ─── Rail mode label ──────────────────────────────────────────────────────────
+function updateModeUI(run) {
+  const zetaris = run.sponsor_proofs?.find(p => p.sponsor === 'zetaris');
+  const isLive  = run.mode === 'LIVE_SYNTHETIC_ZETARIS';
+  const pill    = $('#mode-pill');
+  const label   = $('#mode-label');
+
+  pill.classList.toggle('live', isLive && zetaris?.status === 'VERIFIED');
+  label.textContent = isLive
+    ? (zetaris?.status === 'VERIFIED' ? 'SYNTHETIC · LIVE ZETARIS' : 'SYNTHETIC · ZETARIS FAILED')
+    : 'SYNTHETIC · LOCAL';
+
+  $('#demo-sponsor-status').textContent = isLive
+    ? `Zetaris: ${zetaris?.status ?? 'NOT_CONNECTED'}. No medical advice.`
+    : `Local synthetic mode. Sponsor connections verified each run. No medical advice.`;
+
+  $('#rail-mode-label').textContent = isLive ? 'LIVE EVIDENCE' : 'EVIDENCE LAB';
+}
+
+// ─── Status messages ──────────────────────────────────────────────────────────
+const STATUS_STATES = {
+  PASS: {
+    kind: '',
+    label: 'OBSERVATION AVAILABLE',
+    copy: (run) => run.contract_version === 'investigation.v2'
+      ? `Scientific analysis complete (v2). ${run.findings.filter(f => f.kind === 'candidate_contributor').length} qualified signal(s). Review the evidence tiers below.`
+      : 'A descriptive finding is available below. Cause is not established.',
+  },
+  EXECUTED_PARTIAL: { kind: 'warning', label: 'PARTIAL RESULT',  copy: (run) => run.summary },
+  INSUFFICIENT_DATA:{ kind: 'warning', label: 'INSUFFICIENT EVIDENCE', copy: (run) => run.summary },
+  BLOCKED:          { kind: 'warning', label: 'RESPONSIBLE ABSTENTION', copy: (run) => run.summary },
+  ERROR:            { kind: 'error',   label: 'TOOL UNAVAILABLE', copy: (run) => run.summary },
+};
+
+const PHASE_LABELS = {
+  PASS: 'RESPONSE RECEIVED',
+  EXECUTED_PARTIAL: 'PARTIAL RESULT',
+  INSUFFICIENT_DATA: 'INSUFFICIENT COVERAGE',
+  BLOCKED: 'ABSTENTION',
+  ERROR: 'SOURCE OR TOOL UNAVAILABLE',
+};
+
+const PHASE_CLASSES = {
+  PASS: 'phase-tag phase-pass',
+  EXECUTED_PARTIAL: 'phase-tag phase-warn',
+  INSUFFICIENT_DATA: 'phase-tag phase-warn',
+  BLOCKED: 'phase-tag phase-warn',
+  ERROR: 'phase-tag phase-error',
+};
+
+// ─── Main form submit ─────────────────────────────────────────────────────────
+form.addEventListener('submit', async event => {
+  event.preventDefault();
+  const question = questionInput.value.trim();
+  if (!question) { questionInput.focus(); return; }
+
+  const parentRunId = pendingParentRunId;
+
+  clearPresentation('Querying synthetic data — please wait.');
+  askButton.disabled = true;
+  askButton.querySelector('.ask-label').textContent = 'Querying Python…';
+  for (const chip of $$('[data-question], .suggestion-chip')) chip.disabled = true;
+  $('#main').setAttribute('aria-busy', 'true');
+  agentPhase.className = 'phase-tag phase-running';
+  agentPhase.textContent = 'IN PROGRESS';
+  traceList.innerHTML = '<li class="trace-empty">Waiting for the Python core — no tools confirmed yet.</li>';
+  setStatus('busy', 'INVESTIGATION IN PROGRESS', 'Waiting for the local run; no results or traces are confirmed yet.', 'IN PROGRESS');
+
   try {
-    const scenario=new URLSearchParams(location.search).get('scenario') || 'normal';
-    const analysisVersion=new URLSearchParams(location.search).get('analysis')==='v2' ? 'v2' : 'v1';
-    currentRun=await fetchInvestigation(question,{scenario,parentRunId,analysisVersion});
-    const zetaris=currentRun.sponsor_proofs.find(proof=>proof.sponsor==='zetaris');
-    $('#demo-sponsor-status').textContent=currentRun.mode==='LIVE_SYNTHETIC_ZETARIS'
-      ? `Local Zetaris: ${zetaris?.status || 'NOT_CONNECTED'}. No medical advice.`
-      : 'Local synthetic mode. See sponsor proofs for connection status. No medical advice.';
-    $('.mode-pill').lastChild.textContent=currentRun.mode==='LIVE_SYNTHETIC_ZETARIS'
-      ? ' SYNTHETIC · LOCAL ZETARIS' : ' SYNTHETIC · LOCAL';
-    if(currentRun.status==='PASS' && currentRun.comparison) localStorage.setItem('phis.synthetic.lastRunId',currentRun.run_id);
-    pendingParentRunId=null; updateFollowupContext();
-    $('#window-label').textContent=`${formatDate(currentRun.window.start).toUpperCase()} — ${formatDate(currentRun.window.end).toUpperCase()} ${currentRun.window.end.slice(0,4)}`;
-    renderTrace(currentRun.tool_trace); renderChart(currentRun); renderPeriod(currentRun); renderFindings(currentRun);
-    const states={PASS:['','OBSERVATION AVAILABLE'],EXECUTED_PARTIAL:['warning','PARTIAL RESULT'],INSUFFICIENT_DATA:['warning','INSUFFICIENT EVIDENCE'],BLOCKED:['warning','RESPONSIBLE ABSTENTION'],ERROR:['error','TOOL UNAVAILABLE']};
-    setStatus(states[currentRun.status][0],states[currentRun.status][1],
-      currentRun.status === 'PASS' ? currentRun.contract_version === 'investigation.v2'
-        ? 'Scientific analysis completed. Review qualified signals and explicit limits below.'
-        : 'A descriptive finding is available below. Cause is not established.' : currentRun.summary,
-      currentRun.run_id);
-    $('#agent-phase').textContent={
-      PASS:'RESPONSE RECEIVED',EXECUTED_PARTIAL:'PARTIAL RESULT',
-      INSUFFICIENT_DATA:'INSUFFICIENT COVERAGE',BLOCKED:'ABSTENTION',ERROR:'SOURCE OR TOOL UNAVAILABLE'
-    }[currentRun.status];
-    $('#result-context').textContent=currentRun.parent_run_id
+    const scenario       = new URLSearchParams(location.search).get('scenario') || 'normal';
+    const analysisVersion = new URLSearchParams(location.search).get('analysis') === 'v2' ? 'v2' : 'v1';
+
+    currentRun = await fetchInvestigation(question, { scenario, parentRunId, analysisVersion });
+    incrementRunCounter();
+
+    updateModeUI(currentRun);
+    updateWindowLabel(currentRun);
+
+    if (currentRun.status === 'PASS' && currentRun.comparison) {
+      localStorage.setItem('phis.synthetic.lastRunId', currentRun.run_id);
+    }
+    pendingParentRunId = null;
+    updateFollowupBanner();
+
+    renderTrace(currentRun.tool_trace);
+    renderChart(currentRun);
+    renderTrajectory(currentRun);
+    renderPeriod(currentRun);
+    renderFindings(currentRun);
+    renderSponsorBar(currentRun);
+
+    // Status
+    const state = STATUS_STATES[currentRun.status] || STATUS_STATES.ERROR;
+    setStatus(state.kind, state.label, state.copy(currentRun), currentRun.run_id);
+    agentPhase.className = PHASE_CLASSES[currentRun.status] ?? 'phase-tag phase-warn';
+    agentPhase.textContent = PHASE_LABELS[currentRun.status] ?? 'UNKNOWN';
+
+    // Result context line
+    const ctxEl = $('#result-context');
+    ctxEl.textContent = currentRun.parent_run_id
       ? `Follow-up to ${currentRun.parent_run_id} · decision recovered from World Model · run ${currentRun.run_id}`
-      : `Run ${currentRun.run_id} · ${currentRun.mode==='LIVE_SYNTHETIC_ZETARIS' ? 'synthetic rows queried from local Zetaris' : 'synthetic data from the Python core'}`;
-    evidenceButton.disabled=false;
+      : `Run ${currentRun.run_id} · ${
+          currentRun.mode === 'LIVE_SYNTHETIC_ZETARIS'
+          ? 'synthetic rows queried from local Zetaris'
+          : 'synthetic data from the Python core'
+        }`;
+
+    // Enable evidence drawer and follow-up chips
+    evidenceBtn.disabled = false;
+    if (currentRun.status === 'PASS') {
+      $('#followup-actions').hidden = false;
+      wireFollowupChips(currentRun);
+    }
+
+    // Open signals tab by default if scientific_evidence present
+    if (currentRun.contract_version === 'investigation.v2' && currentRun.scientific_evidence?.signals?.length) {
+      for (const tab of $$('.dialog-tab')) tab.classList.remove('active');
+      $('#tab-signals')?.classList.add('active');
+    }
+
     $('#main').focus();
-  } catch(error) {
+  } catch (error) {
     clearPresentation('The query did not return a valid result.');
-    $('#agent-phase').textContent='NO RESPONSE';
+    agentPhase.className = 'phase-tag phase-error';
+    agentPhase.textContent = 'NO RESPONSE';
     renderTrace([]);
-    setStatus('error','CONNECTION OR CONTRACT ERROR','Could not get a valid response from the Python core. Try again.');
-    console.error('API response rejected',error);
+    setStatus('error', 'CONNECTION OR CONTRACT ERROR',
+      'Could not get a valid response from the Python core. The contract validator rejected the payload or the server is unavailable.');
+    console.error('[PHIS] API response rejected:', error);
   } finally {
-    askButton.disabled=false; askButton.querySelector('span').textContent='Investigate records';
-    for (const button of document.querySelectorAll('[data-question]')) button.disabled=false;
+    askButton.disabled = false;
+    askButton.querySelector('.ask-label').textContent = 'Investigate records';
+    for (const chip of $$('[data-question], .suggestion-chip')) chip.disabled = false;
     $('#main').removeAttribute('aria-busy');
   }
 });
-window.addEventListener('resize',()=>{ if (currentRun?.series[0]?.points.length) renderChart(currentRun); });
+
+// Reset follow-up context when user manually edits the question
+questionInput.addEventListener('input', () => {
+  pendingParentRunId = null;
+  updateFollowupBanner();
+});
+
+// Responsive chart redraw on resize
+window.addEventListener('resize', () => {
+  if (currentRun?.series?.[0]?.points.length) renderChart(currentRun);
+});
+
+// Keyboard: Escape closes dialog
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && dialog.open) dialog.close();
+});
