@@ -14,7 +14,7 @@ Simulated mechanisms are **design facts**, not measured findings: current stress
 
 Revision 2 observed counts: energy 80/84, sleep 78/84, caffeine 83/84, exercise 79/84, stress 80/84, negative control 79/84. Energy min/max 3.636/8.330, sleep 5.623/8.418 hours; lag-1 energy +.461, sleep +.368, stress +.494. First/middle/final 28-day **observed** means: energy 6.808/6.129/5.390; sleep 7.327/7.174/6.605 hours; late caffeine .333/.357/.786; stress 3.943/4.363/4.935. Latest-minus-middle energy is **−.739**, inside the preregistered −.80 to −.25 goal. Sleep is **−.569 hours**, narrowly outside the preregistered −.55 to −.15 goal: **FAIL**. High recent late-caffeine frequency is a scenario limitation. These observed means have no inferential interval or causal interpretation.
 
-Generator SHA-256: `577139be73d3a59b484673cc49e4bbf7fa6a3780633306ed0ad28aefdd5ddadb`. Canonical normalized-record digest: `926f2e88d43f699d53845a8fbe79e847147a26318c62a317abc20bd0e58b258c`.
+Generator SHA-256: `577139be73d3a59b484673cc49e4bbf7fa6a3780633306ed0ad28aefdd5ddadb`. Canonical normalized-record digest: `926f2e88d43f699d53845a8fbe79e847147a26318c62a317abc20bd0e58b258c`. The synthetic CSV export produced 504 rows, file SHA-256 `ba039b9b124c08a4af372a437a969eb0f4d9be00bef1b29831ca061cc30b703a` and the same normalized-record digest; that CSV stayed outside the public worktree. `.gitattributes` pins LF checkout for the byte-hashed generator and plans, including on Windows.
 
 ## Frozen Discovery analysis and measured results
 
@@ -57,6 +57,8 @@ node --test frontend/tests/*.test.mjs
 $env:WORLD_MODEL_IMPL = (Resolve-Path 'vendor\meterless-world-model\src\index.ts').Path
 node --disable-warning=ExperimentalWarning --experimental-transform-types vendor/meterless-world-model/conformance/runner.ts
 python scripts/scientific_http_smoke.py
+$SyntheticCsv = Join-Path $env:TEMP 'phis-v2-synthetic-new.csv'
+python scripts/export_scenario_v2.py $SyntheticCsv
 python scripts/validate_scenario_v2.py --mode baseline > baseline.local.json
 python scripts/validate_scenario_v2.py --mode ablate > ablate.local.json
 python scripts/validate_scenario_v2.py --mode reverse > reverse.local.json
@@ -72,6 +74,7 @@ python scripts/check_scenario_v2_results.py baseline.local.json ablate.local.jso
 | Actual localhost HTTP → Discovery → official Engine, then follow-up read | **PASS**, proof IDs above; Zetaris explicitly NOT_CONNECTED |
 | Fixed-seed revised Discovery families and perturbation checker | **PASS execution** 16+16 children and perturbation checks; **FAIL scientific promotion** 0 candidate in both families |
 | Preregistered latest sleep mean change | **FAIL** −.569 h, .019 h beyond lower bound |
+| Public branch without private package | **PASS fail-closed**: five source-contract tests pass, one engine test skips, and a v2 request returns `BLOCKED` with no scientific package. |
 | Real local Zetaris 504-slot HTTP query and distinct sponsor IDs | **BLOCKED**: Docker client exists but daemon pipe is absent; `ZETARIS_REST_URL`, `ZETARIS_ORG_ID` and `ZETARIS_API_KEY` are unset in the execution environment. Injected-transport 200/200/104 pagination tests pass but are not sponsor proof. |
 | Private Discovery public packaging and clean-clone scientific operation | **BLOCKED** by owner rights/IP/license gate in PR #15/#16; clean clone retains runnable PR #13 fallback, while v2 abstains without the local private package. |
 | Judge-ready supported contributor to recent change | **FAIL** under frozen scientific gates; no causal or adjusted claim. |
