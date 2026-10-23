@@ -8,7 +8,8 @@ from contextlib import redirect_stderr, redirect_stdout
 from phis_open_agent.synthetic import generate_observations
 from phis_open_agent.zetaris_cli import main as cli_main
 from phis_open_agent.zetaris import (
-    ZetarisBlocked, ZetarisClient, ZetarisConfig, registration_sql, synthetic_query,
+    ZetarisBlocked, ZetarisClient, ZetarisConfig, ZetarisUiProxyClient,
+    live_zetaris_client, registration_sql, synthetic_query,
     verify_synthetic_rows,
 )
 
@@ -134,6 +135,52 @@ class ZetarisSimulatedTransportTests(unittest.TestCase):
         with redirect_stderr(error):
             self.assertEqual(cli_main(["preflight"], environ={}), 2)
         self.assertEqual(json.loads(error.getvalue())["status"], "BLOCKED")
+
+
+class SimulatedUiProxyTransport:
+    def __init__(self, *, invalid_login=False, bad_select=False):
+        self.requests = []
+        self.invalid_login = invalid_login
+        self.bad_select = bad_select
+
+    def send(self, request, timeout):
+        self.requests.append(request)
+        if request.full_url.endswith("/api/auth/login"):
+            return {"idToken": "test-only", "orgId": None if self.invalid_login else 7}
+        if request.full_url.endswith("/lightning-database/databases"):
+            return []
+        if request.full_url.endswith("/sql-editor/sqls/run-query"):
+            body = json.loads(request.data)
+            return {"data": [["0" if self.bad_select else "1"]]
+                    if body["sql"] == "SELECT 1" else []}
+        raise AssertionError("Unexpected route")
+
+
+class ZetarisUiProxyTests(unittest.TestCase):
+    def test_authenticated_proxy_route_and_unverified_simulation(self):
+        transport = SimulatedUiProxyTransport()
+        client = ZetarisUiProxyClient("http://localhost:3000", "user", "secret", transport)
+        self.assertEqual(client.preflight()["status"], "SIMULATED")
+        self.assertFalse(client.is_live_transport)
+        self.assertEqual([request.full_url.rsplit("/", 1)[-1]
+                          for request in transport.requests],
+                         ["login", "databases", "run-query"])
+        self.assertEqual(transport.requests[1].get_header("X-org-id"), "7")
+        self.assertEqual(json.loads(transport.requests[2].data)["source"], "SqlEditor")
+        self.assertNotIn("secret", repr(client.config))
+
+    def test_invalid_login_endpoint_and_select_fail_closed(self):
+        with self.assertRaises(ZetarisBlocked):
+            ZetarisUiProxyClient("http://remote.example:3000", "user", "secret",
+                                 SimulatedUiProxyTransport())
+        with self.assertRaises(ZetarisBlocked):
+            ZetarisUiProxyClient("http://localhost:3000", "user", "secret",
+                                 SimulatedUiProxyTransport(invalid_login=True))
+        with self.assertRaises(ZetarisBlocked):
+            ZetarisUiProxyClient("http://localhost:3000", "user", "secret",
+                                 SimulatedUiProxyTransport(bad_select=True)).preflight()
+        with self.assertRaises(ZetarisBlocked):
+            live_zetaris_client({"ZETARIS_CHANNEL": "unknown"})
 
 
 if __name__ == "__main__":

@@ -12,7 +12,7 @@ import json
 import os
 import re
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from urllib.parse import urlsplit
 from urllib.error import HTTPError, URLError
@@ -35,7 +35,7 @@ class ZetarisBlocked(RuntimeError):
 class ZetarisConfig:
     rest_url: str
     org_id: str
-    api_key: str
+    api_key: str = field(repr=False)
 
     @classmethod
     def from_env(cls, environ=None):
@@ -177,6 +177,57 @@ class ZetarisClient:
         result = self.read_synthetic_rows()
         result.pop("rows")
         return result
+
+
+class ZetarisUiProxyClient(ZetarisClient):
+    """Official UI proxy with an existing account login; no API key is created.
+
+    The login response supplies the numeric organisation ID. Both the login
+    token and password stay in process memory. The same bounded query and
+    source validation used by direct REST remain in force.
+    """
+
+    def __init__(self, base_url, username, password, transport=None):
+        parsed = urlsplit(base_url.rstrip("/"))
+        if (parsed.scheme not in ("http", "https") or not parsed.hostname or
+                parsed.path not in ("", "/") or parsed.query or parsed.fragment or
+                parsed.username or parsed.password or
+                (parsed.scheme == "http" and parsed.hostname.lower() not in
+                 ("localhost", "127.0.0.1", "::1"))):
+            raise ZetarisBlocked("ZETARIS_BASE_URL must be a local HTTP or remote HTTPS origin")
+        if not username or not password:
+            raise ZetarisBlocked("ZETARIS_USERNAME and ZETARIS_PASSWORD are required")
+        actual_transport = transport if transport is not None else UrlLibTransport()
+        request = Request(
+            base_url.rstrip("/") + "/api/auth/login",
+            data=json.dumps({"username": username, "password": password}).encode("utf-8"),
+            method="POST",
+            headers={"Content-Type": "application/json", "X-Request-ID": str(uuid.uuid4())},
+        )
+        login = actual_transport.send(request, timeout=30)
+        token = login.get("idToken") if isinstance(login, dict) else None
+        org_id = login.get("orgId") if isinstance(login, dict) else None
+        if not isinstance(token, str) or not token or type(org_id) is not int or org_id < 1:
+            raise ZetarisBlocked("Zetaris login did not supply a token and numeric organisation ID")
+        super().__init__(ZetarisConfig(base_url.rstrip("/") + "/api/proxy", str(org_id), token),
+                         transport=actual_transport)
+
+    def _call(self, path, body=None):
+        routes = {"/datasource/datasources": "/lightning-database/databases",
+                  "/sql-editor/sqls/run": "/sql-editor/sqls/run-query"}
+        return super()._call(routes.get(path, path), body)
+
+
+def live_zetaris_client(environ=None):
+    """Explicitly select one documented channel; never fall back on failure."""
+    env = os.environ if environ is None else environ
+    channel = env.get("ZETARIS_CHANNEL", "direct_rest")
+    if channel == "direct_rest":
+        return ZetarisClient(ZetarisConfig.from_env(env))
+    if channel == "ui_proxy":
+        return ZetarisUiProxyClient(env.get("ZETARIS_BASE_URL", "http://localhost:3000"),
+                                    env.get("ZETARIS_USERNAME"), env.get("ZETARIS_PASSWORD"))
+    raise ZetarisBlocked("Unknown ZETARIS_CHANNEL")
 
 
 def registration_sql(server_path):
