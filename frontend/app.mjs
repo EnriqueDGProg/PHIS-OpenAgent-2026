@@ -69,12 +69,12 @@ function renderChart(run) {
   const series = run.series[0];
   const variable = series?.variable || run.coverage[0]?.variable || 'energy';
   const label = variable === 'sleep_hours' ? 'Sleep' : 'Energy';
-  $('.page-title').innerHTML = variable === 'energy' ? 'What changed in my <em>energy?</em>' : 'What changed in my <em>sleep?</em>';
+  $('.page-title').innerHTML = variable === 'energy' || variable === 'energy_central' ? 'What changed in my <em>energy?</em>' : 'What changed in my <em>sleep?</em>';
   $('#breadcrumb-subject').textContent = label.toUpperCase();
   const coverage = run.coverage.find(item => item.variable === variable);
-  $('#chart-title').textContent = variable === 'energy' ? 'Energy over time' : 'Sleep over time';
+  $('#chart-title').textContent = variable === 'energy' || variable === 'energy_central' ? 'Energy over time' : 'Sleep over time';
   $('#chart-unit').textContent = series?.unit === 'hours' ? 'HOURS' : 'SCALE 1–10';
-  $('#legend-label').textContent = variable === 'energy' ? 'Recorded energy' : 'Recorded sleep';
+  $('#legend-label').textContent = variable === 'energy' || variable === 'energy_central' ? 'Recorded energy' : 'Recorded sleep';
   $('#coverage-label').textContent = coverage ? `${coverage.observed} / ${coverage.eligible} days` : 'NO COVERAGE';
   if (!series?.points.length) {
     $('.chart-footer').classList.add('no-series');
@@ -117,7 +117,7 @@ function renderPeriod(run) {
 function renderFindings(run) {
   const grid = $('#findings'); grid.replaceChildren();
   $('#finding-count').textContent = `${run.findings.length} ${run.findings.length === 1 ? 'FINDING' : 'FINDINGS'}`;
-  const kinds = {observation:'OBSERVATION',association:'ASSOCIATION',hypothesis:'HYPOTHESIS',uncertainty:'UNCERTAINTY',abstention:'ABSTENTION'};
+  const kinds = {observation:'OBSERVATION',association:'ASSOCIATION',hypothesis:'HYPOTHESIS',candidate_contributor:'CANDIDATE',unsupported_hypothesis:'UNSUPPORTED HYPOTHESIS',uncertainty:'UNCERTAINTY',abstention:'ABSTENTION'};
   for (const [index,finding] of run.findings.entries()) {
     const card = document.createElement('article'); card.className = `finding-card ${finding.kind}`;
     const label = document.createElement('span'); label.className = 'finding-index'; label.textContent = `${String(index+1).padStart(2,'0')} / ${kinds[finding.kind]}`;
@@ -207,7 +207,8 @@ function clearPresentation(message) {
 questionInput.addEventListener('input',()=>{pendingParentRunId=null;updateFollowupContext();});
 for (const button of document.querySelectorAll('[data-question]')) button.addEventListener('click',()=>{
   questionInput.value=button.dataset.question;
-  pendingParentRunId=button.dataset.question.includes('sleep') ? currentRun?.run_id || localStorage.getItem('phis.synthetic.lastRunId') : null;
+  pendingParentRunId=button.dataset.question.includes('sleep') || button.dataset.question.includes('next')
+    ? currentRun?.run_id || localStorage.getItem('phis.synthetic.lastRunId') : null;
   updateFollowupContext();
   questionInput.focus();
 });
@@ -224,7 +225,8 @@ form.addEventListener('submit',async event=>{
   setStatus('busy','CONSULTA IN PROGRESS','Waiting for the local run; no results or traces are confirmed yet.','IN PROGRESS');
   try {
     const scenario=new URLSearchParams(location.search).get('scenario') || 'normal';
-    currentRun=await fetchInvestigation(question,{scenario,parentRunId});
+    const analysisVersion=new URLSearchParams(location.search).get('analysis')==='v2' ? 'v2' : 'v1';
+    currentRun=await fetchInvestigation(question,{scenario,parentRunId,analysisVersion});
     const zetaris=currentRun.sponsor_proofs.find(proof=>proof.sponsor==='zetaris');
     $('#demo-sponsor-status').textContent=currentRun.mode==='LIVE_SYNTHETIC_ZETARIS'
       ? `Local Zetaris: ${zetaris?.status || 'NOT_CONNECTED'}. No medical advice.`
@@ -237,7 +239,9 @@ form.addEventListener('submit',async event=>{
     renderTrace(currentRun.tool_trace); renderChart(currentRun); renderPeriod(currentRun); renderFindings(currentRun);
     const states={PASS:['','OBSERVATION AVAILABLE'],EXECUTED_PARTIAL:['warning','PARTIAL RESULT'],INSUFFICIENT_DATA:['warning','INSUFFICIENT EVIDENCE'],BLOCKED:['warning','RESPONSIBLE ABSTENTION'],ERROR:['error','TOOL UNAVAILABLE']};
     setStatus(states[currentRun.status][0],states[currentRun.status][1],
-      currentRun.status === 'PASS' ? 'A descriptive finding is available below. Cause is not established.' : currentRun.summary,
+      currentRun.status === 'PASS' ? currentRun.contract_version === 'investigation.v2'
+        ? 'Scientific analysis completed. Review qualified signals and explicit limits below.'
+        : 'A descriptive finding is available below. Cause is not established.' : currentRun.summary,
       currentRun.run_id);
     $('#agent-phase').textContent={
       PASS:'RESPONSE RECEIVED',EXECUTED_PARTIAL:'PARTIAL RESULT',

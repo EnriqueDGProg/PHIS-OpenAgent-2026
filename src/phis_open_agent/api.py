@@ -11,6 +11,7 @@ from urllib.parse import urlsplit
 
 from .investigation import investigate
 from .run_world_model import MeterlessRunWorldModel
+from .scientific_v2 import investigate_scientific
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -77,13 +78,23 @@ class Handler(BaseHTTPRequestHandler):
             if self.headers.get("Content-Type", "").split(";")[0].strip() != "application/json":
                 raise ValueError("Expected application/json")
             payload = json.loads(self.rfile.read(size))
-            if not isinstance(payload, dict) or set(payload) - {"question", "parent_run_id", "scenario"}:
+            if not isinstance(payload, dict) or set(payload) - {"question", "parent_run_id", "scenario", "analysis_version"}:
                 raise ValueError("Unexpected request fields")
             with self.server.lock:
-                result = investigate(payload.get("question"), parent_run_id=payload.get("parent_run_id"),
-                                     scenario=payload.get("scenario", "normal"),
-                                     world_model=self.server.world_model,
-                                     mode=getattr(self.server, "data_mode", "SYNTHETIC_LOCAL_ONLY"))
+                if payload.get("analysis_version", "v1") == "v2":
+                    if payload.get("scenario", "normal") != "normal":
+                        raise ValueError("Evaluation scenarios are unavailable for scientific v2")
+                    result = investigate_scientific(
+                        payload.get("question"), parent_run_id=payload.get("parent_run_id"),
+                        world_model=self.server.world_model,
+                        mode=getattr(self.server, "data_mode", "SYNTHETIC_LOCAL_ONLY"))
+                elif payload.get("analysis_version", "v1") == "v1":
+                    result = investigate(payload.get("question"), parent_run_id=payload.get("parent_run_id"),
+                                         scenario=payload.get("scenario", "normal"),
+                                         world_model=self.server.world_model,
+                                         mode=getattr(self.server, "data_mode", "SYNTHETIC_LOCAL_ONLY"))
+                else:
+                    raise ValueError("Unknown analysis_version")
             self._send(200, result)
         except (ValueError, TypeError, json.JSONDecodeError) as exc:
             self._send(400, {"error": str(exc)})
