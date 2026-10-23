@@ -13,7 +13,7 @@ from uuid import uuid4
 
 from .discovery_adapter_180d import DiscoveryUnavailable, analyze_family
 from .scenario_contract_180d import DATASET_ID, DAYS, START, VARIABLES, ObservationRejected, canonical_digest, daily_series
-from .zetaris import ZetarisBlocked, ZetarisClient, ZetarisConfig
+from .zetaris import ZetarisBlocked, ZetarisClient, live_zetaris_client
 from .zetaris_180d import read_verified_180d
 
 
@@ -153,7 +153,7 @@ def investigate_scientific(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY"
     try:
         event("PLAN", "PASS", "planned", parent=memory_event["event_id"] if memory_event else None)
         if mode == "LIVE_SYNTHETIC_ZETARIS":
-            client = zetaris_client if zetaris_client is not None else ZetarisClient(ZetarisConfig.from_env())
+            client = zetaris_client if zetaris_client is not None else live_zetaris_client()
             if not isinstance(client, ZetarisClient) or not client.is_live_transport:
                 raise ZetarisBlocked("Live mode requires real Zetaris HTTP transport")
             preflight = client.preflight()
