@@ -195,7 +195,7 @@ def investigate_scientific(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY"
                              "title": "No qualified contributor", "text":
                              "No tested factor passed every predeclared temporal, block and multiple-testing gate.",
                              "source_record_ids": []})
-        findings.extend(_claim_for_signal(item, "unsupported_hypothesis") for item in unstable[:2])
+        findings.extend(_claim_for_signal(item, "association") for item in unstable[:2])
         control = [item for item in package["signals"] if item["exposure"] == "unrelated_count"]
         if any(item["classification"] == "candidate_signal" for item in control):
             raise DiscoveryUnavailable("Negative control promoted; scientific review required")

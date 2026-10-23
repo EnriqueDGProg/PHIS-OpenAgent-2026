@@ -28,7 +28,7 @@ export function validateScientificInvestigation(value) {
   } else if (value.scientific_evidence !== null || value.comparison !== null || value.series.length) {
     throw new Error('Stale scientific evidence after failure');
   }
-  if (value.findings.some(item => !['observation','candidate_contributor','unsupported_hypothesis','uncertainty','abstention'].includes(item.kind) || !Array.isArray(item.source_record_ids))) throw new Error('Invalid scientific finding');
+  if (value.findings.some(item => !['observation','association','candidate_contributor','unsupported_hypothesis','uncertainty','abstention'].includes(item.kind) || !Array.isArray(item.source_record_ids))) throw new Error('Invalid scientific finding');
   return value;
 }
 
