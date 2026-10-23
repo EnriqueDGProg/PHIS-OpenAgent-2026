@@ -18,6 +18,7 @@ COLUMNS = (
 )
 PAGE_SIZE = 200
 MAX_PAGES = 6
+EXPECTED_PAGE_SIZES = (200, 200, 200, 200, 200, 80)
 
 
 def page_sql(offset):
@@ -47,16 +48,17 @@ def read_verified_180d(client: ZetarisClient):
     traces = []
     for page in range(MAX_PAGES):
         page_rows, trace = client.query(page_sql(page * PAGE_SIZE), limit=PAGE_SIZE)
+        if len(page_rows) != EXPECTED_PAGE_SIZES[page]:
+            raise ZetarisBlocked("Zetaris 180-day page size disagrees with the frozen source contract")
         trace = {**trace, "page": page, "offset": page * PAGE_SIZE}
         traces.append(trace)
         for values in page_rows:
             if not isinstance(values, list) or len(values) != len(COLUMNS):
                 raise ZetarisBlocked("Zetaris returned a malformed observation row")
             raw_rows.append(dict(zip(COLUMNS, values)))
-        if len(page_rows) < PAGE_SIZE:
-            break
-    else:
-        raise ZetarisBlocked("Zetaris exceeded bounded pagination")
+    if (len({trace["request_id"] for trace in traces}) != MAX_PAGES or
+            len({trace["query_id"] for trace in traces}) != MAX_PAGES):
+        raise ZetarisBlocked("Zetaris source query IDs are not unique")
     try:
         rows = normalize_observations(raw_rows)
         digest = canonical_digest(rows)

@@ -12,6 +12,7 @@ from urllib.parse import urlsplit
 from .investigation import investigate
 from .run_world_model import MeterlessRunWorldModel
 from .scientific_v2 import investigate_scientific
+from .scientific_180d import investigate_scientific as investigate_scientific_180d
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -85,6 +86,13 @@ class Handler(BaseHTTPRequestHandler):
                     if payload.get("scenario", "normal") != "normal":
                         raise ValueError("Evaluation scenarios are unavailable for scientific v2")
                     result = investigate_scientific(
+                        payload.get("question"), parent_run_id=payload.get("parent_run_id"),
+                        world_model=self.server.world_model,
+                        mode=getattr(self.server, "data_mode", "SYNTHETIC_LOCAL_ONLY"))
+                elif payload.get("analysis_version") == "v3":
+                    if payload.get("scenario", "opportunity") != "opportunity":
+                        raise ValueError("Only the preregistered opportunity case is available for scientific v3")
+                    result = investigate_scientific_180d(
                         payload.get("question"), parent_run_id=payload.get("parent_run_id"),
                         world_model=self.server.world_model,
                         mode=getattr(self.server, "data_mode", "SYNTHETIC_LOCAL_ONLY"))
