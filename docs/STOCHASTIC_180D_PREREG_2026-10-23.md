@@ -1,0 +1,21 @@
+# Stochastic 180-day benchmark preregistration
+
+Registered before running the new generator or PHIS Discovery. This is a technical synthetic benchmark, not a clinical model. Base is PR #18 (`a2dc3c0`); PR #20 is the product specification. All cases and seeds below will be reported, including failures. No seed replacement or post-result tuning is permitted.
+
+## Fixed design
+
+- Three fictional cases, 180 consecutive local calendar dates ending 2026-10-21; six typed daily variables and 1,080 date-variable slots per case. The trailing 84 days form the history ablation. The same original v1.1 policy, pairs, routes, lags, 999 resamples, 3/7/14-day blocks and correction families from PR #18 apply to both lengths. Only dataset ID differs in plans. The engine receives observed rows only, never case mechanisms or labels.
+- Development seeds: **3101, 3102**. Held-out evaluation seeds: **4101, 4102**. Each seed is used in each of the three cases. Evaluate development and held-out seeds once; disclose every result. Seed 4101 is the predetermined illustration seed regardless of its outcome.
+- Generator parameter ranges (fixed values within ranges, not fitted to outcomes): energy baseline 6.1–7.7/10; sleep baseline 7.0–7.8 h; stress baseline 2.3–4.3/10; late-caffeine probability 0.12–0.45; exercise baseline 3.0–4.6/10; AR coefficients 0.15–0.45; same-day sleep-to-energy coefficient 0–0.75; same-day stress-to-energy −0.35–0; prior-day caffeine-to-sleep −0.8–0 h; prior-day exercise-to-energy −0.2–0.12; daily Gaussian SD energy 0.5–0.8, sleep 0.4–0.65, stress 0.55–0.9, exercise 0.9–1.25. Missingness 4–10% by variable plus a two-day sleep gap. These ranges are plausibility assumptions, not population estimates.
+- Opportunity: nonzero sleep, stress and caffeine pathways; a temporary workload episode near the latter part of history and recovery, with no direct energy offset. High baseline: smaller exposure variation, high energy/sleep baseline and weak or absent modifiable pathways. Null/confounded: shared workload may move stress, sleep and energy, but no direct sleep-to-energy or caffeine-to-sleep pathway. Independently generated unrelated-count control has no pathway in any case. Independent random streams isolate measurement missingness and controls.
+- Overnight convention: `late_caffeine` on date *t* can influence `sleep_hours` on date *t+1*. `sleep_hours` on date *t* can influence energy on date *t*. Missing is null, never zero.
+
+## Fixed objectives and decisions
+
+1. Contract: unique complete keys, plausible bounds, >=70% observed coverage per variable and case, realistic variation, visible but non-perfect lag alignment; no generator imports in the runtime adapter.
+2. Scientific output: report all 16 original children per family via class counts; selected known pairs, lag/route, r, CI, N, corrected q, temporal flags and block sensitivity. Count detection only when an expected pair is original `candidate_signal`; `unstable_candidate` remains a miss for strict detection. Count any promoted unrelated control as a false positive. No target pass rate is assumed.
+3. Comparison: same seed/case over 84 vs 180 days; report class changes, selected effects and both-family wall time. A longer history is useful only if actual diagnostics support it.
+4. Falsification: shuffle observed sleep in the opportunity illustration, preserving missing slots; record target change. Sparse sleep should abstain. Null/high-baseline cases must not receive fabricated improvement guidance.
+5. Guidance policy v1 is additive: Tier 1 requires original `candidate_signal`. Tier 2 requires original `unstable_candidate`, >=30 raw and >=20 effective aligned pairs, >=70% coverage, absolute r >=.30, interval excluding zero, compatible lag direction, and a predeclared low-risk observation question. Display *every* engine flag, all q values, temporal and block diagnostics as counterevidence. A raw correlation alone never qualifies. Null controls are never guidance candidates. Tier 3 covers all else. Tier 2 is exploratory and never means actionable, confirmed, adjusted or causal.
+
+If results are scientifically inconclusive, retain them and stop. Trend-aware regression is a future separately validated proposal, not part of this run. Synthetic results do not establish clinical effectiveness.
