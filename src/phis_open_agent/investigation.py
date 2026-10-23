@@ -122,5 +122,8 @@ def investigate(question, *, world_model, parent_run_id=None, scenario="normal")
             "window": {"start": first_window[0], "end": first_window[1]},
             "summary": execution["answer"], "coverage": coverages, "series": series,
             "comparison": comparison, "findings": findings, "tool_trace": trace,
-            "sponsor_proofs": [{"sponsor": name, "status": "NOT_CONNECTED", "trace_id": None}
+            "sponsor_proofs": [{"sponsor": name,
+                                "status": execution["sponsor_proofs"][name],
+                                "trace_id": world_model.engine_trace_id if name == "meterless_engine" and
+                                execution["sponsor_proofs"][name] == "VERIFIED" else None}
                                for name in SPONSORS]}

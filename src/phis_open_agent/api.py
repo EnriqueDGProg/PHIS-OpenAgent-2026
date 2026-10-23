@@ -10,7 +10,7 @@ from threading import Lock
 from urllib.parse import urlsplit
 
 from .investigation import investigate
-from .run_world_model import SyntheticRunWorldModel
+from .run_world_model import MeterlessRunWorldModel
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -28,7 +28,7 @@ class DemoServer(ThreadingHTTPServer):
 
     def __init__(self, address, handler=BaseHTTPRequestHandler, *, state_path=None):
         super().__init__(address, handler)
-        self.world_model = SyntheticRunWorldModel(
+        self.world_model = MeterlessRunWorldModel(
             state_path if state_path is not None else ROOT / ".local-state" / "agent-events.jsonl")
         self.lock = Lock()
 

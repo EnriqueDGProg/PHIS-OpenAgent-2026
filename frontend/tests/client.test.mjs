@@ -20,6 +20,16 @@ test('client accepts sourced gaps and rejects fabricated sponsor proof', () => {
   assert.throws(() => validateInvestigation(fake),/patrocinador/);
 });
 
+test('client accepts only an Engine proof tied to a returned event', () => {
+  const run=base();
+  const eventId='a'.repeat(64);
+  run.tool_trace=[{trace_id:eventId,tool:'PLAN',status:'PASS',detail:'local event',source_record_ids:[]}];
+  run.sponsor_proofs.push({sponsor:'meterless_engine',status:'VERIFIED',trace_id:eventId});
+  assert.equal(validateInvestigation(run).sponsor_proofs[1].status,'VERIFIED');
+  run.sponsor_proofs[1].trace_id='b'.repeat(64);
+  assert.throws(() => validateInvestigation(run),/patrocinador/);
+});
+
 test('client rejects numeric point without source and comparison in abstention', () => {
   const badPoint=base(); badPoint.series[0].points[1].source_record_id=null;
   assert.throws(() => validateInvestigation(badPoint),/fuente/);

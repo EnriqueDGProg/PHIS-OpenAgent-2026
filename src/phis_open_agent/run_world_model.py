@@ -1,14 +1,15 @@
-"""Synthetic run-state slice inspired by Meterless World Model.
+"""Synthetic event schema and two local run-state backends.
 
-This is an original, bounded implementation of append-only events, stable IDs,
-provenance validation, and a read surface. It is not Nightshift or a claim of
-full Meterless World Model conformance.
+SyntheticRunWorldModel is the earlier original JSONL implementation inspired by
+World Model. MeterlessRunWorldModel uses the pinned official reference Engine.
+Neither backend is Nightshift or Meterless Runtime inference.
 """
 
 import hashlib
 import json
 import math
 import re
+import subprocess
 from pathlib import Path
 
 
@@ -34,36 +35,8 @@ class SyntheticRunWorldModel:
         self.path = Path(path)
 
     def append(self, *, run_id, kind, payload, source_record_ids):
-        if not isinstance(run_id, str) or not re.fullmatch(r"SYN-RUN-[A-Za-z0-9_-]{1,64}", run_id) or kind not in ALLOWED_KINDS:
-            raise ValueError("Only allowlisted synthetic run events are accepted")
-        if kind == "energy_comparison":
-            valid_payload = (isinstance(payload, dict) and set(payload) == {"status", "difference"}
-                             and payload["status"] in {"PASS", "INSUFFICIENT_DATA"}
-                             and (payload["difference"] is None or
-                                  (not isinstance(payload["difference"], bool) and
-                                   isinstance(payload["difference"], (int, float)) and
-                                   math.isfinite(payload["difference"]))))
-        else:
-            valid_payload = (isinstance(payload, dict) and
-                             set(payload) == {"phase", "status", "intent", "action", "reason_code", "parent_event_id"}
-                             and payload["phase"] in PHASES and payload["status"] in STATES
-                             and payload["intent"] in INTENTS and payload["action"] in ACTIONS
-                             and payload["reason_code"] in REASONS
-                             and (payload["parent_event_id"] is None or
-                                  (isinstance(payload["parent_event_id"], str) and
-                                   len(payload["parent_event_id"]) == 64 and
-                                   all(c in "0123456789abcdef" for c in payload["parent_event_id"]))))
-        if not valid_payload:
-            raise ValueError("Unexpected run-state payload")
-        if not isinstance(source_record_ids, (list, tuple)) or (kind == "energy_comparison" and not source_record_ids) or any(
-            not isinstance(item, str) or not item.startswith("SYN-") for item in source_record_ids
-        ):
-            raise ValueError("Event requires synthetic source provenance")
-        material = {"schema_version": SCHEMA, "run_id": run_id, "kind": kind,
-                    "payload": payload, "source_record_ids": sorted(set(source_record_ids)),
-                    "synthetic": True}
-        event_id = hashlib.sha256(_canonical(material).encode("ascii")).hexdigest()
-        event = {"event_id": event_id, **material}
+        event = _make_event(run_id, kind, payload, source_record_ids)
+        event_id = event["event_id"]
         current = self.read(run_id)
         if any(item["event_id"] == event_id for item in current):
             return event
@@ -73,21 +46,128 @@ class SyntheticRunWorldModel:
         return event
 
     def read(self, run_id):
-        if not isinstance(run_id, str) or not re.fullmatch(r"SYN-RUN-[A-Za-z0-9_-]{1,64}", run_id):
-            raise ValueError("Only synthetic run IDs are accepted")
+        _validate_run_id(run_id)
         if not self.path.exists():
             return []
         events = []
         with self.path.open(encoding="utf-8") as handle:
             for line in handle:
                 event = json.loads(line)
-                material = {key: value for key, value in event.items() if key != "event_id"}
-                if hashlib.sha256(_canonical(material).encode("ascii")).hexdigest() != event["event_id"]:
-                    raise ValueError("Run-state event integrity failed")
-                if event["schema_version"] != SCHEMA or event["synthetic"] is not True:
-                    raise ValueError("Non-synthetic run-state event")
+                _validate_stored_event(event)
                 if event["run_id"] == run_id:
                     events.append(event)
+        return events
+
+
+def _validate_run_id(run_id):
+    if not isinstance(run_id, str) or not re.fullmatch(r"SYN-RUN-[A-Za-z0-9_-]{1,64}", run_id):
+        raise ValueError("Only synthetic run IDs are accepted")
+
+
+def _make_event(run_id, kind, payload, source_record_ids):
+    if not isinstance(run_id, str) or not re.fullmatch(r"SYN-RUN-[A-Za-z0-9_-]{1,64}", run_id) or kind not in ALLOWED_KINDS:
+        raise ValueError("Only allowlisted synthetic run events are accepted")
+    if kind == "energy_comparison":
+        valid_payload = (isinstance(payload, dict) and set(payload) == {"status", "difference"}
+                         and payload["status"] in {"PASS", "INSUFFICIENT_DATA"}
+                         and (payload["difference"] is None or
+                              (not isinstance(payload["difference"], bool) and
+                               isinstance(payload["difference"], (int, float)) and
+                               math.isfinite(payload["difference"]))))
+    else:
+        valid_payload = (isinstance(payload, dict) and
+                         set(payload) == {"phase", "status", "intent", "action", "reason_code", "parent_event_id"}
+                         and payload["phase"] in PHASES and payload["status"] in STATES
+                         and payload["intent"] in INTENTS and payload["action"] in ACTIONS
+                         and payload["reason_code"] in REASONS
+                         and (payload["parent_event_id"] is None or
+                              (isinstance(payload["parent_event_id"], str) and
+                               len(payload["parent_event_id"]) == 64 and
+                               all(c in "0123456789abcdef" for c in payload["parent_event_id"]))))
+    if not valid_payload:
+        raise ValueError("Unexpected run-state payload")
+    if not isinstance(source_record_ids, (list, tuple)) or (kind == "energy_comparison" and not source_record_ids) or any(
+        not isinstance(item, str) or not item.startswith("SYN-") for item in source_record_ids
+    ):
+        raise ValueError("Event requires synthetic source provenance")
+    material = {"schema_version": SCHEMA, "run_id": run_id, "kind": kind,
+                "payload": payload, "source_record_ids": sorted(set(source_record_ids)),
+                "synthetic": True}
+    event_id = hashlib.sha256(_canonical(material).encode("ascii")).hexdigest()
+    return {"event_id": event_id, **material}
+
+
+def _validate_stored_event(event):
+    if not isinstance(event, dict) or "event_id" not in event:
+        raise ValueError("Run-state event integrity failed")
+    material = {key: value for key, value in event.items() if key != "event_id"}
+    if hashlib.sha256(_canonical(material).encode("ascii")).hexdigest() != event["event_id"]:
+        raise ValueError("Run-state event integrity failed")
+    if event["schema_version"] != SCHEMA or event["synthetic"] is not True:
+        raise ValueError("Non-synthetic run-state event")
+    expected = _make_event(event["run_id"], event["kind"], event["payload"],
+                           event["source_record_ids"])
+    if event != expected:
+        raise ValueError("Unexpected run-state event")
+
+
+class MeterlessRunWorldModel:
+    """Synthetic PHIS events persisted through the official World Model Engine.
+
+    The path selects a private local namespace. Its actual file is
+    ``path.parent/.world/<path.stem>.json``; old JSONL stores are not imported.
+    """
+
+    engine_name = "Meterless World Model reference"
+    _bridge = Path(__file__).resolve().parents[2] / "vendor" / "meterless-world-model" / "bridge.ts"
+
+    def __init__(self, path):
+        self.path = Path(path)
+        self.engine_verified = False
+        self.engine_trace_id = None
+
+    def _invoke(self, request):
+        try:
+            result = subprocess.run(
+                ["node", "--disable-warning=ExperimentalWarning", "--experimental-transform-types", str(self._bridge)],
+                input=json.dumps({"statePath": str(self.path.resolve()), **request}, allow_nan=False),
+                text=True, capture_output=True, timeout=20, check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise OSError("Meterless World Model Engine unavailable") from exc
+        if result.returncode != 0:
+            raise OSError("Meterless World Model Engine write or read failed")
+        try:
+            return json.loads(result.stdout)
+        except json.JSONDecodeError as exc:
+            raise OSError("Meterless World Model Engine returned invalid JSON") from exc
+
+    def append(self, *, run_id, kind, payload, source_record_ids):
+        event = _make_event(run_id, kind, payload, source_record_ids)
+        response = self._invoke({"operation": "append", "runId": run_id, "event": event})
+        if (response.get("event") != event or response.get("durable_readback") is not True or
+                not isinstance(response.get("engine_event_id"), str)):
+            raise OSError("Meterless World Model Engine receipt invalid")
+        self.engine_verified = True
+        self.engine_trace_id = event["event_id"]
+        return {**event, "engine_event_id": response["engine_event_id"]}
+
+    def read(self, run_id):
+        _validate_run_id(run_id)
+        response = self._invoke({"operation": "read", "runId": run_id})
+        records = response.get("records")
+        if not isinstance(records, list):
+            raise OSError("Meterless World Model Engine read receipt invalid")
+        events = []
+        for record in records:
+            event = record.get("event") if isinstance(record, dict) else None
+            _validate_stored_event(event)
+            if event["run_id"] != run_id or not isinstance(record.get("engine_event_id"), str):
+                raise ValueError("Meterless World Model Engine record scope invalid")
+            events.append({**event, "engine_event_id": record["engine_event_id"]})
+        if events:
+            self.engine_verified = True
+            self.engine_trace_id = events[-1]["event_id"]
         return events
 
 

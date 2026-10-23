@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 from .orchestrator import SyntheticAgent
-from .run_world_model import SyntheticRunWorldModel
+from .run_world_model import MeterlessRunWorldModel
 from .synthetic import generate_observations
 
 
@@ -21,9 +21,9 @@ def main():
     parser.add_argument("intent", choices=QUESTIONS)
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--parent-run-id")
-    parser.add_argument("--state", type=Path, default=Path(".synthetic-agent-state.jsonl"))
+    parser.add_argument("--state", type=Path, default=Path(".local-state/agent-events.jsonl"))
     args = parser.parse_args()
-    result = SyntheticAgent(SyntheticRunWorldModel(args.state)).run(
+    result = SyntheticAgent(MeterlessRunWorldModel(args.state)).run(
         run_id=args.run_id, question=QUESTIONS[args.intent], rows=generate_observations(),
         parent_run_id=args.parent_run_id)
     print(json.dumps(result, ensure_ascii=False, indent=2))
