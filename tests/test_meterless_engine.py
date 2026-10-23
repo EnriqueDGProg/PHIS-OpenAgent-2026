@@ -1,11 +1,15 @@
 """Local Engine tests, plus one missing-process fault. No Runtime or health data."""
 
 import json
+import io
 import tempfile
 import unittest
 from pathlib import Path
+from threading import Lock
+from types import SimpleNamespace
 from unittest.mock import patch
 
+from phis_open_agent.api import Handler
 from phis_open_agent.orchestrator import SyntheticAgent
 from phis_open_agent.investigation import investigate
 from phis_open_agent.run_world_model import MeterlessRunWorldModel, select_followup_tool
@@ -20,6 +24,36 @@ class MeterlessEngineTests(unittest.TestCase):
 
     def store(self):
         return MeterlessRunWorldModel(self.path)
+
+    def call_api(self, store, payload):
+        body = json.dumps(payload).encode("utf-8")
+        handler = Handler.__new__(Handler)
+        handler.path = "/api/investigations"
+        handler.headers = {"Content-Type": "application/json", "Content-Length": str(len(body))}
+        handler.rfile = io.BytesIO(body)
+        handler.server = SimpleNamespace(lock=Lock(), world_model=store)
+        sent = []
+        handler._send = lambda code, data, content_type="application/json": sent.append((code, data))
+        handler.do_POST()
+        return sent[0]
+
+    def test_http_contract_uses_persisted_engine_and_fails_closed(self):
+        code, parent = self.call_api(self.store(), {"question": "¿Cómo cambió mi energía?"})
+        self.assertEqual(code, 200)
+        self.assertEqual(parent["status"], "PASS")
+        self.assertEqual(next(proof for proof in parent["sponsor_proofs"]
+                              if proof["sponsor"] == "meterless_engine")["status"], "VERIFIED")
+        code, child = self.call_api(self.store(),
+                                    {"question": "¿Y el sueño?", "parent_run_id": parent["run_id"]})
+        self.assertEqual(code, 200)
+        self.assertEqual(child["status"], "PASS")
+        self.assertEqual([step["tool"] for step in child["tool_trace"] if step["phase"] == "TOOLS"],
+                         ["get_variable_coverage", "get_longitudinal_trend"])
+        self.assertTrue(any(step["parent_event_id"] for step in child["tool_trace"]))
+        with patch("phis_open_agent.run_world_model.subprocess.run", side_effect=FileNotFoundError):
+            code, unavailable = self.call_api(self.store(), {"question": "energía"})
+        self.assertEqual(code, 503)
+        self.assertEqual(unavailable, {"error": "Synthetic state store unavailable"})
 
     def test_event_persist_read_changes_next_tool_after_restart(self):
         rows = generate_observations()
