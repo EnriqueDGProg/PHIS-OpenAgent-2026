@@ -4,46 +4,346 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#173c35" />
-  <meta name="description" content="PHIS Open Agent: evidence-backed longitudinal investigation using synthetic data." />
-  <title>PHIS — Evidence Explorer</title>
+  <meta name="description" content="PHIS — Personal Health Intelligence System. Evidence-backed longitudinal investigation using synthetic data." />
+  <title>PHIS — Personal Health Intelligence System</title>
   <link rel="stylesheet" href="./styles.css" />
   <script type="module" src="./app.mjs"></script>
 </head>
 <body>
-  <a class="skip-link" href="#main">Skip to results</a>
+  <a class="skip-link" href="#main">Skip to investigation results</a>
+
   <div class="app-shell">
-    <aside class="investigation-rail" aria-label="Investigation">
-      <div class="brand-row"><div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></div><div class="brand-name">phis<span class="brand-dot">.</span></div><span class="brand-caption">OPEN AGENT</span></div>
-      <div class="rail-topline"><span class="live-dot" aria-hidden="true"></span> EVIDENCE LAB <span>01 / 01</span></div>
+
+    <!-- ═══ LEFT RAIL ══════════════════════════════════════════════════ -->
+    <aside class="investigation-rail" aria-label="Investigation panel">
+
+      <!-- Brand -->
+      <div class="brand-row">
+        <div class="brand-lockup" aria-label="PHIS — Personal Health Intelligence System">
+          <div class="brand-mark" aria-hidden="true">
+            <span></span><span></span><span></span><span></span>
+          </div>
+          <div class="brand-wordmark">
+            <span class="brand-name">PHIS</span><span class="brand-dot" aria-hidden="true">.</span>
+          </div>
+        </div>
+        <span class="brand-caption" aria-label="Open Agent">OPEN AGENT</span>
+      </div>
+
+      <!-- Evidence lab label -->
+      <div class="rail-topline" role="status" aria-live="polite">
+        <span class="live-dot" aria-hidden="true"></span>
+        <span id="rail-mode-label">EVIDENCE LAB</span>
+        <span id="rail-run-counter" aria-label="Run 0">00 / 00</span>
+      </div>
+
+      <!-- Hero -->
       <div class="rail-hero">
-        <div class="hero-ornament" aria-hidden="true"><span></span><span></span><span></span></div>
-        <p class="eyebrow">LONGITUDINAL INVESTIGATION · DEMO</p>
-        <h1>Investigate a change in your <em>records.</em></h1>
-        <p class="hero-copy">Ask about energy or sleep. See the available data, its source, and what remains uncertain.</p>
+        <div class="hero-ornament" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+        <p class="eyebrow">LONGITUDINAL INVESTIGATION · SYNTHETIC DEMO</p>
+        <h1>Investigate a change in your <em>health records.</em></h1>
+        <p class="hero-copy">
+          Ask about energy or sleep patterns. PHIS retrieves your actual
+          dated records, runs a pre-declared analysis, and tells you what
+          the evidence supports — and where it runs out.
+        </p>
       </div>
-      <form id="question-form" class="question-panel">
+
+      <!-- Question form -->
+      <form id="question-form" class="question-panel" novalidate>
         <label for="question">01 / YOUR QUESTION</label>
-        <div class="question-field"><textarea id="question" name="question" rows="3" maxlength="240" spellcheck="true">Why has my energy changed recently?</textarea><span class="question-cursor" aria-hidden="true">↗</span></div>
-        <div class="question-actions"><span>Scope: energy and sleep</span><button class="ask-button" type="submit"><span>Investigate records</span><span aria-hidden="true">↗</span></button></div>
+        <div class="question-field">
+          <textarea
+            id="question"
+            name="question"
+            rows="3"
+            maxlength="240"
+            spellcheck="true"
+            aria-describedby="question-hint"
+          >Why has my energy changed over the past few months?</textarea>
+          <span class="question-cursor" aria-hidden="true">↗</span>
+        </div>
+        <p id="question-hint" class="question-hint">
+          Scope: energy and sleep. Ask naturally — e.g.&nbsp;"What's been driving my fatigue?"
+        </p>
+        <div class="question-actions">
+          <div class="question-suggestions" aria-label="Question suggestions">
+            <button type="button" class="suggestion-chip" data-fill="Why has my energy changed over the past few months?">Energy trend</button>
+            <button type="button" class="suggestion-chip" data-fill="How did my sleep change during that period?">Sleep pattern</button>
+            <button type="button" class="suggestion-chip" data-fill="What should I investigate next?">What's next?</button>
+          </div>
+          <button class="ask-button" type="submit" id="ask-button">
+            <span class="ask-label">Investigate records</span>
+            <span aria-hidden="true">↗</span>
+          </button>
+        </div>
       </form>
-      <div id="followup-context" class="followup-context" role="status" hidden></div>
-      <div class="example-row"><span>CONTINUE THE INVESTIGATION</span><button type="button" class="text-chip" data-question="How did my sleep change in that period?">Investigate sleep</button><button type="button" class="text-chip" data-question="What should we investigate next?">Next question</button></div>
-      <div class="demo-notice" role="note"><span class="notice-icon" aria-hidden="true">✳</span><div><strong>Synthetic demo · fictional participant</strong><p id="demo-sponsor-status">Sponsor status is checked on every run. No medical advice.</p></div></div>
-      <section class="agent-panel" aria-labelledby="agent-title"><div class="panel-heading"><span class="tiny-star" aria-hidden="true">✳</span><h2 id="agent-title">Agent activity</h2><span id="agent-phase" class="local-tag">NOT STARTED</span></div><p class="agent-caption">Plan and tool calls returned by Python. Blocked actions are never presented as executed.</p><ol id="trace-list" class="trace-list"><li class="trace-empty">Submit a question to see execution and limits.</li></ol></section>
-      <div class="rail-footer"><span>PHIS / DISCOVERY</span><span>2026 · DEMO</span></div>
-    </aside>
-    <main id="main" class="workbench" tabindex="-1">
-      <header class="workbench-header"><div class="breadcrumb">INVESTIGATION <span>/</span> <span id="breadcrumb-subject">ENERGY</span></div><div class="header-right"><span class="mode-pill"><i aria-hidden="true"></i> SYNTHETIC · MODE PENDING</span><span class="avatar" aria-label="Fictional participant">SF</span></div></header>
-      <div class="content-wrap">
-        <div class="intro-row"><div><div class="section-kicker"><span class="section-number">02</span> RESULT <span class="kicker-line"></span> <span id="window-label">30 JUL — 21 OCT 2026</span></div><h2 class="page-title">What changed in my <em>energy?</em></h2><p id="result-context" class="page-subtitle">Submit a question to query the Python core.</p></div><button id="evidence-button" class="evidence-button" type="button" aria-controls="evidence-dialog" disabled><span class="button-icon" aria-hidden="true">▦</span> Open evidence <span aria-hidden="true">↗</span></button></div>
-        <div class="status-strip" role="status" aria-live="polite"><div class="strip-main"><span class="status-bloom" aria-hidden="true">✳</span><div><span id="status-label" class="status-label">READY TO EXPLORE</span><p id="status-copy">Run a question to query the synthetic core.</p></div></div><span id="run-id" class="run-id">NO RUN</span></div>
-        <div class="overview-grid"><section class="chart-card" aria-labelledby="chart-title"><div class="card-header"><div><p class="card-eyebrow">DAILY RECORD · NO INTERPOLATION</p><h3 id="chart-title">Energy over time</h3></div><span id="chart-unit" class="chart-unit">SCALE 1–10</span></div><div id="chart-container" class="chart-container"><div class="chart-placeholder"><strong>The series will appear here</strong><span>Missing days remain visible.</span></div></div><div class="chart-footer"><span><i class="legend-dot" aria-hidden="true"></i> <span id="legend-label">Recorded energy</span></span><span><i class="legend-gap" aria-hidden="true"></i> Missing record; line broken</span><strong id="coverage-label">— / 84 days</strong></div><p id="chart-help" class="chart-help">Each point opens its source ID.</p></section>
-        <aside class="period-card" aria-labelledby="period-title"><p class="card-eyebrow">DESCRIPTIVE COMPARISON</p><h3 id="period-title">Two 28-day periods</h3><p id="period-description" class="period-copy">Only observed days are compared. A difference does not establish a cause.</p><div id="period-values" class="period-values"><div><span>EARLIER PERIOD</span><strong>—</strong></div><div><span>RECENT PERIOD</span><strong>—</strong></div></div><div id="period-footnote" class="period-footnote">Mean of observed days · unit shown in series</div></aside></div>
-        <div class="findings-heading"><div><p class="card-eyebrow">INTERPRETATION</p><h3>What we know. What we do not.</h3></div><span id="finding-count">NO FINDINGS</span></div><div id="findings" class="findings-grid"><article class="finding-card empty-card"><span class="finding-index">01 / OBSERVATION</span><h4>Explore to see the evidence.</h4><p>Each finding has a source and a limit.</p></article></div>
-        <footer class="workbench-footer"><span>100% SYNTHETIC DATA · NO DIAGNOSIS</span><span>PHIS OPEN AGENT / DEMO EXPERIENCE</span></footer>
+
+      <!-- Follow-up context banner -->
+      <div id="followup-banner" class="followup-banner" role="status" hidden>
+        <span class="followup-icon" aria-hidden="true">↺</span>
+        <div>
+          <strong>Continuing investigation</strong>
+          <p id="followup-detail">Reading prior World Model decision</p>
+        </div>
       </div>
-    </main>
-  </div>
-  <dialog id="evidence-dialog" class="evidence-dialog" aria-labelledby="dialog-title"><div class="dialog-header"><div><p class="card-eyebrow">LINEAGE / SOURCES</p><h2 id="dialog-title">Behind every finding.</h2></div><button id="dialog-close" class="close-button" type="button" aria-label="Close evidence panel">×</button></div><div id="dialog-content" class="dialog-content"><p>Start an investigation to inspect records and tools.</p></div></dialog>
+
+      <!-- Follow-up action chips (shown after PASS result) -->
+      <div id="followup-actions" class="followup-actions" hidden aria-label="Follow-up actions">
+        <span class="followup-actions-label">CONTINUE INVESTIGATION</span>
+        <button type="button" class="text-chip" id="chip-sleep" data-question="How did my sleep change in that period?">
+          Investigate sleep ↗
+        </button>
+        <button type="button" class="text-chip" id="chip-next" data-question="What should we investigate next?">
+          What's next? ↗
+        </button>
+        <button type="button" class="text-chip" id="chip-abstain" data-question="Is there a clinical diagnosis here?">
+          Test abstention ↗
+        </button>
+      </div>
+
+      <!-- Synthetic data notice -->
+      <div class="demo-notice" role="note">
+        <span class="notice-icon" aria-hidden="true">✳</span>
+        <div>
+          <strong>Synthetic demo · fictional participant</strong>
+          <p id="demo-sponsor-status">Sponsor connections are verified on every run. No medical advice.</p>
+        </div>
+      </div>
+
+      <!-- Agent activity trace -->
+      <section class="agent-panel" aria-labelledby="agent-title">
+        <div class="panel-heading">
+          <span class="tiny-star" aria-hidden="true">✳</span>
+          <h2 id="agent-title">Agent activity</h2>
+          <span id="agent-phase" class="phase-tag phase-idle">NOT STARTED</span>
+        </div>
+        <p class="agent-caption">
+          Tool calls and phase decisions returned by the Python core.
+          Blocked steps are never shown as executed.
+        </p>
+        <ol id="trace-list" class="trace-list" aria-label="Agent tool trace">
+          <li class="trace-empty">Submit a question to see the execution trace and any limits.</li>
+        </ol>
+      </section>
+
+      <div class="rail-footer">
+        <span>PHIS / PERSONAL HEALTH INTELLIGENCE</span>
+        <span>2026 · DEMO</span>
+      </div>
+    </aside><!-- /rail -->
+
+    <!-- ═══ MAIN WORKBENCH ═════════════════════════════════════════════ -->
+    <main id="main" class="workbench" tabindex="-1">
+
+      <!-- Workbench header -->
+      <header class="workbench-header">
+        <nav class="breadcrumb" aria-label="Investigation context">
+          INVESTIGATION
+          <span aria-hidden="true">/</span>
+          <span id="breadcrumb-subject">ENERGY</span>
+        </nav>
+        <div class="header-right">
+          <span id="mode-pill" class="mode-pill">
+            <i aria-hidden="true"></i>
+            <span id="mode-label">SYNTHETIC · MODE PENDING</span>
+          </span>
+          <span id="window-badge" class="window-badge" aria-label="Analysis window">84 DAYS</span>
+          <span class="avatar" aria-label="Fictional participant — synthetic data">SF</span>
+        </div>
+      </header>
+
+      <div class="content-wrap">
+
+        <!-- Section intro row -->
+        <div class="intro-row">
+          <div>
+            <div class="section-kicker">
+              <span class="section-number" aria-hidden="true">02</span>
+              RESULT
+              <span class="kicker-line" aria-hidden="true"></span>
+              <span id="window-label" aria-label="Analysis window dates">— / — 2026</span>
+            </div>
+            <h2 id="page-title" class="page-title">
+              What changed in my <em>energy?</em>
+            </h2>
+            <p id="result-context" class="page-subtitle">
+              Submit a question to query the synthetic Python core.
+            </p>
+          </div>
+          <button
+            id="evidence-button"
+            class="evidence-button"
+            type="button"
+            aria-controls="evidence-dialog"
+            aria-haspopup="dialog"
+            disabled
+          >
+            <span class="button-icon" aria-hidden="true">▦</span>
+            Open evidence
+            <span aria-hidden="true">↗</span>
+          </button>
+        </div>
+
+        <!-- Status strip -->
+        <div class="status-strip" role="status" aria-live="polite" aria-atomic="true">
+          <div class="strip-main">
+            <span class="status-bloom" aria-hidden="true">✳</span>
+            <div>
+              <span id="status-label" class="status-label">READY TO EXPLORE</span>
+              <p id="status-copy">Run a question to query the synthetic core.</p>
+            </div>
+          </div>
+          <span id="run-id" class="run-id" aria-label="Run ID">NO RUN</span>
+        </div>
+
+        <!-- Trajectory hero strip (hidden until PASS) -->
+        <div id="trajectory-strip" class="trajectory-strip" hidden aria-live="polite">
+          <div id="trajectory-direction" class="trajectory-direction" aria-hidden="true">▼</div>
+          <div>
+            <div id="trajectory-delta" class="trajectory-delta">—</div>
+            <div id="trajectory-label" class="trajectory-label">in the most recent 28-day period vs. prior 28 days</div>
+          </div>
+          <div class="trajectory-baseline">
+            <span id="trajectory-baseline-label" class="baseline-label">Personal baseline</span>
+            <span id="trajectory-baseline-value" class="baseline-value">—</span>
+          </div>
+        </div>
+
+        <!-- Overview grid: chart + period -->
+        <div class="overview-grid">
+          <!-- Chart card -->
+          <section class="chart-card" aria-labelledby="chart-title">
+            <div class="card-header">
+              <div>
+                <p class="card-eyebrow">DAILY RECORD · NO INTERPOLATION · ACTUAL OBSERVED DATES</p>
+                <h3 id="chart-title">Energy over time</h3>
+              </div>
+              <span id="chart-unit" class="chart-unit" aria-label="Unit: scale 1–10">SCALE 1–10</span>
+            </div>
+            <div id="chart-container" class="chart-container" role="img" aria-labelledby="chart-title">
+              <div class="chart-placeholder">
+                <span class="placeholder-icon" aria-hidden="true">⬡</span>
+                <strong>The longitudinal series will appear here</strong>
+                <span>Missing days remain visible as gaps — not zeros.</span>
+              </div>
+            </div>
+            <div class="chart-footer">
+              <span>
+                <i class="legend-dot legend-primary" aria-hidden="true"></i>
+                <span id="legend-label">Recorded energy</span>
+              </span>
+              <span>
+                <i class="legend-dot legend-baseline" aria-hidden="true"></i>
+                Personal baseline mean
+              </span>
+              <span>
+                <i class="legend-gap" aria-hidden="true"></i>
+                Missing record (gap, not zero)
+              </span>
+              <strong id="coverage-label" class="coverage-label" aria-live="polite">— / 84 days</strong>
+            </div>
+            <p id="chart-help" class="chart-help">Activate a point to see its date, value, and synthetic record ID.</p>
+          </section>
+
+          <!-- Period comparison card -->
+          <aside class="period-card" aria-labelledby="period-title">
+            <p class="card-eyebrow">DESCRIPTIVE COMPARISON</p>
+            <h3 id="period-title">Two 28-day periods</h3>
+            <p id="period-description" class="period-copy">
+              Only observed days are compared. A numerical difference does not establish a cause.
+            </p>
+            <div id="period-values" class="period-values">
+              <div>
+                <span>EARLIER PERIOD</span>
+                <strong id="period-earlier" aria-live="polite">—</strong>
+              </div>
+              <div class="period-recent">
+                <span>RECENT PERIOD</span>
+                <strong id="period-recent" aria-live="polite">—</strong>
+              </div>
+            </div>
+            <div id="period-diff" class="period-diff" hidden>
+              <span id="period-diff-label" class="diff-label">Change</span>
+              <strong id="period-diff-value" class="diff-value">—</strong>
+            </div>
+            <div id="period-footnote" class="period-footnote">
+              Mean of observed days · unit shown in series
+            </div>
+          </aside>
+        </div><!-- /overview-grid -->
+
+        <!-- Findings section -->
+        <div class="findings-heading">
+          <div>
+            <p class="card-eyebrow">INTERPRETATION</p>
+            <h3>What the evidence supports. What it does not.</h3>
+          </div>
+          <div class="findings-meta">
+            <span id="finding-count" aria-live="polite">NO FINDINGS</span>
+            <span id="evidence-tier-legend" class="tier-legend" hidden>
+              <span class="tier-dot tier-supported" aria-hidden="true"></span>Supported
+              <span class="tier-dot tier-investigable" aria-hidden="true"></span>Investigable
+              <span class="tier-dot tier-insufficient" aria-hidden="true"></span>Insufficient
+            </span>
+          </div>
+        </div>
+
+        <div id="findings" class="findings-grid" role="list" aria-label="Investigation findings">
+          <article class="finding-card empty-card" role="listitem">
+            <span class="finding-index">01 / OBSERVATION</span>
+            <h4>Explore to see the evidence.</h4>
+            <p>Each finding has a source, a limit, and a tier. Supported signals survive all temporal, robustness and multiple-testing gates.</p>
+          </article>
+        </div>
+
+        <!-- Sponsor proof surface (shown after run) -->
+        <div id="sponsor-proof-bar" class="sponsor-proof-bar" hidden aria-label="Sponsor connection proofs" role="region">
+          <span class="proof-bar-label">SPONSOR SERVICES</span>
+          <div id="proof-badges" class="proof-badges"></div>
+        </div>
+
+        <footer class="workbench-footer">
+          <span>100% SYNTHETIC DATA · FICTIONAL PARTICIPANT · NO DIAGNOSIS</span>
+          <span>PHIS OPEN AGENT · PERSONAL HEALTH INTELLIGENCE SYSTEM · 2026 DEMO</span>
+        </footer>
+      </div><!-- /content-wrap -->
+    </main><!-- /workbench -->
+  </div><!-- /app-shell -->
+
+  <!-- ═══ EVIDENCE DIALOG ════════════════════════════════════════════ -->
+  <dialog
+    id="evidence-dialog"
+    class="evidence-dialog"
+    aria-labelledby="dialog-title"
+    aria-describedby="dialog-description"
+  >
+    <div class="dialog-header">
+      <div>
+        <p class="card-eyebrow">LINEAGE / SOURCES / PROOFS</p>
+        <h2 id="dialog-title">Behind every finding.</h2>
+        <p id="dialog-description" class="dialog-description">
+          Every number here was returned by the Python core — not generated by the LLM.
+        </p>
+      </div>
+      <button id="dialog-close" class="close-button" type="button" aria-label="Close evidence panel">×</button>
+    </div>
+
+    <!-- Tab navigation inside drawer -->
+    <div class="dialog-tabs" role="tablist" aria-label="Evidence sections">
+      <button role="tab" class="dialog-tab active" id="tab-finding" aria-controls="panel-finding" aria-selected="true">Finding</button>
+      <button role="tab" class="dialog-tab" id="tab-signals" aria-controls="panel-signals" aria-selected="false">Scientific signals</button>
+      <button role="tab" class="dialog-tab" id="tab-trace" aria-controls="panel-trace" aria-selected="false">Tool trace</button>
+      <button role="tab" class="dialog-tab" id="tab-sponsors" aria-controls="panel-sponsors" aria-selected="false">Sponsor proofs</button>
+      <button role="tab" class="dialog-tab" id="tab-meta" aria-controls="panel-meta" aria-selected="false">Run metadata</button>
+    </div>
+
+    <div id="dialog-content" class="dialog-content">
+      <p>Start an investigation to inspect records and tool outputs.</p>
+    </div>
+  </dialog>
+
 </body>
 </html>
