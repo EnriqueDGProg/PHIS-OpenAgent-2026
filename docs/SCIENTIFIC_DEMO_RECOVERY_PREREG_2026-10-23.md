@@ -1,0 +1,20 @@
+# Scientific demo recovery: preregistration
+
+Registered before generating or evaluating revision 3. This is one fictional scenario and one baseline evaluation. The generator, seed, scientific families and acceptance criteria are frozen after this registration; a failed result remains a failed result. This document is part of a branch based on PR #18 and does not alter PR #13 or PR #18.
+
+## Scenario and blind evaluation
+
+- Dataset: `PHIS-SYN-84D-v3`, 84 local days starting 2026-07-30, one fictional participant, six variables and 504 date-variable slots. Fixed generator seed `20261023`. Independent random streams supply measurement missingness and the unrelated-count negative control.
+- Use the first scenario's stationary daily mechanisms as the base: sleep depends on preceding late caffeine, stress and exercise; energy depends on current sleep and stress plus preceding exercise. A weekday exercise pattern and Gaussian noise create variation. Retain a two-day sleep logging gap and approximately 5–7% missingness. Round observed continuous values to three decimals. Do not expose equations to runtime analysis.
+- A fictional short workload period begins at day index 63 (final 21 days). It adds 0.90 to latent daily stress and 0.08 to late-caffeine probability, with clipping at the previously used bounds. There is no direct energy offset. This late episode can lower recent energy while a sleep-energy association has been present throughout the 84 days. Current stress is an observed common cause of caffeine and energy; preceding stress also affects sleep. Thus an unadjusted sleep-energy association is not a causal or multivariable-adjusted effect.
+- The new scenario code will copy the first generator's equations, seed, missingness and metadata, changing only the workload period, its two amplitudes, and dataset/source IDs. Use the frozen PR #18 energy and sleep scientific plans, changing only `dataset_id` in copied plans. Both families keep all 16 children, levels and first differences, lags 0/1, 999 resamples, 3/7/14-day block sensitivity and the original coverage, effect, BY and hierarchy gates.
+- Evaluate the generated rows once with authentic owner-approved, local-only PHIS Discovery v1.1. Save that first baseline output locally before reading results. Do not alter the generator, plans, seed or criteria in response. Then apply the predefined sleep shuffle, caffeine shuffle, energy sign reversal and low sleep-coverage perturbations, preserving the same scientific plans.
+
+## Acceptance criteria, set before evaluation
+
+1. All 504 slots have unique date-variable keys, plausible ranges, 70% or higher coverage per variable, missing values represented as null, and no leakage from ground-truth equations to the runtime analytical adapter.
+2. The final 28-day observed energy mean is at least 0.20 and at most 0.60 score points below the preceding 28-day mean. This is a descriptive demonstration target, not an inferential or medical threshold.
+3. At least one `candidate_signal` in the energy family, preferably same-day sleep versus energy, satisfies the unchanged Discovery correction, temporal and block-stability gates. No unrelated-count negative-control child is promoted. A supported result is an association across 84 days, not proof of the cause of the recent change.
+4. Ablating the target exposure removes its positive association; reversing energy reverses the target effect sign without creating false causal confidence; low coverage yields `insufficient_data`; negative controls remain unpromoted. Report exact results even when a check fails.
+
+Revision 2 failed with no promoted children despite large raw correlations. Its energy time Spearman trend was −0.654 (incompatible threshold absolute 0.55); its caffeine robust half-median shift was 2.0 (incompatible threshold 1.5). For energy/sleep and sleep/caffeine, the 14-day block scenario did not support inference, and worst-block selection parent BY q values were 0.100 and 0.0667. This design reduces the length and amplitude of the imposed period without changing any scientific gate. It may still fail; one evaluation will decide.

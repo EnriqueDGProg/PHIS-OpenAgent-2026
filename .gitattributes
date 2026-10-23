@@ -1,2 +1,4 @@
 plans/*_v2.json text eol=lf
 src/phis_open_agent/scenario_v2.py text eol=lf
+src/phis_open_agent/scenario_v3.py text eol=lf
+plans/*_v3.json text eol=lf
