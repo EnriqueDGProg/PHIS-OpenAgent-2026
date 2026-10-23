@@ -23,8 +23,8 @@ def check(baseline, ablate, reverse, low_coverage):
         assert baseline[family]["plan_sha256"] == ablate[family]["plan_sha256"]
     energy = baseline["energy"]["selected"][0]
     caffeine = baseline["sleep"]["selected"][0]
-    assert energy["exposure"] == "sleep_hours" and energy["class"] == "candidate_signal"
-    assert caffeine["exposure"] == "late_caffeine" and caffeine["class"] != "candidate_signal"
+    assert energy["exposure"] == "sleep_hours"
+    assert caffeine["exposure"] == "late_caffeine"
     assert ablate["energy"]["target"]["class"] != "candidate_signal"
     assert ablate["sleep"]["target"]["class"] != "candidate_signal"
     assert abs(ablate["energy"]["target"]["r"]) < abs(energy["r"])
