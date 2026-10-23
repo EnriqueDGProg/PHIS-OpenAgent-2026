@@ -78,9 +78,16 @@ def _claim_for_signal(item, kind):
 
 
 def investigate_scientific(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY",
-                           parent_run_id=None, zetaris_client=None, rows_override=None):
+                           parent_run_id=None, zetaris_client=None, rows_override=None,
+                           family_override=None, run_id_override=None):
     """Run one bounded energy/sleep family and persist the verified package ID."""
     intent = _intent(question)
+    if family_override is not None:
+        if family_override not in {"energy", "sleep"} or intent == "unsupported" and any(
+                word in question.casefold() for word in ("diagnos", "prescri", "medication", "medicine",
+                                                  "treatment", "dose", "drug", "medic")):
+            raise ValueError("Invalid or medically unsupported family override")
+        intent = family_override
     if mode not in {"SYNTHETIC_LOCAL_ONLY", "LIVE_SYNTHETIC_ZETARIS"}:
         raise ValueError("Unknown source mode")
     if parent_run_id is not None and (not isinstance(parent_run_id, str) or
@@ -88,7 +95,10 @@ def investigate_scientific(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY"
         raise ValueError("Invalid parent run ID")
     if rows_override is not None and mode != "SYNTHETIC_LOCAL_ONLY":
         raise ValueError("Injected records are never accepted in live mode")
-    run_id = f"SYN-RUN-{uuid4().hex[:12]}"
+    if run_id_override is not None and (not isinstance(run_id_override, str) or
+                                        not re.fullmatch(r"SYN-RUN-[A-Za-z0-9_-]{1,64}", run_id_override)):
+        raise ValueError("Invalid run ID override")
+    run_id = run_id_override or f"SYN-RUN-{uuid4().hex[:12]}"
     window = {"start": START.isoformat(), "end": (START + timedelta(days=DAYS - 1)).isoformat()}
     trace = []
     sponsor = {"zetaris": {"sponsor": "zetaris", "status": "NOT_CONNECTED", "trace_id": None},

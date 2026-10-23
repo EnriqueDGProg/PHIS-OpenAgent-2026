@@ -15,7 +15,8 @@ from pathlib import Path
 
 SCHEMA = "synthetic-run-event-v1"
 ALLOWED_KINDS = frozenset({"energy_comparison", "agent_state", "scientific_evidence",
-                           "scientific_evidence_180d"})
+                           "scientific_evidence_180d", "agent_decision_180d",
+                           "agent_tool_evidence_180d"})
 PHASES = frozenset({"PLAN", "TOOLS", "EVIDENCE", "VERIFY", "RESPOND", "ABSTAIN"})
 STATES = frozenset({"PASS", "INSUFFICIENT_DATA", "BLOCKED", "ERROR"})
 INTENTS = frozenset({"energy", "sleep", "followup", "unsupported"})
@@ -75,6 +76,54 @@ def _make_event(run_id, kind, payload, source_record_ids):
                               (not isinstance(payload["difference"], bool) and
                                isinstance(payload["difference"], (int, float)) and
                                math.isfinite(payload["difference"]))))
+    elif kind == "agent_tool_evidence_180d":
+        expected = {"family", "tool", "status", "source_digest_sha256", "output_sha256",
+                    "observed_days", "eligible_days", "descriptive_difference",
+                    "scientific_event_id"}
+        valid_payload = (isinstance(payload, dict) and set(payload) == expected
+                         and payload["family"] in {"energy", "sleep", "none"}
+                         and payload["tool"] in {"discovery", "trend", "coverage", "abstain"}
+                         and payload["status"] in STATES
+                         and all(isinstance(payload[name], str) and
+                                 re.fullmatch(r"[0-9a-f]{64}", payload[name])
+                                 for name in ("source_digest_sha256", "output_sha256"))
+                         and (payload["observed_days"] is None or
+                              type(payload["observed_days"]) is int and 0 <= payload["observed_days"] <= 180)
+                         and payload["eligible_days"] == 180
+                         and (payload["descriptive_difference"] is None or
+                              type(payload["descriptive_difference"]) in (int, float) and
+                              math.isfinite(payload["descriptive_difference"]))
+                         and (payload["scientific_event_id"] is None or
+                              isinstance(payload["scientific_event_id"], str) and
+                              re.fullmatch(r"[0-9a-f]{64}", payload["scientific_event_id"])))
+    elif kind == "agent_decision_180d":
+        expected = {"phase", "family", "tool", "decision", "provider_status",
+                    "provider_request_id", "provider_response_id", "provider_model", "source_digest_sha256",
+                    "evidence_event_id", "parent_run_id"}
+        valid_payload = (isinstance(payload, dict) and set(payload) == expected
+                         and payload["phase"] in {"PLAN", "VERIFY"}
+                         and payload["family"] in {"energy", "sleep", "none"}
+                         and payload["tool"] in {"discovery", "trend", "coverage", "abstain"}
+                         and payload["decision"] in {"planned", "accept", "replan", "abstain"}
+                         and payload["provider_status"] in {"VERIFIED", "SIMULATED", "BLOCKED"}
+                         and (payload["provider_request_id"] is None or
+                              isinstance(payload["provider_request_id"], str) and
+                              re.fullmatch(r"[A-Za-z0-9_.:-]{1,160}", payload["provider_request_id"]))
+                         and (payload["provider_response_id"] is None or
+                              isinstance(payload["provider_response_id"], str) and
+                              re.fullmatch(r"[A-Za-z0-9_.:-]{1,160}", payload["provider_response_id"]))
+                         and (payload["provider_model"] is None or
+                              isinstance(payload["provider_model"], str) and
+                              re.fullmatch(r"[A-Za-z0-9_./:-]{1,160}", payload["provider_model"]))
+                         and (payload["source_digest_sha256"] is None or
+                              isinstance(payload["source_digest_sha256"], str) and
+                              re.fullmatch(r"[0-9a-f]{64}", payload["source_digest_sha256"]))
+                         and (payload["evidence_event_id"] is None or
+                              isinstance(payload["evidence_event_id"], str) and
+                              re.fullmatch(r"[0-9a-f]{64}", payload["evidence_event_id"]))
+                         and (payload["parent_run_id"] is None or
+                              isinstance(payload["parent_run_id"], str) and
+                              re.fullmatch(r"SYN-RUN-[A-Za-z0-9_-]{1,64}", payload["parent_run_id"])))
     elif kind == "scientific_evidence_180d":
         expected = {"status", "family", "next_family", "plan_sha256", "family_id",
                     "temporal_policy_sha256", "record_digest_sha256", "candidate_signal_ids",
