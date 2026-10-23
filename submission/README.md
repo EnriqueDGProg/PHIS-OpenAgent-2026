@@ -5,10 +5,12 @@
 ## Use this pack
 
 1. Review [the track and narrative brief](NARRATIVE_AND_TRACK.md), then have the founder select one primary track.
-2. Replace only verified evidence in [the editable deck](PHIS_Open_Agent_2026_Submission_Deck.pptx). Product screenshot frames are deliberately labeled **PENDING VERIFIED CAPTURE**.
+2. Replace only verified evidence in [the editable deck](deck/PHIS_Open_Agent_2026_Submission_Deck.pptx). Product screenshot frames are deliberately labeled **PENDING VERIFIED CAPTURE**.
 3. Record [the timed demo](DEMO_SCRIPT_AND_STORYBOARD.md) against a real, final candidate. Its conditional lines must be resolved using the final run trace.
 4. Paste the applicable text from [the HackOS form draft](HACKOS_FORM_DRAFT.md) into the actual form; the form itself controls its fields and limits.
 5. Reconcile [the capability and sponsor matrix](CAPABILITY_AND_SPONSOR_MATRIX.md) and close [the readiness checklist](FINAL_READINESS_CHECKLIST.md) before any submission.
+
+The PPTX contains editable text and diagrams. Its [source script](build_deck.mjs) can regenerate the provisional deck with the Codex bundled presentation runtime. Set `RUNTIME_NODE_MODULES` and `RUNTIME_PYTHON` to the paths returned by the desktop app's workspace-dependencies tool, set `PHIS_PRESENTATIONS_SKILL` to the installed Presentations skill directory if it differs from the authoring host, then run `node submission/build_deck.mjs` from the repository root. The script checks package structure, layout, fonts and re-import before writing the deck. On this Windows workspace, the finalizer's atomic hardlink was denied after validation; the script copied the already validated candidate byte for byte.
 
 ## Evidence boundary
 
