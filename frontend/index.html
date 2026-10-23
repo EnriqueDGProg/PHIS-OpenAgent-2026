@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#173c35" />
+  <meta name="description" content="PHIS Open Agent: evidence-backed longitudinal investigation using synthetic data." />
+  <title>PHIS — Evidence Explorer</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <script type="module" src="./app.mjs"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to results</a>
+  <div class="app-shell">
+    <aside class="investigation-rail" aria-label="Investigation">
+      <div class="brand-row"><div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></div><div class="brand-name">phis<span class="brand-dot">.</span></div><span class="brand-caption">OPEN AGENT</span></div>
+      <div class="rail-topline"><span class="live-dot" aria-hidden="true"></span> EVIDENCE LAB <span>01 / 01</span></div>
+      <div class="rail-hero">
+        <div class="hero-ornament" aria-hidden="true"><span></span><span></span><span></span></div>
+        <p class="eyebrow">LONGITUDINAL INVESTIGATION · DEMO</p>
+        <h1>Investigate a change in your <em>records.</em></h1>
+        <p class="hero-copy">Ask about energy or sleep. See the available data, its source, and what remains uncertain.</p>
+      </div>
+      <form id="question-form" class="question-panel">
+        <label for="question">01 / YOUR QUESTION</label>
+        <div class="question-field"><textarea id="question" name="question" rows="3" maxlength="240" spellcheck="true">Why has my energy changed recently?</textarea><span class="question-cursor" aria-hidden="true">↗</span></div>
+        <div class="question-actions"><span>Scope: energy and sleep</span><button class="ask-button" type="submit"><span>Investigate records</span><span aria-hidden="true">↗</span></button></div>
+      </form>
+      <div id="followup-context" class="followup-context" role="status" hidden></div>
+      <div class="example-row"><span>CONTINUE OR TEST A LIMIT</span><button type="button" class="text-chip" data-question="How did my sleep change in that period?">Investigate sleep</button><button type="button" class="text-chip" data-question="Should I change my medication?">Clinical request</button></div>
+      <div class="demo-notice" role="note"><span class="notice-icon" aria-hidden="true">✳</span><div><strong>Synthetic demo · fictional participant</strong><p id="demo-sponsor-status">Sponsor status is checked on every run. No medical advice.</p></div></div>
+      <section class="agent-panel" aria-labelledby="agent-title"><div class="panel-heading"><span class="tiny-star" aria-hidden="true">✳</span><h2 id="agent-title">Agent activity</h2><span id="agent-phase" class="local-tag">NOT STARTED</span></div><p class="agent-caption">Plan and tool calls returned by Python. Blocked actions are never presented as executed.</p><ol id="trace-list" class="trace-list"><li class="trace-empty">Submit a question to see execution and limits.</li></ol></section>
+      <div class="rail-footer"><span>PHIS / DISCOVERY</span><span>2026 · DEMO</span></div>
+    </aside>
+    <main id="main" class="workbench" tabindex="-1">
+      <header class="workbench-header"><div class="breadcrumb">INVESTIGATION <span>/</span> <span id="breadcrumb-subject">ENERGY</span></div><div class="header-right"><span class="mode-pill"><i aria-hidden="true"></i> SYNTHETIC · MODE PENDING</span><span class="avatar" aria-label="Fictional participant">SF</span></div></header>
+      <div class="content-wrap">
+        <div class="intro-row"><div><div class="section-kicker"><span class="section-number">02</span> RESULT <span class="kicker-line"></span> <span id="window-label">30 JUL — 21 OCT 2026</span></div><h2 class="page-title">What changed in my <em>energy?</em></h2><p id="result-context" class="page-subtitle">Submit a question to query the Python core.</p></div><button id="evidence-button" class="evidence-button" type="button" aria-controls="evidence-dialog" disabled><span class="button-icon" aria-hidden="true">▦</span> Open evidence <span aria-hidden="true">↗</span></button></div>
+        <div class="status-strip" role="status" aria-live="polite"><div class="strip-main"><span class="status-bloom" aria-hidden="true">✳</span><div><span id="status-label" class="status-label">READY TO EXPLORE</span><p id="status-copy">Run a question to query the synthetic core.</p></div></div><span id="run-id" class="run-id">NO RUN</span></div>
+        <div class="overview-grid"><section class="chart-card" aria-labelledby="chart-title"><div class="card-header"><div><p class="card-eyebrow">DAILY RECORD · NO INTERPOLATION</p><h3 id="chart-title">Energy over time</h3></div><span id="chart-unit" class="chart-unit">SCALE 1–10</span></div><div id="chart-container" class="chart-container"><div class="chart-placeholder"><strong>The series will appear here</strong><span>Missing days remain visible.</span></div></div><div class="chart-footer"><span><i class="legend-dot" aria-hidden="true"></i> <span id="legend-label">Recorded energy</span></span><span><i class="legend-gap" aria-hidden="true"></i> Missing record; line broken</span><strong id="coverage-label">— / 84 days</strong></div><p id="chart-help" class="chart-help">Each point opens its source ID.</p></section>
+        <aside class="period-card" aria-labelledby="period-title"><p class="card-eyebrow">DESCRIPTIVE COMPARISON</p><h3 id="period-title">Two 28-day periods</h3><p id="period-description" class="period-copy">Only observed days are compared. A difference does not establish a cause.</p><div id="period-values" class="period-values"><div><span>EARLIER PERIOD</span><strong>—</strong></div><div><span>RECENT PERIOD</span><strong>—</strong></div></div><div id="period-footnote" class="period-footnote">Mean of observed days · unit shown in series</div></aside></div>
+        <div class="findings-heading"><div><p class="card-eyebrow">INTERPRETATION</p><h3>What we know. What we do not.</h3></div><span id="finding-count">NO FINDINGS</span></div><div id="findings" class="findings-grid"><article class="finding-card empty-card"><span class="finding-index">01 / OBSERVATION</span><h4>Explore to see the evidence.</h4><p>Each finding has a source and a limit.</p></article></div>
+        <footer class="workbench-footer"><span>100% SYNTHETIC DATA · NO DIAGNOSIS</span><span>PHIS OPEN AGENT / DEMO EXPERIENCE</span></footer>
+      </div>
+    </main>
+  </div>
+  <dialog id="evidence-dialog" class="evidence-dialog" aria-labelledby="dialog-title"><div class="dialog-header"><div><p class="card-eyebrow">LINEAGE / SOURCES</p><h2 id="dialog-title">Behind every finding.</h2></div><button id="dialog-close" class="close-button" type="button" aria-label="Close evidence panel">×</button></div><div id="dialog-content" class="dialog-content"><p>Start an investigation to inspect records and tools.</p></div></dialog>
+</body>
+</html>
