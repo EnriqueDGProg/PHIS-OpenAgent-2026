@@ -1,27 +1,39 @@
-# PHIS-OpenAgent-2026
-Evidence-first personal health intelligence agent | Open Agent Hackathon 2026 | AI Venture Studio
+# PHIS Open Agent 2026
 
-## Build-window prototype
+Evidence-backed investigation of a fictional 84-day energy and sleep record for the [Open Agent Hackathon 2026](https://hackathon.genai.works/event/open-agent-hackathon-2026). Every observation is synthetic. This public repository contains competition-window code, not private PHIS source or real health data.
 
-This branch builds on the synthetic release candidate PR #6 and adds a real local **Meterless World Model Engine** integration. It remains a draft, synthetic-only demo and imports no private PHIS code. See the [Engine conformance matrix](docs/METERLESS_ENGINE_CONFORMANCE_2026-10-22.md) for the official contract, evidence and remaining gates.
+## Release candidate
 
-Python 3.11+ and Node.js 24 are needed for the Engine-backed API and CLI:
+This independent draft RC combines the PR #11 UX lineage, PR #10 live Zetaris adapter, PR #12 pinned official Meterless World Model Engine, and the adversarial suite. The [final integration report](docs/FINAL_INTEGRATION_RC_2026-10-23.md) records provenance, native HTTP/Chrome evidence, and PASS/FAIL/BLOCKED gates. No branch was merged or deployed.
+
+The Python agent selects deterministic coverage, trend, and comparison tools. Zetaris live mode reads and validates all 156 fictional source rows before analysis; a failed query abstains without substituting the local fixture. The official World Model Engine persists synthetic decision events, reopens its log in a fresh process, and changes the follow-up tool choice. Each sponsor proof has its own trace ID. Meterless Runtime/Power and NVIDIA inference remain separate and disconnected.
+
+## Run locally
+
+Requires Python 3.11+ and Node.js 24. The core and Engine require no Python or npm packages, external account, or paid service.
 
 ```powershell
 $env:PYTHONPATH='src'
-python -m unittest discover -s tests -v
-python -m phis_open_agent.agent_cli energy --run-id SYN-RUN-DEMO
+python -m phis_open_agent.api
+```
+
+Open `http://127.0.0.1:4173`. The default `SYNTHETIC_LOCAL_ONLY` mode uses only fictional local rows. Engine state is under ignored `.local-state/.world/`. `PHIS_SYNTHETIC_STATE_FILE` chooses a different private local namespace. `GET /api/health` reports process health, not sponsor verification.
+
+For a previously authorized local Zetaris instance containing the 156-row fictional table, set `PHIS_DATA_MODE=LIVE_SYNTHETIC_ZETARIS`, `ZETARIS_REST_URL`, `ZETARIS_ORG_ID`, and `ZETARIS_API_KEY` only in the API process environment. Use the documented direct `/api/v1.0` endpoint. Keep credentials and the local Compose bundle outside this repository. The API calls datasource listing, `SELECT 1`, and the bounded synthetic query on each investigation. See [Zetaris activation](docs/ZETARIS_REST_ACTIVATION.md) and [frontend instructions](frontend/README.md).
+
+## Verify
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest discover -s tests -q
+python -m unittest tests.evaluation.test_adversarial_battery -q
+python -m tests.evaluation.run_eval
+node --test frontend/tests/*.test.mjs
 $env:WORLD_MODEL_IMPL=(Resolve-Path vendor/meterless-world-model/src/index.ts).Path
 node --disable-warning=ExperimentalWarning --experimental-transform-types vendor/meterless-world-model/conformance/runner.ts
 python scripts/meterless_engine_trace.py
 ```
 
-The emitted dataset and outputs are fictional. Descriptive comparisons do not establish a cause, clinical conclusion or statistical association. Meterless **Engine** passes its pinned official conformance runner locally (8/8); Meterless Runtime/Power, NVIDIA and Zetaris are separate and are not connected in this branch. PR #10 has independent live Zetaris work and is not part of this stack.
+For native localhost checks against a running API, use `python scripts/native_http_smoke.py` in local mode or `python scripts/native_live_zetaris_smoke.py` in live mode. Installed Chrome plus an existing Playwright module can run `frontend/tests/e2e_native_chrome.mjs` with `PHIS_PLAYWRIGHT_MODULE` set to its absolute `index.mjs` path. No installation is performed by that script.
 
-The earlier JSONL `SyntheticRunWorldModel` still exists for regression tests and was only inspired by [Meterless World Model](https://github.com/Meterless/Meterless/tree/main/engines/world-model). The API and agent CLI now use the pinned official reference Engine with durable readback. The [execution gate](docs/EXECUTION_GATE_2026-10-22.md) records older checks; the current Engine result is in the [conformance matrix](docs/METERLESS_ENGINE_CONFORMANCE_2026-10-22.md). The response contract is in [contracts/investigation.v1.schema.json](contracts/investigation.v1.schema.json).
-
-## Integrated demo lineage
-
-PR #6 combines the earlier frontend and Python core work. This branch adds the Engine-backed same-origin API. To run it, use `python -m phis_open_agent.api` and open `http://127.0.0.1:4173`. Node.js 24 is required for the Engine bridge; no npm package installation is needed. See [frontend instructions](frontend/README.md) for scenarios and tests. The frontend does not calculate observations, coverage or comparison means: these come from deterministic Python tools through `investigation.v1`.
-
-This remains a bounded, deterministic demo, not a deployed agent or a sponsor-compliant submission. `meterless_engine` is conditionally `VERIFIED` after a successful local write and durable readback; the other sponsor statuses remain `NOT_CONNECTED`. No private PHIS code or health data is included.
+The `investigation.v1` contract is in [contracts/investigation.v1.schema.json](contracts/investigation.v1.schema.json). Comparisons are descriptive; the 14-observation threshold is an operational completeness rule. The agent gives no diagnosis, treatment, causal finding, or unsupported statistical claim.

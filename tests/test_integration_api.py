@@ -88,7 +88,7 @@ class IntegrationApiTests(unittest.TestCase):
         self.assertEqual((failed["coverage"], failed["series"], failed["comparison"]), ([], [], None))
         self.assertEqual([t["tool"] for t in failed["tool_trace"] if t["phase"] == "TOOLS"],
                          ["get_longitudinal_trend"])
-        self.assertIn("falló", failed["summary"])
+        self.assertIn("failed", failed["summary"])
 
     def test_invalid_request_and_unknown_parent(self):
         self.assertEqual(self.call({"question": "energía", "unexpected": "SQL"})[0], 400)
@@ -105,7 +105,7 @@ class IntegrationApiTests(unittest.TestCase):
         handler._send = lambda code, data, content_type="": sent.append((code, data, content_type))
         handler.do_GET()
         self.assertEqual(sent[0][0], 200)
-        self.assertIn(b"Demostraci", sent[0][1])
+        self.assertIn(b"Synthetic demo", sent[0][1])
         handler.path = "/api/health"
         handler.do_GET()
         self.assertEqual(sent[1][1]["sponsors"], "NOT_CONNECTED")

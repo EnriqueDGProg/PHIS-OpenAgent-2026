@@ -23,11 +23,14 @@ test('client accepts sourced gaps and rejects fabricated sponsor proof', () => {
 test('client accepts only an Engine proof tied to a returned event', () => {
   const run=base();
   const eventId='a'.repeat(64);
-  run.tool_trace=[{trace_id:eventId,tool:'PLAN',status:'PASS',detail:'local event',source_record_ids:[]}];
+  run.tool_trace=[{trace_id:eventId,tool:'PLAN',phase:'PLAN',status:'PASS',detail:'local event',source_record_ids:[]}];
   run.sponsor_proofs.push({sponsor:'meterless_engine',status:'VERIFIED',trace_id:eventId});
   assert.equal(validateInvestigation(run).sponsor_proofs[1].status,'VERIFIED');
   run.sponsor_proofs[1].trace_id='b'.repeat(64);
   assert.throws(() => validateInvestigation(run),/patrocinador/);
+  run.sponsor_proofs[1].trace_id=eventId;
+  run.tool_trace[0].tool='zetaris.synthetic_query';
+  assert.throws(() => validateInvestigation(run),/Engine/);
 });
 
 test('client rejects numeric point without source and comparison in abstention', () => {

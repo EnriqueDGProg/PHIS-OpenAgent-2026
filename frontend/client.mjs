@@ -6,12 +6,16 @@ export function validateInvestigation(value) {
   if (typeof value.run_id !== 'string' || typeof value.summary !== 'string' || !value.window?.start || !value.window?.end) throw new Error('Ejecución incompleta');
   if (!Array.isArray(value.coverage) || !Array.isArray(value.series) || !Array.isArray(value.findings) || !Array.isArray(value.tool_trace) || !Array.isArray(value.sponsor_proofs)) throw new Error('Colecciones ausentes');
   const zetaris = value.sponsor_proofs.find(proof => proof.sponsor === 'zetaris');
+  const engine = value.sponsor_proofs.find(proof => proof.sponsor === 'meterless_engine');
   if (value.sponsor_proofs.some(proof => !['NOT_CONNECTED','VERIFIED','FAILED'].includes(proof.status)
     || (proof.status !== 'VERIFIED' && proof.trace_id !== null)
-    || (proof.status === 'VERIFIED' && !value.tool_trace.some(step => step.trace_id === proof.trace_id))
+    || (proof.status === 'VERIFIED' && proof.sponsor !== 'zetaris' && !value.tool_trace.some(step => step.trace_id === proof.trace_id))
     || (proof.sponsor !== 'zetaris' && proof.sponsor !== 'meterless_engine' && proof.status !== 'NOT_CONNECTED')
     || (proof.sponsor === 'meterless_engine' && proof.status === 'FAILED'))) throw new Error('Prueba de patrocinador inesperada');
-  if (value.mode === 'SYNTHETIC_LOCAL_ONLY' && zetaris?.status !== 'NOT_CONNECTED') throw new Error('Prueba Zetaris inesperada');
+  if (value.mode === 'SYNTHETIC_LOCAL_ONLY' && zetaris?.status !== 'NOT_CONNECTED') throw new Error('Prueba de patrocinador Zetaris inesperada');
+  if (engine?.status === 'VERIFIED' && (!/^[0-9a-f]{64}$/.test(engine.trace_id)
+    || engine.trace_id === zetaris?.trace_id
+    || !value.tool_trace.some(step => step.trace_id === engine.trace_id && step.tool !== 'zetaris.synthetic_query' && step.phase))) throw new Error('Prueba de patrocinador Engine inesperada');
   if (value.mode === 'LIVE_SYNTHETIC_ZETARIS') {
     if (!zetaris) throw new Error('Falta prueba Zetaris');
     const query = value.tool_trace.find(step => step.tool === 'zetaris.synthetic_query' && step.trace_id === zetaris.trace_id);

@@ -45,7 +45,7 @@ async function routeRequest(route) {
 
 async function submit(page) {
   await page.locator('#question-form button[type="submit"]').click();
-  await page.waitForFunction(() => /RESPUESTA RECIBIDA|ABSTENCIÓN|COBERTURA INSUFICIENTE|FALLO LOCAL/.test(
+  await page.waitForFunction(() => /RESPONSE RECEIVED|ABSTENTION|INSUFFICIENT COVERAGE|SOURCE OR TOOL UNAVAILABLE/.test(
     document.querySelector('#agent-phase')?.textContent || ''));
 }
 
@@ -59,18 +59,18 @@ try {
   page.on('pageerror', error => pageErrors.push(error.message));
   await page.goto(url);
   await submit(page);
-  assert.equal(await page.locator('#status-label').textContent(), 'OBSERVACIÓN DISPONIBLE');
-  assert.match(await page.locator('#coverage-label').textContent(), /84 días/);
+  assert.equal(await page.locator('#status-label').textContent(), 'OBSERVATION AVAILABLE');
+  assert.match(await page.locator('#coverage-label').textContent(), /84 days/);
   assert.equal(await page.locator('.chart-point').count() > 50, true);
   assert.match(await page.locator('#trace-list').textContent(), /PLAN|plan/i);
   await page.screenshot({ path: path.join(output, 'rc-desktop-pass.png'), fullPage: true });
   const parentId = await page.locator('#run-id').textContent();
   // Every POST uses a fresh Python process; the next run must read JSONL from disk.
   await page.reload();
-  await page.getByRole('button', { name: 'Investigar sueño' }).click();
+  await page.getByRole('button', { name: 'Investigate sleep' }).click();
   assert.match(await page.locator('#followup-context').textContent(), new RegExp(parentId));
   await submit(page);
-  assert.equal(await page.locator('#status-label').textContent(), 'OBSERVACIÓN DISPONIBLE');
+  assert.equal(await page.locator('#status-label').textContent(), 'OBSERVATION AVAILABLE');
   assert.match(await page.locator('#result-context').textContent(), /World Model/);
   assert.match(await page.locator('#trace-list').textContent(), /get_variable_coverage/);
   assert.notEqual(bridgePids[0], bridgePids[1]);
@@ -83,17 +83,17 @@ try {
   mobilePage.on('pageerror', error => pageErrors.push(error.message));
   await mobilePage.goto(url);
   await submit(mobilePage);
-  assert.equal(await mobilePage.locator('#status-label').textContent(), 'OBSERVACIÓN DISPONIBLE');
+  assert.equal(await mobilePage.locator('#status-label').textContent(), 'OBSERVATION AVAILABLE');
   await mobilePage.screenshot({ path: path.join(output, 'rc-mobile-pass.png'), fullPage: true });
   assert.equal(await mobilePage.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
 
   await page.goto(url + '?scenario=insufficient');
   await submit(page);
-  assert.equal(await page.locator('#status-label').textContent(), 'EVIDENCIA INSUFICIENTE');
+  assert.equal(await page.locator('#status-label').textContent(), 'INSUFFICIENT EVIDENCE');
   await page.screenshot({ path: path.join(output, 'rc-desktop-insufficient.png'), fullPage: true });
   await page.goto(url + '?scenario=tool_error');
   await submit(page);
-  assert.equal(await page.locator('#status-label').textContent(), 'HERRAMIENTA NO DISPONIBLE');
+  assert.equal(await page.locator('#status-label').textContent(), 'TOOL UNAVAILABLE');
   await page.screenshot({ path: path.join(output, 'rc-desktop-error.png'), fullPage: true });
   assert.deepEqual(pageErrors, []);
   console.log('PASS Chrome desktop/mobile via socketless API handler, persisted follow-up, sparse and tool error; screenshots in docs/evidence');

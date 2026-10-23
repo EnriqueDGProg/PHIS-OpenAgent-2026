@@ -15,22 +15,22 @@ DATASET_ID = "PHIS-SYN-84D-v1"
 WINDOW = {"start": START.isoformat(), "end": (START + timedelta(days=DAYS - 1)).isoformat()}
 SPONSORS = ("zetaris", "meterless_engine", "meterless_runtime", "nemotron")
 DETAILS = {
-    "planned": "Primer paso elegido según la pregunta; los siguientes dependen de la evidencia.",
-    "tool_pass": "Herramienta local ejecutada con registros sintéticos trazables.",
-    "weak_coverage": "Cobertura inferior al umbral operativo; se omiten pasos posteriores.",
-    "comparison_unavailable": "No hay comparación previa verificada o cobertura para continuar.",
-    "parent_missing": "El seguimiento requiere una ejecución previa verificada.",
-    "unsupported_question": "La pregunta queda fuera del alcance descriptivo.",
-    "tool_error": "Falló una herramienta local; se abstiene sin publicar conclusión.",
-    "verified": "Respuesta limitada a afirmaciones respaldadas por herramientas ejecutadas.",
-    "synthesis_rejected": "Selección opcional no verificada; se usó el texto determinista.",
-    "source_error": "Zetaris falló o no verificó las filas; no se usaron datos locales como sustitución.",
-    "source_verified": "Consulta HTTP real a Zetaris y 156 fuentes ficticias verificadas antes del análisis.",
+    "planned": "First step chosen from the question; later steps depend on evidence.",
+    "tool_pass": "Local tool executed with traceable synthetic records.",
+    "weak_coverage": "Coverage below the operational threshold; later steps are skipped.",
+    "comparison_unavailable": "No verified prior comparison or coverage to continue.",
+    "parent_missing": "Follow-up requires a verified prior run.",
+    "unsupported_question": "Question outside the descriptive scope.",
+    "tool_error": "A local tool failed; the agent abstained without a conclusion.",
+    "verified": "Answer limited to claims backed by executed tools.",
+    "synthesis_rejected": "Optional selection failed verification; deterministic text was used.",
+    "source_error": "Zetaris failed or rows did not verify; local data was not substituted.",
+    "source_verified": "Real Zetaris HTTP query and 156 fictional sources verified before analysis.",
 }
 TOOL_NAMES = {"coverage": "get_variable_coverage", "trend": "get_longitudinal_trend",
               "compare": "compare_periods"}
-FINDING_TITLES = {"recent-coverage": "Cobertura reciente", "energy-difference": "Cambio descriptivo",
-                  "sleep-coverage": "Sueño disponible para revisar", "followup-coverage": "Cobertura del seguimiento"}
+FINDING_TITLES = {"recent-coverage": "Recent coverage", "energy-difference": "Descriptive change",
+                  "sleep-coverage": "Sleep available for review", "followup-coverage": "Follow-up coverage"}
 
 
 def _coverage(item):
@@ -145,14 +145,14 @@ def investigate(question, *, world_model, parent_run_id=None, scenario="normal",
         first_window = (WINDOW["start"], WINDOW["end"])
     if status == "PASS":
         findings = [{"finding_id": claim["id"], "kind": "observation",
-                     "title": FINDING_TITLES.get(claim["id"], "Observación trazable"),
+                     "title": FINDING_TITLES.get(claim["id"], "Traceable observation"),
                      "text": claim["text"], "source_record_ids": claim["source_record_ids"]}
                     for claim in execution["claims"]]
-        findings.append({"finding_id": "LIMIT-01", "kind": "uncertainty", "title": "Límite de la evidencia",
-                         "text": "Esta lectura descriptiva no identifica causas ni equivale a un análisis clínico.",
+        findings.append({"finding_id": "LIMIT-01", "kind": "uncertainty", "title": "Evidence limit",
+                         "text": "This descriptive finding does not identify causes or constitute clinical analysis.",
                          "source_record_ids": []})
     else:
-        findings = [{"finding_id": "ABSTAIN-01", "kind": "abstention", "title": "No se puede concluir",
+        findings = [{"finding_id": "ABSTAIN-01", "kind": "abstention", "title": "No conclusion available",
                      "text": execution["answer"], "source_record_ids": []}]
     trace = [zetaris_trace] if zetaris_trace is not None else []
     for step in execution["trace"]:

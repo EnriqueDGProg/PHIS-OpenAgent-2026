@@ -22,7 +22,7 @@ def _intent(question: str, parent_run_id: str | None = None) -> str:
     if not isinstance(question, str) or not question.strip():
         return "unsupported"
     q = question.casefold()
-    if any(word in q for word in ("medic", "diagnóst", "diagnost", "tratamiento", "fármaco", "farmaco", "dosis")):
+    if any(word in q for word in ("medic", "diagnóst", "diagnost", "treatment", "tratamiento", "fármaco", "farmaco", "dosis", "dose", "prescription")):
         return "unsupported"
     if any(word in q for word in ("demuestra", "demostrar", "prueba", "probar")) and any(
         word in q for word in ("caus", "provoc", "debido")
@@ -73,7 +73,9 @@ class SyntheticAgent:
         return {"run_id": run_id, "synthetic": True, "status": "ERROR",
                 "intent": intent, "question": question, "trace": trace,
                 "evidence": [], "claims": [],
-                "answer": "La fuente Zetaris no está disponible o no superó la verificación; no se publican resultados."}
+                "answer": "The Zetaris source is unavailable or failed verification; no results are published.",
+                "sponsor_proofs": {"meterless_engine": "VERIFIED" if getattr(self.world_model, "engine_verified", False) else "NOT_CONNECTED",
+                                   "meterless_runtime": "NOT_CONNECTED", "nemotron": "NOT_CONNECTED", "zetaris": "NOT_CONNECTED"}}
 
     def run(self, *, run_id: str, question: str, rows: list[dict], parent_run_id: str | None = None) -> dict:
         if not isinstance(run_id, str) or not re.fullmatch(r"SYN-RUN-[A-Za-z0-9_-]{1,64}", run_id):
@@ -122,9 +124,9 @@ class SyntheticAgent:
                     "intent": intent, "question": question, "trace": trace,
                     "evidence": evidence, "claims": claims,
                     "answer": " ".join(c["text"] for c in claims) if status == "PASS" else
-                              "Una herramienta local falló; no se publican resultados." if status == "ERROR" else
-                              "Esta pregunta o seguimiento queda fuera del alcance verificable." if status == "BLOCKED" else
-                              "No hay evidencia suficiente para responder con fiabilidad.",
+                              "A local tool failed; no results are published." if status == "ERROR" else
+                              "This question or follow-up is outside the verifiable scope." if status == "BLOCKED" else
+                              "There is insufficient evidence for a reliable answer.",
                     "sponsor_proofs": {"meterless_engine": "VERIFIED" if getattr(self.world_model, "engine_verified", False) else "NOT_CONNECTED",
                                        "meterless_runtime": "NOT_CONNECTED",
                                        "nemotron": "NOT_CONNECTED", "zetaris": "NOT_CONNECTED"}}
@@ -184,9 +186,9 @@ class SyntheticAgent:
                     return finish("INSUFFICIENT_DATA", "weak_coverage")
                 if decision["tool"] == "get_variable_coverage":
                     use("trend", variable, start, end)
-                label = "sueño" if variable == "sleep_hours" else "energía"
+                label = "sleep" if variable == "sleep_hours" else "energy"
                 claims.append({"id": "followup-coverage", "text":
-                               f"En los últimos 28 días hay {result['coverage']['observed']} de 28 registros sintéticos de {label}.",
+                               f"In the last 28 days there are {result['coverage']['observed']} of 28 synthetic records for {label}.",
                                "source_record_ids": result["source_record_ids"]})
                 return finish("PASS", "verified")
 
@@ -199,9 +201,9 @@ class SyntheticAgent:
             recent = use("coverage", variable, recent_start, recent_end)
             if recent["coverage"]["observed"] < MIN_OBSERVED:
                 return finish("INSUFFICIENT_DATA", "weak_coverage")
-            label = "sueño" if variable == "sleep_hours" else "energía"
+            label = "sleep" if variable == "sleep_hours" else "energy"
             claims.append({"id": "recent-coverage", "text":
-                           f"Hay {recent['coverage']['observed']} de 28 registros sintéticos recientes de {label}; los huecos permanecen visibles.",
+                           f"There are {recent['coverage']['observed']} of 28 recent synthetic records for {label}; missing days remain visible.",
                            "source_record_ids": recent["source_record_ids"]})
             if intent == "sleep":
                 return finish("PASS", "verified")
@@ -219,13 +221,13 @@ class SyntheticAgent:
             parent_event_id = event["event_id"]
             difference = comparison["difference_comparison_minus_baseline"]
             claims.append({"id": "energy-difference", "text":
-                           f"La diferencia descriptiva entre las dos ventanas de 28 días es {difference:.2f} puntos de escala 1–10; no establece una causa.",
+                           f"The descriptive difference between the two 28-day windows is {difference:.2f} points on a 1–10 scale; it does not establish a cause.",
                            "source_record_ids": comparison["source_record_ids"]})
             if difference < 0:  # A result changes the next tool, but never proves association.
                 sleep = use("coverage", "sleep_hours", recent_start, recent_end)
                 if sleep["coverage"]["observed"] >= MIN_OBSERVED:
                     claims.append({"id": "sleep-coverage", "text":
-                                   f"Hay {sleep['coverage']['observed']} de 28 registros sintéticos recientes de sueño para una revisión posterior.",
+                                   f"There are {sleep['coverage']['observed']} of 28 recent synthetic records for sleep for later review.",
                                    "source_record_ids": sleep["source_record_ids"]})
             return finish("PASS", "verified")
         except (ValueError, TypeError, AttributeError, KeyError, RuntimeError, OSError):

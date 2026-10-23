@@ -212,6 +212,7 @@ tempCodeRunnerFile.py
 .pypirc
 .local-state/
 .synthetic-agent-state.jsonl
+synthetic_observations.csv
 
 # Marimo
 marimo/_static/
