@@ -5,7 +5,10 @@ export function validateInvestigation(value) {
   if (!['PASS','EXECUTED_PARTIAL','INSUFFICIENT_DATA','BLOCKED','ERROR'].includes(value.status)) throw new Error('Estado desconocido');
   if (typeof value.run_id !== 'string' || typeof value.summary !== 'string' || !value.window?.start || !value.window?.end) throw new Error('Ejecución incompleta');
   if (!Array.isArray(value.coverage) || !Array.isArray(value.series) || !Array.isArray(value.findings) || !Array.isArray(value.tool_trace) || !Array.isArray(value.sponsor_proofs)) throw new Error('Colecciones ausentes');
-  if (value.sponsor_proofs.some(proof => proof.status !== 'NOT_CONNECTED' || proof.trace_id !== null)) throw new Error('Prueba de patrocinador inesperada');
+  if (value.sponsor_proofs.some(proof => !['NOT_CONNECTED','VERIFIED'].includes(proof.status)
+    || (proof.status === 'NOT_CONNECTED' && proof.trace_id !== null)
+    || (proof.status === 'VERIFIED' && (proof.sponsor !== 'meterless_engine'
+      || !value.tool_trace.some(step => step.trace_id === proof.trace_id))))) throw new Error('Prueba de patrocinador inesperada');
   for (const series of value.series) {
     if (!['energy','sleep_hours'].includes(series.variable) || !['score/10','hours'].includes(series.unit)) throw new Error('Variable o unidad inválida');
     if (!Array.isArray(series.points)) throw new Error('Serie inválida');

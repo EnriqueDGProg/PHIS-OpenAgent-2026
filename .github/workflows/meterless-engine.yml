@@ -1,0 +1,34 @@
+name: Meterless World Model Engine
+
+on:
+  pull_request:
+  push:
+    branches: [codex/meterless-engine-conformance-20261022]
+
+jobs:
+  local-engine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Official pinned World Model conformance
+        env:
+          WORLD_MODEL_IMPL: ${{ github.workspace }}/vendor/meterless-world-model/src/index.ts
+        run: node --disable-warning=ExperimentalWarning --experimental-transform-types vendor/meterless-world-model/conformance/runner.ts
+      - name: Python integration and negative tests
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python -m unittest discover -s tests -q
+      - name: Synthetic event to changed decision trace
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python scripts/meterless_engine_trace.py
+      - name: Frontend contract tests
+        run: node --test frontend/tests/*.test.mjs

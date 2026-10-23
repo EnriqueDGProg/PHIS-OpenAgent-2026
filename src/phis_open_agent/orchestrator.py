@@ -102,7 +102,7 @@ class SyntheticAgent:
                               "Una herramienta local falló; no se publican resultados." if status == "ERROR" else
                               "Esta pregunta o seguimiento queda fuera del alcance verificable." if status == "BLOCKED" else
                               "No hay evidencia suficiente para responder con fiabilidad.",
-                    "sponsor_proofs": {"meterless_engine": "NOT_CONNECTED",
+                    "sponsor_proofs": {"meterless_engine": "VERIFIED" if getattr(self.world_model, "engine_verified", False) else "NOT_CONNECTED",
                                        "meterless_runtime": "NOT_CONNECTED",
                                        "nemotron": "NOT_CONNECTED", "zetaris": "NOT_CONNECTED"}}
 

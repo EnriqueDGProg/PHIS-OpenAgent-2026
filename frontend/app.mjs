@@ -158,7 +158,9 @@ function renderEvidence(run, findingId = null, sourceId = null) {
   content.append(lead);
   const sponsor=block('SERVICIOS EXTERNOS');
   const sponsorText=document.createElement('p'); sponsorText.className='sponsor-warning';
-  sponsorText.textContent=`Desconectados en esta demo: ${run.sponsor_proofs.map(item => item.sponsor).join(', ')}. Ninguna consulta externa está acreditada.`;
+  const activeEngine=run.sponsor_proofs.find(item => item.sponsor === 'meterless_engine' && item.status === 'VERIFIED');
+  const disconnected=run.sponsor_proofs.filter(item => item.status !== 'VERIFIED').map(item => item.sponsor);
+  sponsorText.textContent=`${activeEngine ? `Meterless World Model Engine local verificado: evento ${activeEngine.trace_id.slice(0,12)}. ` : ''}Desconectados: ${disconnected.join(', ')}. No se acredita inferencia externa.`;
   sponsor.append(sponsorText); content.append(sponsor);
   const origin=disclosure('Origen, ventana y cobertura');
   origin.append(description([['Dataset',run.dataset_id],['Modo',run.mode],['Escenario',run.scenario],['Ventana',`${run.window.start} a ${run.window.end}`],['Zona horaria',run.timezone],['Ejecución actual',run.run_id],['Ejecución previa',run.parent_run_id || 'Ninguna'],...run.coverage.map(c=>[`Cobertura ${c.variable}`,`${c.observed} de ${c.eligible} días`])])); content.append(origin);
