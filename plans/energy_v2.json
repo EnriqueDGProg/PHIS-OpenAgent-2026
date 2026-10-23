@@ -1,6 +1,6 @@
 {
   "schema_version": "phis-discovery-plan-v2",
-  "dataset_id": "PHIS-SYN-84D-v2",
+  "dataset_id": "PHIS-SYN-84D-v2r2",
   "family": "energy",
   "outcome": "energy_central",
   "pairs": [

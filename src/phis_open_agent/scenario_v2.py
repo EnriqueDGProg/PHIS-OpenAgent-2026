@@ -10,7 +10,8 @@ import random
 from datetime import date, timedelta
 
 SCHEMA_VERSION = "synthetic-observation-v2"
-DATASET_ID = "PHIS-SYN-84D-v2"
+DATASET_ID = "PHIS-SYN-84D-v2r2"
+GENERATOR_REVISION = "2026-10-23-r2"
 PARTICIPANT_ID = "fictional-001"
 START = date(2026, 7, 30)
 DAYS = 84
@@ -67,27 +68,33 @@ def generate_observations(*, seed: int = FIXED_SEED) -> list[dict]:
         day = START + timedelta(days=index)
         recent = index >= 56
         weekday_stress = 0.25 if day.weekday() in (0, 1) else 0.0
-        stress = _bound(4.0 + weekday_stress + (0.25 if recent else 0.0)
-                        + signals.gauss(0, 0.95), 1.0, 9.0)
+        prior_stress = values["stress_score"][-1] if index else 4.0
+        prior_caffeine = values["late_caffeine"][-1] if index else 0
+        prior_exercise = values["exercise_load"][-1] if index else 3.7
+        prior_sleep = values["sleep_hours"][-1] if index else 7.2
+        prior_energy = values["energy_central"][-1] if index else 6.3
+        stress = _bound(4.0 + weekday_stress + (0.60 if recent else 0.0)
+                        + 0.35 * (prior_stress - 4.0) + signals.gauss(0, 0.80), 1.0, 9.0)
         caffeine_probability = _bound(
-            0.46 + 0.09 * (stress - 4.0) + (0.12 if recent else 0.0),
+            0.41 + 0.10 * (stress - 4.0) + 0.05 * prior_caffeine
+            + (0.26 if recent else 0.0),
             0.08, 0.78,
         )
         late_caffeine = int(signals.random() < caffeine_probability)
         training_day = 1.0 if day.weekday() in (1, 5) else 0.0
-        exercise = _bound(3.7 + 1.2 * training_day + signals.gauss(0, 1.25),
+        exercise = _bound(3.7 + 1.2 * training_day + 0.20 * (prior_exercise - 3.7)
+                          + signals.gauss(0, 1.15),
                           0.0, 9.5)
-        prior_caffeine = values["late_caffeine"][-1] if index else 0
-        prior_stress = values["stress_score"][-1] if index else 4.0
-        prior_exercise = values["exercise_load"][-1] if index else 3.7
         sleep = _bound(
-            7.55 - 0.98 * prior_caffeine - 0.20 * (prior_stress - 4.0)
-            - 0.055 * (prior_exercise - 3.7) + signals.gauss(0, 0.45),
+            7.55 - 0.78 * prior_caffeine - 0.20 * (prior_stress - 4.0)
+            - 0.06 * (prior_exercise - 3.7) + 0.22 * (prior_sleep - 7.2)
+            + signals.gauss(0, 0.52),
             5.2, 9.3,
         )
         energy = _bound(
-            6.4 + 1.18 * (sleep - 7.2) - 0.24 * (stress - 4.0)
-            - 0.15 * (prior_exercise - 3.7) + signals.gauss(0, 0.48),
+            6.4 + 0.90 * (sleep - 7.2) - 0.30 * (stress - 4.0)
+            - 0.14 * (prior_exercise - 3.7) + 0.20 * (prior_energy - 6.3)
+            + signals.gauss(0, 0.62),
             1.0, 10.0,
         )
         today = {
@@ -120,7 +127,7 @@ def generate_observations(*, seed: int = FIXED_SEED) -> list[dict]:
                 "value": value,
                 "unit": UNITS[name],
                 "source_type": SOURCES[name],
-                "source_record_id": f"SYN-V2-{index:03d}-{name.upper()}",
+                "source_record_id": f"SYN-V2R2-{index:03d}-{name.upper()}",
                 "observed": not absent,
                 "quality": "recorded" if not absent else "not_recorded",
                 "synthetic": True,

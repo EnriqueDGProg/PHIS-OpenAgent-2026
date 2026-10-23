@@ -28,8 +28,8 @@ class ScenarioV2Tests(unittest.TestCase):
     def test_synthetic_only_and_explicit_missingness(self):
         self.assertTrue(all(r["synthetic"] is True for r in self.rows))
         self.assertTrue(all(r["participant_id"] == "fictional-001" for r in self.rows))
-        self.assertTrue(all(r["dataset_id"] == "PHIS-SYN-84D-v2" for r in self.rows))
-        self.assertTrue(all(r["source_record_id"].startswith("SYN-V2-") for r in self.rows))
+        self.assertTrue(all(r["dataset_id"] == "PHIS-SYN-84D-v2r2" for r in self.rows))
+        self.assertTrue(all(r["source_record_id"].startswith("SYN-V2R2-") for r in self.rows))
         for variable in VARIABLES:
             rows = [r for r in self.rows if r["variable"] == variable]
             self.assertGreaterEqual(sum(r["value"] is None for r in rows), 1)
