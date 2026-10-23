@@ -54,6 +54,10 @@ def _git_blob(data: bytes) -> str:
 
 
 def verify_source(source: Path) -> dict[str, bytes]:
+    if not source.exists():
+        raise ReleaseGateError("local source directory is absent")
+    if source.is_symlink():
+        raise ReleaseGateError("source symlinks are forbidden")
     source = source.resolve(strict=True)
     if not source.is_dir() or _inside_git(source):
         raise ReleaseGateError("source must be a directory outside every Git checkout")

@@ -81,7 +81,7 @@ class PackageDiscoveryCandidateTest(unittest.TestCase):
     def test_clean_clone_has_no_private_source(self) -> None:
         public_source = SCRIPT.parents[1] / "src" / "phis_master"
         self.assertFalse(public_source.exists())
-        with self.assertRaises(FileNotFoundError):
+        with self.assertRaisesRegex(gate.ReleaseGateError, "source directory is absent"):
             gate.verify_source(public_source)
 
 
