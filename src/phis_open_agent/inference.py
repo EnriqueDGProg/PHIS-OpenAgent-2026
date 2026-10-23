@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 import os
-import uuid
 from dataclasses import dataclass
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
@@ -90,7 +89,12 @@ class UrlLibTransport:
             with urlopen(request, timeout=timeout) as response:
                 if response.status != 200:
                     raise InferenceBlocked(f"Inference HTTP {response.status}")
-                return json.loads(response.read().decode("utf-8"))
+                payload = json.loads(response.read().decode("utf-8"))
+                if isinstance(payload, dict):
+                    request_id = response.headers.get("x-request-id") or response.headers.get("x-meterless-request-id")
+                    if request_id:
+                        payload["_http_request_id"] = request_id
+                return payload
         except HTTPError as error:
             if error.code in (401, 403):
                 raise InferenceBlocked("Inference unauthorized (HTTP 401/403)") from error
@@ -134,16 +138,19 @@ class MeterlessClient:
             raise InferenceBlocked("Runtime model discovery response is invalid") from error
         if self.config.model not in ids:
             raise InferenceBlocked("Configured Meterless route is unavailable")
-        answer = _chat_response(self._request("/chat/completions", body={
+        response = self._request("/chat/completions", body={
             "model": self.config.model,
             "messages": [{"role": "user", "content": PROBE_PROMPT}],
             "stream": False, "max_tokens": 32,
-        }))
+        })
+        answer = _chat_response(response)
         if answer.upper().strip(". ") != "READY":
             raise InferenceBlocked("Runtime did not return the expected synthetic probe answer")
         live = type(self.transport) is UrlLibTransport
         return {"status": "PASS" if live else "SIMULATED", "provider": "meterless_runtime",
-                "model_route": self.config.model, "trace_id": str(uuid.uuid4()) if live else None,
+                "model_route": self.config.model,
+                "trace_id": response.get("id") if live and isinstance(response.get("id"), str) else None,
+                "response_model": response.get("model") if live else None,
                 "nemotron_verified": False}
 
 
@@ -166,5 +173,6 @@ class NvidiaClient:
             raise InferenceBlocked("NVIDIA did not return the expected synthetic probe answer")
         live = type(self.transport) is UrlLibTransport
         return {"status": "PASS" if live else "SIMULATED", "provider": "nvidia_direct",
-                "model": self.config.model, "trace_id": str(uuid.uuid4()) if live else None,
+                "model": self.config.model,
+                "trace_id": result.get("id") if live and isinstance(result.get("id"), str) else None,
                 "meterless_power_verified": False}
