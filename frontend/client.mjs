@@ -1,6 +1,39 @@
 /** @typedef {import('../contracts/investigation.v1.d.ts').InvestigationV1} InvestigationV1 */
 
+export function validateScientificInvestigation(value) {
+  if (!value || value.contract_version !== 'investigation.v2' || value.synthetic !== true ||
+      !['SYNTHETIC_LOCAL_ONLY','LIVE_SYNTHETIC_ZETARIS'].includes(value.mode) ||
+      !['PASS','BLOCKED','ERROR','INSUFFICIENT_DATA'].includes(value.status)) throw new Error('Invalid scientific contract');
+  if (!value.window?.start || !value.window?.end || !Array.isArray(value.findings) ||
+      !Array.isArray(value.tool_trace) || !Array.isArray(value.sponsor_proofs) ||
+      !Array.isArray(value.series) || !Array.isArray(value.coverage)) throw new Error('Incomplete scientific response');
+  const zetaris = value.sponsor_proofs.find(item => item.sponsor === 'zetaris');
+  const engine = value.sponsor_proofs.find(item => item.sponsor === 'meterless_engine');
+  if (!zetaris || !engine || !['VERIFIED','NOT_CONNECTED','FAILED'].includes(zetaris.status) ||
+      !['VERIFIED','NOT_CONNECTED'].includes(engine.status)) throw new Error('Invalid sponsor proof');
+  if (engine.status === 'VERIFIED' && !value.tool_trace.some(item => item.trace_id === engine.trace_id && item.engine_event_id)) throw new Error('Untraced Engine proof');
+  if (value.mode === 'SYNTHETIC_LOCAL_ONLY' && zetaris.status !== 'NOT_CONNECTED') throw new Error('False Zetaris proof');
+  if (value.status === 'PASS') {
+    const evidence = value.scientific_evidence;
+    if (!evidence || evidence.hypothesis_count !== 16 || evidence.signals?.length !== 16 ||
+        !/^[a-f0-9]{64}$/.test(evidence.plan_sha256) ||
+        !/^[a-f0-9]{64}$/.test(evidence.record_digest_sha256)) throw new Error('Missing Discovery family');
+    if (evidence.signals.some(signal => signal.exposure === 'unrelated_count' && signal.classification === 'candidate_signal')) throw new Error('Promoted negative control');
+    if (value.mode === 'LIVE_SYNTHETIC_ZETARIS') {
+      const ids = evidence.source_query?.request_ids;
+      if (zetaris.status !== 'VERIFIED' || !Array.isArray(ids) || ids.length !== 3 ||
+          new Set(ids).size !== 3 || zetaris.trace_id !== ids[0] ||
+          ids.some(id => !value.tool_trace.some(step => step.tool === 'zetaris.query_v2' && step.trace_id === id && step.query_id))) throw new Error('Untraced Zetaris pagination');
+    }
+  } else if (value.scientific_evidence !== null || value.comparison !== null || value.series.length) {
+    throw new Error('Stale scientific evidence after failure');
+  }
+  if (value.findings.some(item => !['observation','candidate_contributor','unsupported_hypothesis','uncertainty','abstention'].includes(item.kind) || !Array.isArray(item.source_record_ids))) throw new Error('Invalid scientific finding');
+  return value;
+}
+
 export function validateInvestigation(value) {
+  if (value?.contract_version === 'investigation.v2') return validateScientificInvestigation(value);
   if (!value || value.contract_version !== 'investigation.v1' || !['SYNTHETIC_LOCAL_ONLY','LIVE_SYNTHETIC_ZETARIS'].includes(value.mode)) throw new Error('Contrato o modo no admitido');
   if (!['PASS','EXECUTED_PARTIAL','INSUFFICIENT_DATA','BLOCKED','ERROR'].includes(value.status)) throw new Error('Estado desconocido');
   if (typeof value.run_id !== 'string' || typeof value.summary !== 'string' || !value.window?.start || !value.window?.end) throw new Error('Ejecución incompleta');
@@ -47,10 +80,11 @@ export function validateInvestigation(value) {
   return value;
 }
 
-export async function fetchInvestigation(question, { scenario = 'normal', parentRunId = null, fetcher = fetch } = {}) {
+export async function fetchInvestigation(question, { scenario = 'normal', parentRunId = null, analysisVersion = 'v1', fetcher = fetch } = {}) {
   const response = await fetcher('/api/investigations', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ question, scenario, ...(parentRunId ? { parent_run_id: parentRunId } : {}) }),
+    body: JSON.stringify({ question, scenario, ...(parentRunId ? { parent_run_id: parentRunId } : {}),
+      ...(analysisVersion === 'v2' ? { analysis_version: 'v2' } : {}) }),
   });
   const payload = await response.json();
   if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);

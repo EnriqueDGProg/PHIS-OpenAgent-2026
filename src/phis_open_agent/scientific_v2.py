@@ -7,10 +7,11 @@ from __future__ import annotations
 
 import re
 import statistics
+from datetime import timedelta
 from uuid import uuid4
 
 from .discovery_adapter_v2 import DiscoveryUnavailable, analyze_family
-from .scenario_contract_v2 import DATASET_ID, DAYS, VARIABLES, ObservationRejected, canonical_digest, daily_series
+from .scenario_contract_v2 import DATASET_ID, DAYS, START, VARIABLES, ObservationRejected, canonical_digest, daily_series
 from .zetaris import ZetarisBlocked, ZetarisClient, ZetarisConfig
 from .zetaris_v2 import read_verified_v2
 
@@ -70,6 +71,7 @@ def investigate_scientific(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY"
     if rows_override is not None and mode != "SYNTHETIC_LOCAL_ONLY":
         raise ValueError("Injected records are never accepted in live mode")
     run_id = f"SYN-RUN-{uuid4().hex[:12]}"
+    window = {"start": START.isoformat(), "end": (START + timedelta(days=DAYS - 1)).isoformat()}
     trace = []
     sponsor = {"zetaris": {"sponsor": "zetaris", "status": "NOT_CONNECTED", "trace_id": None},
                "meterless_engine": {"sponsor": "meterless_engine", "status": "NOT_CONNECTED", "trace_id": None},
@@ -86,7 +88,8 @@ def investigate_scientific(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY"
                                   source_record_ids=list(ids))
         trace.append({"phase": phase, "status": status, "tool": "meterless.world_model",
                       "trace_id": item["event_id"], "engine_event_id": item.get("engine_event_id"),
-                      "parent_event_id": parent, "source_record_ids": list(ids)})
+                      "parent_event_id": parent, "source_record_ids": list(ids),
+                      "detail": f"{phase.lower()} event durably recorded"})
         return item
 
     def blocked(status, reason, message):
@@ -99,7 +102,8 @@ def investigate_scientific(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY"
             pass
         return {"contract_version": "investigation.v2", "run_id": run_id,
                 "parent_run_id": parent_run_id, "dataset_id": DATASET_ID,
-                "mode": mode, "synthetic": True, "status": status, "reason_code": reason,
+                "mode": mode, "scenario": "normal", "timezone": "Europe/Madrid", "window": window,
+                "synthetic": True, "status": status, "reason_code": reason,
                 "question": question, "summary": message,
                 "findings": [{"finding_id": "ABSTAIN-01", "kind": "abstention", "title": "No supported result",
                               "text": message, "source_record_ids": []}],
@@ -125,7 +129,8 @@ def investigate_scientific(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY"
         family = memory_event["payload"]["next_family"]
         trace.append({"phase": "PLAN", "status": "PASS", "tool": "meterless.world_model.read",
                       "trace_id": memory_event["event_id"], "engine_event_id": memory_event.get("engine_event_id"),
-                      "selected_family": family, "source_record_ids": memory_event["source_record_ids"]})
+                      "selected_family": family, "source_record_ids": memory_event["source_record_ids"],
+                      "detail": f"Prior verified evidence selected the {family} analysis"})
     try:
         event("PLAN", "PASS", "planned", parent=memory_event["event_id"] if memory_event else None)
         if mode == "LIVE_SYNTHETIC_ZETARIS":
@@ -148,7 +153,7 @@ def investigate_scientific(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY"
                 trace.append({"phase": "TOOLS", "status": "PASS", "tool": "zetaris.query_v2",
                               "trace_id": page["request_id"], "query_id": page["query_id"],
                               "sql_sha256": page["sql_sha256"], "row_count": page["row_count"],
-                              "source_record_ids": []})
+                              "source_record_ids": [], "detail": f"Verified page {page['page'] + 1}: {page['row_count']} rows"})
         else:
             if rows_override is None:
                 # The explicit offline fixture route is never used by live mode.
@@ -164,7 +169,8 @@ def investigate_scientific(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY"
             raise ObservationRejected("Source and Discovery digests disagree")
         trace.append({"phase": "TOOLS", "status": "PASS", "tool": "phis.discovery_v1.1",
                       "trace_id": package["family_id"], "plan_sha256": package["plan_sha256"],
-                      "hypothesis_count": package["hypothesis_count"], "source_record_ids": []})
+                      "hypothesis_count": package["hypothesis_count"], "source_record_ids": [],
+                      "detail": "Executed all 16 frozen hypotheses with temporal and correction gates"})
         windows = _means(series, "energy_central" if family == "energy" else "sleep_hours")
         if windows[1]["observed"] < 20 or windows[2]["observed"] < 20:
             return blocked("INSUFFICIENT_DATA", "weak_coverage", "Too few observed days support a comparison.")
@@ -208,25 +214,30 @@ def investigate_scientific(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY"
             source_record_ids=[row["source_record_id"] for row in rows])
         trace.append({"phase": "EVIDENCE", "status": "PASS", "tool": "meterless.world_model.append",
                       "trace_id": evidence_event["event_id"], "engine_event_id": evidence_event.get("engine_event_id"),
-                      "source_record_ids": evidence_event["source_record_ids"]})
+                      "source_record_ids": evidence_event["source_record_ids"],
+                      "detail": "Validated scientific package persisted and read back"})
         event("RESPOND", "PASS", "verified", parent=evidence_event["event_id"])
         if getattr(world_model, "engine_verified", False):
             sponsor["meterless_engine"] = {"sponsor": "meterless_engine", "status": "VERIFIED",
                                            "trace_id": evidence_event["event_id"]}
         return {"contract_version": "investigation.v2", "run_id": run_id,
                 "parent_run_id": parent_run_id, "dataset_id": DATASET_ID,
-                "mode": mode, "synthetic": True, "status": "PASS", "reason_code": None,
+                "mode": mode, "scenario": "normal", "timezone": "Europe/Madrid", "window": window,
+                "synthetic": True, "status": "PASS", "reason_code": None,
                 "question": question, "intent": intent, "family": family,
                 "summary": " ".join(item["text"] for item in findings[:2]),
-                "comparison": {"variable": primary, "baseline": windows[1],
-                               "comparison": windows[2], "difference": difference,
+                "comparison": {"variable": primary, "unit": by_key[(days[-1], primary)]["unit"],
+                               "baseline": {**windows[1], "start": days[28], "end": days[55]},
+                               "comparison": {**windows[2], "start": days[56], "end": days[83]},
+                               "difference": difference,
                                "method": "arithmetic_mean_observed_days",
                                "source_record_ids": observed_ids},
                 "coverage": [{"variable": name, "observed": sum(v is not None for v in series[name]),
                               "eligible": DAYS} for name in VARIABLES],
                 "series": [{"variable": primary, "unit": by_key[(days[-1], primary)]["unit"],
                             "points": [{"local_date": day, "value": series[primary][i],
-                                        "source_record_id": by_key[(day, primary)]["source_record_id"]}
+                                        "source_record_id": by_key[(day, primary)]["source_record_id"]
+                                        if series[primary][i] is not None else None}
                                        for i, day in enumerate(days)]}],
                 "findings": findings, "scientific_evidence": package,
                 "tool_trace": trace, "sponsor_proofs": list(sponsor.values())}
