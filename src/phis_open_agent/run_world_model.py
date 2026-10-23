@@ -14,7 +14,8 @@ from pathlib import Path
 
 
 SCHEMA = "synthetic-run-event-v1"
-ALLOWED_KINDS = frozenset({"energy_comparison", "agent_state", "scientific_evidence"})
+ALLOWED_KINDS = frozenset({"energy_comparison", "agent_state", "scientific_evidence",
+                           "scientific_evidence_180d"})
 PHASES = frozenset({"PLAN", "TOOLS", "EVIDENCE", "VERIFY", "RESPOND", "ABSTAIN"})
 STATES = frozenset({"PASS", "INSUFFICIENT_DATA", "BLOCKED", "ERROR"})
 INTENTS = frozenset({"energy", "sleep", "followup", "unsupported"})
@@ -74,6 +75,49 @@ def _make_event(run_id, kind, payload, source_record_ids):
                               (not isinstance(payload["difference"], bool) and
                                isinstance(payload["difference"], (int, float)) and
                                math.isfinite(payload["difference"]))))
+    elif kind == "scientific_evidence_180d":
+        expected = {"status", "family", "next_family", "plan_sha256", "family_id",
+                    "temporal_policy_sha256", "record_digest_sha256", "candidate_signal_ids",
+                    "classification_counts", "source_mode", "source_query_request_ids",
+                    "source_query_ids", "source_sql_sha256"}
+        valid_payload = (isinstance(payload, dict) and set(payload) == expected
+                         and payload["status"] == "PASS"
+                         and payload["family"] in {"energy", "sleep"}
+                         and payload["next_family"] in {"energy", "sleep"}
+                         and payload["next_family"] != payload["family"]
+                         and all(isinstance(payload[name], str) and
+                                 re.fullmatch(r"[0-9a-f]{64}", payload[name]) for name in
+                                 ("plan_sha256", "family_id", "temporal_policy_sha256",
+                                  "record_digest_sha256"))
+                         and isinstance(payload["candidate_signal_ids"], list)
+                         and len(payload["candidate_signal_ids"]) <= 16
+                         and all(isinstance(item, str) and re.fullmatch(r"[0-9a-f]{64}", item)
+                                 for item in payload["candidate_signal_ids"])
+                         and isinstance(payload["classification_counts"], dict)
+                         and set(payload["classification_counts"]) <= {
+                             "candidate_signal", "unstable_candidate", "weak_candidate",
+                             "insufficient_data"}
+                         and all(type(count) is int and count >= 0
+                                 for count in payload["classification_counts"].values())
+                         and sum(payload["classification_counts"].values()) == 16
+                         and payload["classification_counts"].get("candidate_signal", 0)
+                             == len(payload["candidate_signal_ids"])
+                         and payload["source_mode"] in {"SYNTHETIC_LOCAL_ONLY",
+                                                        "LIVE_SYNTHETIC_ZETARIS"}
+                         and all(isinstance(payload[name], list) and len(payload[name]) <= 6
+                                 for name in ("source_query_request_ids", "source_query_ids",
+                                              "source_sql_sha256"))
+                         and len(payload["source_query_request_ids"])
+                             == len(payload["source_query_ids"])
+                             == len(payload["source_sql_sha256"])
+                         and (len(payload["source_query_ids"]) == 6
+                              if payload["source_mode"] == "LIVE_SYNTHETIC_ZETARIS"
+                              else len(payload["source_query_ids"]) == 0)
+                         and all(isinstance(item, str) and re.fullmatch(r"[0-9a-f-]{36}", item)
+                                 for name in ("source_query_request_ids", "source_query_ids")
+                                 for item in payload[name])
+                         and all(isinstance(item, str) and re.fullmatch(r"[0-9a-f]{64}", item)
+                                 for item in payload["source_sql_sha256"]))
     elif kind == "scientific_evidence":
         valid_payload = (isinstance(payload, dict) and
                          set(payload) == {"status", "family", "next_family", "plan_sha256",
@@ -106,10 +150,14 @@ def _make_event(run_id, kind, payload, source_record_ids):
                                all(c in "0123456789abcdef" for c in payload["parent_event_id"]))))
     if not valid_payload:
         raise ValueError("Unexpected run-state payload")
-    if not isinstance(source_record_ids, (list, tuple)) or (kind in {"energy_comparison", "scientific_evidence"} and not source_record_ids) or any(
+    if not isinstance(source_record_ids, (list, tuple)) or (kind in {"energy_comparison", "scientific_evidence", "scientific_evidence_180d"} and not source_record_ids) or any(
         not isinstance(item, str) or not item.startswith("SYN-") for item in source_record_ids
     ):
         raise ValueError("Event requires synthetic source provenance")
+    if kind == "scientific_evidence_180d" and (
+            len(source_record_ids) != 1080 or len(set(source_record_ids)) != 1080 or
+            any(not item.startswith("SYN-180-opportunity-4101-") for item in source_record_ids)):
+        raise ValueError("180-day evidence requires all unique source IDs")
     material = {"schema_version": SCHEMA, "run_id": run_id, "kind": kind,
                 "payload": payload, "source_record_ids": sorted(set(source_record_ids)),
                 "synthetic": True}
