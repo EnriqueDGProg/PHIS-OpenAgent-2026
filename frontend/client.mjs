@@ -213,7 +213,8 @@ export function validateLongitudinalInvestigation(value) {
   if (value.status !== 'PASS' && (value.scientific_evidence || value.comparison || value.series.length))
     throw new Error('Stale evidence after failure');
   if (value.contract_version === 'investigation.v4' &&
-      !['NIGHTSHIFT_VERIFIED', 'NIGHTSHIFT_PARTIAL', 'SIMULATED', 'LOCAL DETERMINISTIC MODE', 'BLOCKED']
+      !['NIGHTSHIFT_VERIFIED', 'NIGHTSHIFT_PARTIAL', 'NVIDIA_VERIFIED', 'NVIDIA_PARTIAL',
+        'SIMULATED', 'LOCAL DETERMINISTIC MODE', 'BLOCKED']
         .includes(value.planner_mode))
     throw new Error('Unknown planner provenance');
   return value;

@@ -8,9 +8,10 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from phis_open_agent.inference import InferenceBlocked, MeterlessClient, MeterlessConfig
+from phis_open_agent.inference import (InferenceBlocked, MeterlessClient, MeterlessConfig,
+                                       NvidiaClient, NvidiaConfig, NVIDIA_MODEL)
 from phis_open_agent.nightshift_agent import (
-    NightshiftPlanner, PlanRejected, investigate_agentic, parse_critique, parse_plan,
+    NightshiftPlanner, NvidiaPlanner, PlanRejected, investigate_agentic, parse_critique, parse_plan,
 )
 from phis_open_agent.run_world_model import MeterlessRunWorldModel, SyntheticRunWorldModel
 
@@ -36,6 +37,33 @@ def planner(*answers):
 
 
 class PlannerContractTests(unittest.TestCase):
+    def test_nvidia_hosted_planner_simulation_never_claims_verification(self):
+        with tempfile.TemporaryDirectory() as folder:
+            store = MeterlessRunWorldModel(Path(folder) / "events.jsonl")
+            transport = ScriptedTransport('{"family":"energy","tool":"trend"}',
+                                          '{"decision":"accept"}',
+                                          '{"family":"sleep","tool":"coverage"}',
+                                          '{"decision":"replan_coverage"}')
+            planner = NvidiaPlanner(NvidiaClient(
+                NvidiaConfig.from_env({"NVIDIA_API_KEY": "simulated-token"}), transport))
+            first = investigate_agentic("How has energy changed?", world_model=store, planner=planner)
+            second = investigate_agentic("How is sleep coverage?", world_model=store,
+                                        parent_run_id=first["run_id"], planner=planner)
+            self.assertEqual([first["plan"]["tool"], second["plan"]["tool"]], ["trend", "coverage"])
+            self.assertEqual(second["verification"], "replan_coverage")
+            self.assertEqual(first["planner_mode"], "SIMULATED")
+            self.assertEqual(second["planner_mode"], "SIMULATED")
+            self.assertEqual(len(transport.requests), 4)
+            self.assertTrue(all(req.full_url == "https://integrate.api.nvidia.com/v1/chat/completions"
+                                for req, _ in transport.requests))
+            self.assertTrue(all(json.loads(req.data)["model"] == NVIDIA_MODEL
+                                for req, _ in transport.requests))
+            for result in (first, second):
+                self.assertEqual(next(p for p in result["sponsor_proofs"]
+                                      if p["sponsor"] == "nemotron")["status"], "NOT_CONNECTED")
+                self.assertEqual(next(p for p in result["sponsor_proofs"]
+                                      if p["sponsor"] == "meterless_runtime")["status"], "NOT_CONNECTED")
+
     def test_strict_schema_rejects_hallucinated_numbers_and_tools(self):
         for text in ('{"family":"energy","tool":"discovery","r":0.9}',
                      '{"family":"energy","family":"sleep","tool":"discovery"}',

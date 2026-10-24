@@ -30,7 +30,7 @@ try {
   await submit(desktop);
   assert.equal(await desktop.locator('#status-label').textContent(), 'OBSERVATION AVAILABLE');
   assert.match(await desktop.locator('.mode-pill').textContent(), live ? /LOCAL ZETARIS/ : /SYNTHETIC · LOCAL/);
-  assert.match(await desktop.locator('#coverage-label').textContent(), /84 days/);
+  assert.match(await desktop.locator('#coverage-label').textContent(), /180 days/);
   assert.ok(await desktop.locator('.chart-point').count() > 50);
   const parent = await desktop.locator('#run-id').textContent();
   await desktop.screenshot({ path: path.join(output, `${prefix}-desktop.png`), fullPage: true });

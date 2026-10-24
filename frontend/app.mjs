@@ -930,7 +930,8 @@ function updateModeUI(run) {
 
   const plannerNote = run.contract_version === 'investigation.v4'
     ? (run.planner_mode === 'NIGHTSHIFT_VERIFIED' ? 'Verified Nightshift planner.'
-      : `Planner: ${run.planner_mode?.toLowerCase() ?? 'unavailable'}; Nightshift not connected.`)
+      : run.planner_mode === 'NVIDIA_VERIFIED' ? 'Verified NVIDIA Nemotron planner.'
+      : `Planner: ${run.planner_mode?.toLowerCase() ?? 'unavailable'}; hosted inference not verified.`)
     : '';
   $('#demo-sponsor-status').textContent = isLive
     ? `Zetaris: ${zetaris?.status ?? 'NOT_CONNECTED'}. ${plannerNote} No medical advice.`

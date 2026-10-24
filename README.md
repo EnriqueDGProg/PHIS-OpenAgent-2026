@@ -1,30 +1,38 @@
 # PHIS Open Agent 2026
 
-Evidence-backed investigation of a fictional 84-day energy and sleep record for the [Open Agent Hackathon 2026](https://hackathon.genai.works/event/open-agent-hackathon-2026). Every observation is synthetic. This public repository contains competition-window code, not private PHIS source or real health data.
+Evidence-backed investigation of a fictional **180-day, 1,080-record** energy and sleep dataset for the [Open Agent Hackathon 2026](https://hackathon.genai.works/event/open-agent-hackathon-2026). Every observation is synthetic. This standalone public repository contains no real health data. Its five original PHIS Discovery modules are expressly authorized preexisting code; see the [scoped MIT license and provenance notice](src/phis_master/NOTICE.md). The vendored Meterless World Model retains its [Apache-2.0 license](vendor/meterless-world-model/LICENSE).
 
 ## Release candidate
 
-This independent draft RC combines the PR #11 UX lineage, PR #10 live Zetaris adapter, PR #12 pinned official Meterless World Model Engine, and the adversarial suite. The [final integration report](docs/FINAL_INTEGRATION_RC_2026-10-23.md) records provenance, native HTTP/Chrome evidence, and PASS/FAIL/BLOCKED gates. No branch was merged or deployed.
+The integrated PR #31 candidate combines the 180-day scientific scenario, authenticated Zetaris adapter, official Meterless World Model Engine, bounded v4 planner and adversarial suite. The [PR #31 integration report](docs/SINGLE_SHA_PRODUCT_INTEGRATION_2026-10-23.md) records the earlier baseline. Each release claim needs verification on the final commit. No branch has been merged or deployed.
 
-The Python agent selects deterministic coverage, trend, and comparison tools. Zetaris live mode reads and validates all 156 fictional source rows before analysis; a failed query abstains without substituting the local fixture. The official World Model Engine persists synthetic decision events, reopens its log in a fresh process, and changes the follow-up tool choice. Each sponsor proof has its own trace ID. Meterless Runtime/Power and NVIDIA inference remain separate and disconnected.
+The Python agent selects deterministic coverage, trend, and Discovery tools. Zetaris live mode reads and validates all 1,080 fictional source records in six bounded pages; a failed query abstains without substituting the local fixture. The World Model Engine persists synthetic decision events, reopens its state in a fresh process, and changes follow-up decisions. Discovery alone computes scientific results. Sponsor proofs have separate trace IDs; Meterless Runtime/Power, NVIDIA direct inference and Nightshift must never be inferred from Engine use.
 
 ## Run locally
 
-Requires Python 3.11+ and Node.js 24. The core and Engine require no Python or npm packages, external account, or paid service.
+Requires Python 3.11+ and Node.js 24. The core and Engine require no Python or npm package installation, external account, or paid service. From a clean public clone, check out this Draft PR branch while it is under review:
 
 ```powershell
-$env:PYTHONPATH='src'
+git clone https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026.git
+cd PHIS-OpenAgent-2026
+git switch codex/phis-judge-release-20261024
+```
+
+```powershell
+$env:PYTHONPATH=(Resolve-Path src).Path
 python -m phis_open_agent.api
 ```
 
-Open `http://127.0.0.1:4173`. The default `SYNTHETIC_LOCAL_ONLY` mode uses only fictional local rows. Engine state is under ignored `.local-state/.world/`. `PHIS_SYNTHETIC_STATE_FILE` chooses a different private local namespace. `GET /api/health` reports process health, not sponsor verification.
+Open `http://127.0.0.1:4173`. The default `SYNTHETIC_LOCAL_ONLY` mode uses only fictional local rows. `/?analysis=v4` exercises the bounded agentic planner; the default `v3` route shows the deterministic scientific investigation. Engine state is under ignored `.local-state/.world/`. `PHIS_SYNTHETIC_STATE_FILE` chooses a different private local namespace. `GET /api/health` reports process health, not sponsor verification.
 
-For a previously authorized local Zetaris instance containing the 156-row fictional table, set `PHIS_DATA_MODE=LIVE_SYNTHETIC_ZETARIS`, `ZETARIS_REST_URL`, `ZETARIS_ORG_ID`, and `ZETARIS_API_KEY` only in the API process environment. Use the documented direct `/api/v1.0` endpoint. Keep credentials and the local Compose bundle outside this repository. The API calls datasource listing, `SELECT 1`, and the bounded synthetic query on each investigation. See [Zetaris activation](docs/ZETARIS_REST_ACTIVATION.md) and [frontend instructions](frontend/README.md).
+For a previously authorized local Zetaris instance containing the 1,080-record fictional table, set `PHIS_DATA_MODE=LIVE_SYNTHETIC_ZETARIS`, `ZETARIS_REST_URL`, `ZETARIS_ORG_ID`, and `ZETARIS_API_KEY` only in the API process environment. Use the documented direct `/api/v1.0` endpoint. Keep credentials and the local Compose bundle outside this repository. The API calls datasource listing, `SELECT 1`, and six bounded synthetic pages on each investigation. See [Zetaris activation](docs/ZETARIS_REST_ACTIVATION.md) and [frontend instructions](frontend/README.md).
+
+The optional direct NVIDIA route uses the [official hosted chat-completions API](https://docs.api.nvidia.com/nim/reference/nvidia-nemotron-3_5-bolt-e4b-infer) and its documented gateway identifier `stg/nvidia/nemotron-3.5-bolt-e4b`. After the account owner enables a free API key, set `NVIDIA_API_KEY` privately in the API process and `PHIS_INFERENCE_PROVIDER=nvidia_direct`; use `/?analysis=v4`. The key is never sent to the browser or stored by the app. A simulated transport or missing provider receipt never verifies Nemotron. Direct NVIDIA does not establish Meterless Power or Runtime. Do not send real health data to this trial API. Cursor is optional per event support and is not a runtime dependency.
 
 ## Verify
 
 ```powershell
-$env:PYTHONPATH='src'
+$env:PYTHONPATH=(Resolve-Path src).Path
 python -m unittest discover -s tests -q
 python -m unittest tests.evaluation.test_adversarial_battery -q
 python -m tests.evaluation.run_eval
