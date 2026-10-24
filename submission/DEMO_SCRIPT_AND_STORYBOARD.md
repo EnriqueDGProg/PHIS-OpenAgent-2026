@@ -1,60 +1,42 @@
-# Three-minute demo — narration and second-by-second production storyboard
+# PHIS Open Agent — 3-minute demo script and actual-evidence storyboard
 
-**Target cut: 03:00 (180 seconds). Script status: CONDITIONAL.** Record a real final run after the final backend and browser gates. Every proposed on-screen trace is a shot instruction, not an assertion that footage exists. Use the exact dataset/window shown by the accepted run. Never composite a sponsor success badge onto an unrelated scientific result. The authenticated [Demo Video Guide](https://hackathon.genai.works/resources?id=01a08ff1-562f-733f-9ae0-baf2c7ac152b) recommends 2:30–3:30, a running system, real sponsor work, readable screen text and a trace, and allows cutting wait time if input/output are real.
+**Updated editorial draft: 24 October 2026. Track 02 FINAL. Target cut: ~03:00, 1–4 min hard rules. NOT RECORDED.** Use one actual coherent candidate SHA and input/output evidence; edit only after final integrated browser run. The six variables × 180 days = 1,080 *synthetic observation slots*, not real patient records. Sponsor “verified” badges must agree with footage and provider IDs; no composited results.
 
-## Narration master (~380 words; rehearse to 180 seconds)
+## Narration master (English; solo contestant, approx 3 minutes with visual pauses)
 
-**00:00–00:20 — Problem.** “Why has my energy changed lately? For a person looking back over months of fragmented observations, a neat answer can be more dangerous than an honest one. Our proposed entry for *The Agent That Can Explain Why* is PHIS Open Agent. Today the entire demo uses fictional, labeled data.”
+**0:00–0:20 — Problem.** “Why has my energy changed? Many people collect daily measurements, but a pattern is not an explanation. A fluent chatbot can mistake correlation for causation. PHIS Open Agent is a Track 02 entry for *The Agent That Can Explain Why*. Everything you are about to see uses fictional data.”
 
-**00:20–00:42 — What PHIS does.** “PHIS makes the investigation visible. It shows the longitudinal pattern and missing days, selects which evidence to inspect, and separates an observation from a hypothesis. The goal is a bounded, traceable answer—or an explicit abstention.”
+**0:20–0:42 — Outcome.** “PHIS turns that question into a bounded investigation. It exposes the 180-day timeline, missing observations, candidate factors and links back to the original records. When evidence is insufficient, it withholds an answer rather than inventing one.”
 
-**00:42–01:10 — Genuine agentic workflow.** “The planner interprets the question and coverage. A source tool retrieves the records. Specialized PHIS Discovery tests a predeclared family. The verifier checks whether source IDs, scientific gates and trace agree before response. If evidence is weak, the response says so. The official Meterless World Model Engine stores an event that a later follow-up can read, so the next decision can differ.”
+**0:42–1:10 — Agentic roles.** “The planner selects a scientific evidence path. A data tool retrieves structured observations. The pre-existing PHIS Discovery engine applies deterministic tests, including temporal, stability and coverage checks. The evidence verifier reviews the results. A shared World Model remembers what was checked and changes the next investigation.”
 
-**01:10–01:43 — Real run and science.** “Here is the actual run on the synthetic energy question. Watch the selected tools and source IDs, then the energy timeline and its gaps. A raw correlation is not a verdict: Discovery checks aligned dates, coverage, block stability, multiplicity and temporal validity. In our 84-day local evaluation, strong raw associations did **not** qualify, so PHIS withheld a contributing-factor claim.”
+**1:10–1:42 — Real workflow.** “Here is a genuine energy investigation. The source evidence spans 180 synthetic days. Discovery tests predeclared associations and reports which, if any, survive its scientific gates. Notice the gaps, source references and distinctions between an observed change and a possible contributing factor. No language model manufactures these statistics.”
 
-**01:43–02:07 — Sponsor proof.** “Zetaris is the data-access layer: in the verified fallback, a real local query returned fictional records with request and source IDs. The 180-day scientific live path is shown only if its own query-to-Discovery trace is verified. The World Model stores the decision and the follow-up recovers it after restart. These are separate proofs; we do not call an injected fixture a sponsor query.”
+**1:42–2:12 — Sponsor proof and collaboration.** “Zetaris provides authenticated access to the synthetic observation records, with traceable query and source IDs. The official Meterless World Model Engine preserves investigation decisions. On follow-up, PHIS reads that memory and switches focus from energy to sleep. This is a meaningful change in the next action, not an agent-label animation.”
 
-**02:07–02:31 — Follow-up and differentiation.** “Now ask the follow-up. The persisted state changes which family PHIS examines. Compare that with a general language model receiving a single prompt: PHIS exposes the plan, deterministic test, source lineage, verification and reason for abstention. It does not invent measurements or convert correlation into cause.”
+**2:12–2:35 — NVIDIA evidence and limits.** “A hosted NVIDIA Nemotron model can plan the evidence path and critique the returned results under strict validation; unsupported answers are rejected. Its model identity and response IDs are recorded. This direct model endpoint is separate from Meterless's World Model memory engine.”
 
-**02:31–03:00 — Honest outcome and vision.** “The final view tells the user what changed, what remains uncertain, and what evidence supports each statement. The stochastic benchmark reports an opportunity seed, a held-out failure and negative controls; we show all three rather than selecting only the pleasing case. A future consented system could ingest data automatically and help people understand patterns in daily life. That is a roadmap, not a clinical outcome or a capability claimed for this demo. PHIS makes the limits inspectable.”
+**2:35–3:00 — Result and future.** “The output connects a qualified association, uncertainty and supporting source records—or abstains when evidence is inadequate. The result suggests what to observe or ask next, not a diagnosis. Connections to consented health data and studies of real-world usefulness are future work. PHIS makes its evidence and its limitations visible.”
 
-**Conditional edit before recording:** If final 180-day live Zetaris → authentic Discovery → Meterless proof passes, replace the fallback sentence at 01:43 with the exact verified window, row count and trace IDs. If Nightshift remains unproven, do **not** record this as a submission-ready sponsor demo; the current HackOS checklist expects Nightshift as primary AI provider. If the final scientific result differs, replace the 84-day example with the actual returned state and retain the full limitation.
+**IMPORTANT conditional production logic:** The above Zetaris live energy+follow-up claim is independently verified in PR33, and Nemotron hosted local v4 plan+critique in PR35. They were **NOT YET** demonstrated on the same final SHA/run. If the final integrated run still cannot combine them, record them as **separate, plainly labeled short sequences**, preserving truthful claim boundaries; do not imply the Nemotron model powered the earlier Zetaris science shots. A v4 real model critique `accept` is not evidence of a replan; only show an actual replan if it occurs. Scientific associations are not causal findings. Video voice can be adapted for solo presentation, with no fictitious team reference.
 
-## Second-by-second storyboard
+## Shot list — replace shot plan with real final capture IDs
 
-Each range specifies exact **in/out seconds**, transition and proof artifact. The editor may hold a single real shot across several rows; the table is a timing plan, not fabricated footage.
-
-| Seconds | Frame / action | Audio and verification instruction |
+| Time | Shot | Necessary real evidence |
 | --- | --- | --- |
-| 000–005 | Title: PHIS Open Agent; proposed track and “synthetic demo” label. | Start the user question. Confirm track after founder decision. |
-| 005–012 | Show the question in the actual UI at readable zoom. | State user/problem; no health record from a real person. |
-| 012–020 | Empty or initial investigation state, not a staged result. | Clarify the harm of an ungrounded neat answer. |
-| 020–027 | User starts the longitudinal energy investigation. | Show actual input/click. |
-| 027–035 | Timeline enters loading state; missing days visible when returned. | Explain observation versus hypothesis. |
-| 035–042 | UI status/evidence affordance. | Introduce abstention; keep synthetic label visible. |
-| 042–050 | Actual plan/tool trace begins. | Planner role and conditional choice. |
-| 050–058 | Actual source retrieval trace, with safe IDs. | Source tool role; do not expose secrets or raw private paths. |
-| 058–066 | Actual Discovery family call and verifier state. | Scientific tool and verification; use only executed trace. |
-| 066–070 | Engine event in actual trace. | World Model persistence statement only if receipt visible. |
-| 070–079 | Run starts or continues in real browser/API. | Show a real input-to-output sequence; cuts may compress waiting only. |
-| 079–090 | Longitudinal chart and gap treatment. | Describe the observed pattern without a fabricated statistic. |
-| 090–101 | Discovery evidence panel with real family/child IDs. | Explain why raw association is not qualification. |
-| 101–103 | Display actual abstention/uncertainty state. | Use the 84-day local result only if footage belongs to that run. |
-| 103–114 | Actual Zetaris query/request proof for chosen run. | For fallback, label “156-row local synthetic proof”; never imply 180-day science. |
-| 114–122 | Source record IDs linked to evidence. | Show provenance from query to output. |
-| 122–127 | Official World Model event/receipt. | Distinguish Engine from Nightshift inference. |
-| 127–135 | Submit a real follow-up. | Contrast with a single prompt, without showing a fake LLM comparison run. |
-| 135–144 | After restart, recovered prior Engine state in actual trace. | Show changed family/decision; if restart proof unavailable, omit the restart claim. |
-| 144–151 | Verifier or abstention event with source link. | Explain no invented metrics or causal leap. |
-| 151–161 | Final answer, limitations and evidence drawer. | Allow reading time; cite exact run IDs on screen if safe. |
-| 161–170 | Compact benchmark panel: opportunity, held-out miss, control. | Label **offline benchmark**; no live badge. |
-| 170–176 | Roadmap text: consented automated ingestion. | Future tense; no clinical/quality-of-life improvement claim as a measured fact. |
-| 176–180 | Closing title, repository URL and synthetic disclaimer. | End exactly within four minutes; target 03:00. |
+| 00:00–00:20 | Title plus actual PHIS question | Track 02, user, question, prominently synthetic |
+| 00:20–00:42 | Actual trajectory and missingness UX | 180-day window / typed synthetic data; no invented numerical delta |
+| 00:42–01:10 | Real trace + simple architecture | Visible planner/tool/verifier events, not a static fake multi-agent dialogue |
+| 01:10–01:42 | Real executed energy investigation and evidence drawer | Discovery family/child ID, chosen period, qualification/abstention, scientific source ID |
+| 01:42–02:12 | Zetaris actual six-page requests + genuine World Model follow-up | Verified LIVE sponsor status and request IDs, World Model event read that changes sleep follow-up |
+| 02:12–02:35 | Real hosted Nemotron local or LIVE v4 output, clearly labelled | Valid PLAN and CRITIQUE, exact provider IDs and mode, no claim of Nightshift/Meterless routing |
+| 02:35–03:00 | Actual scientific output, abstention + roadmap | User benefit, uncertainty and clearly future consented ingestion |
 
-## Capture and edit rules
+## Hard production checklist
 
-- Use authentic Chrome desktop capture of the final integrated app; inspect mobile separately for the deck, not as a substitute for desktop proof.
-- Put the exact mode, dataset/window and sponsor status in a visible lower-third only when it agrees with the run trace. Never overlay “live” on local/offline footage.
-- Reserve **actual on-screen proof** for Zetaris query/request IDs, Discovery family/child/source IDs, Engine event/receipt and a state-dependent follow-up after restart. Hide credentials, `*.env`, provider dashboards and private source paths.
-- Use a clean real run. If two takes are stitched, maintain run continuity or explicitly label the cut. Do not combine a 156-row sponsor call with a 180-day scientific output as though they were one execution.
-- Do a read-through with a stopwatch, then shorten narration rather than speeding it until evidence becomes unreadable. Export MP4 with clear audio; test full playback and link access in a private browser window.
+- All shown runs actually occurred. Cuts can remove latency but may not splice source proof of one run into another as if one event.
+- No raw medical/personally identifiable data (all source records fictional); no token, DPAPI file, secret snippet or provider API-key screen.
+- User sees one coherent product, source provenance, a true critique/branch/follow-up, honest qualified evidence/abstention, limitations.
+- Final exported MP4 must last 1–4 minutes, preferably 1080p 16:9, have clear spoken audio, readable text and be watchable in a private window. Verify video and deck links.
+- This script is **not recorded footage**. Replace conditional text and match final accepted SHA before recording.
+- Align slide deck, README, form, sponsor status and video with [JUDGE_QUALITY_GATE](JUDGE_QUALITY_GATE_2026-10-24.md).
