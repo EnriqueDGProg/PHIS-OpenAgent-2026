@@ -78,9 +78,16 @@ def _claim_for_signal(item, kind):
 
 
 def investigate_scientific(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY",
-                           parent_run_id=None, zetaris_client=None, rows_override=None):
+                           parent_run_id=None, zetaris_client=None, rows_override=None,
+                           verified_source=None, family_override=None, run_id_override=None):
     """Run one bounded energy/sleep family and persist the verified package ID."""
     intent = _intent(question)
+    if family_override is not None:
+        if family_override not in {"energy", "sleep"} or (_intent(question) == "unsupported" and any(
+                word in question.casefold() for word in ("diagnos", "prescri", "medication", "medicine",
+                                                  "treatment", "dose", "drug", "medic"))):
+            raise ValueError("Invalid or medically unsupported family override")
+        intent = family_override
     if mode not in {"SYNTHETIC_LOCAL_ONLY", "LIVE_SYNTHETIC_ZETARIS"}:
         raise ValueError("Unknown source mode")
     if parent_run_id is not None and (not isinstance(parent_run_id, str) or
@@ -88,7 +95,13 @@ def investigate_scientific(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY"
         raise ValueError("Invalid parent run ID")
     if rows_override is not None and mode != "SYNTHETIC_LOCAL_ONLY":
         raise ValueError("Injected records are never accepted in live mode")
-    run_id = f"SYN-RUN-{uuid4().hex[:12]}"
+    if verified_source is not None and (mode != "LIVE_SYNTHETIC_ZETARIS" or
+                                        zetaris_client is not None or rows_override is not None):
+        raise ValueError("Verified source handoff is live-only and exclusive")
+    if run_id_override is not None and (not isinstance(run_id_override, str) or
+                                        not re.fullmatch(r"SYN-RUN-[A-Za-z0-9_-]{1,64}", run_id_override)):
+        raise ValueError("Invalid run ID override")
+    run_id = run_id_override or f"SYN-RUN-{uuid4().hex[:12]}"
     window = {"start": START.isoformat(), "end": (START + timedelta(days=DAYS - 1)).isoformat()}
     trace = []
     sponsor = {"zetaris": {"sponsor": "zetaris", "status": "NOT_CONNECTED", "trace_id": None},
@@ -153,16 +166,30 @@ def investigate_scientific(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY"
     try:
         event("PLAN", "PASS", "planned", parent=memory_event["event_id"] if memory_event else None)
         if mode == "LIVE_SYNTHETIC_ZETARIS":
-            client = zetaris_client if zetaris_client is not None else live_zetaris_client()
+            if verified_source is not None:
+                if (not isinstance(verified_source, tuple) or len(verified_source) != 2):
+                    raise ZetarisBlocked("Invalid verified-source handoff")
+                client, readback = verified_source
+            else:
+                client = zetaris_client if zetaris_client is not None else live_zetaris_client()
             if not isinstance(client, ZetarisClient) or not client.is_live_transport:
                 raise ZetarisBlocked("Live mode requires real Zetaris HTTP transport")
-            preflight = client.preflight()
-            if preflight["status"] != "PASS":
-                raise ZetarisBlocked("Zetaris preflight failed")
-            readback = read_verified_180d(client)
-            if readback["status"] != "VERIFIED":
+            if verified_source is None:
+                preflight = client.preflight()
+                if preflight["status"] != "PASS":
+                    raise ZetarisBlocked("Zetaris preflight failed")
+                readback = read_verified_180d(client)
+            if (not client._preflight_passed or not isinstance(readback, dict) or
+                    readback.get("status") != "VERIFIED" or readback.get("source_count") != 1080 or
+                    len(readback.get("pages", [])) != 6 or
+                    [page.get("row_count") for page in readback["pages"]] != [200, 200, 200, 200, 200, 80] or
+                    readback.get("sponsor_proof", {}).get("status") != "VERIFIED"):
                 raise ZetarisBlocked("Zetaris source was not verified")
             rows = readback["rows"]
+            if (canonical_digest(rows) != readback.get("record_digest_sha256") or
+                    set(readback.get("source_record_ids", [])) !=
+                    {row["source_record_id"] for row in rows}):
+                raise ZetarisBlocked("Zetaris source proof and rows disagree")
             sponsor["zetaris"] = readback["sponsor_proof"]
             source_proof = {"mode": mode, "request_ids": [page["request_id"] for page in readback["pages"]],
                             "query_ids": [page["query_id"] for page in readback["pages"]],

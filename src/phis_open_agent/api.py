@@ -13,6 +13,7 @@ from .investigation import investigate
 from .run_world_model import MeterlessRunWorldModel
 from .scientific_v2 import investigate_scientific
 from .scientific_180d import investigate_scientific as investigate_scientific_180d
+from .nightshift_agent import investigate_agentic
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -22,6 +23,7 @@ STATIC = {"/": ("index.html", "text/html; charset=utf-8"),
           "/styles.css": ("styles.css", "text/css; charset=utf-8"),
           "/app.mjs": ("app.mjs", "text/javascript; charset=utf-8"),
           "/client.mjs": ("client.mjs", "text/javascript; charset=utf-8")}
+STATIC["/presentation.mjs"] = ("presentation.mjs", "text/javascript; charset=utf-8")
 MAX_BODY = 4096
 
 
@@ -86,6 +88,13 @@ class Handler(BaseHTTPRequestHandler):
                     if payload.get("scenario", "normal") != "normal":
                         raise ValueError("Evaluation scenarios are unavailable for scientific v2")
                     result = investigate_scientific(
+                        payload.get("question"), parent_run_id=payload.get("parent_run_id"),
+                        world_model=self.server.world_model,
+                        mode=getattr(self.server, "data_mode", "SYNTHETIC_LOCAL_ONLY"))
+                elif payload.get("analysis_version") == "v4":
+                    if payload.get("scenario", "opportunity") != "opportunity":
+                        raise ValueError("Only the preregistered opportunity case is available for agentic v4")
+                    result = investigate_agentic(
                         payload.get("question"), parent_run_id=payload.get("parent_run_id"),
                         world_model=self.server.world_model,
                         mode=getattr(self.server, "data_mode", "SYNTHETIC_LOCAL_ONLY"))
