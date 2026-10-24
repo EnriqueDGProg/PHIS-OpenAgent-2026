@@ -17,6 +17,9 @@ from .zetaris import ZetarisBlocked, ZetarisClient, live_zetaris_client
 from .zetaris_180d import read_verified_180d
 
 
+MIN_COMPARISON_OBSERVED = 20  # Existing frozen 28-day comparison gate.
+
+
 def _intent(question):
     if not isinstance(question, str) or not question.strip() or len(question) > 240:
         raise ValueError("Question must contain 1–240 characters")
@@ -218,7 +221,8 @@ def investigate_scientific(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY"
                       "hypothesis_count": package["hypothesis_count"], "source_record_ids": [],
                       "detail": "Executed all 16 frozen hypotheses with temporal and correction gates"})
         windows = _means(series, "energy_central" if family == "energy" else "sleep_hours")
-        if windows[1]["observed"] < 20 or windows[2]["observed"] < 20:
+        if (windows[1]["observed"] < MIN_COMPARISON_OBSERVED or
+                windows[2]["observed"] < MIN_COMPARISON_OBSERVED):
             return blocked("INSUFFICIENT_DATA", "weak_coverage", "Too few observed days support a comparison.")
         difference = windows[2]["mean"] - windows[1]["mean"]
         primary = "energy_central" if family == "energy" else "sleep_hours"
