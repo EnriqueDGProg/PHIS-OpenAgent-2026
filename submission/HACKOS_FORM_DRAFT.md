@@ -1,51 +1,49 @@
-# HackOS submission form — ready-to-paste draft
+# HackOS form — Track 02, director-controlled submission draft
 
-**Not submitted. Founder approval and final technical gates pending.** This is a copy bank, not a representation that HackOS has accepted the project. The live signed-in form was inspected on 23 October 2026. It presently exposes **Track***, **Team Name** (automatically populated), **Description*** (150–2000 characters), **Video*** (YouTube/Vimeo/Google Drive link or file; max 4 minutes), **Github Solution***, and **Pitch Deck (Optional)** (link or file). `Save Draft` and `Submit` were not activated; the empty preview was cancelled and the hub remained at 0 submissions. The [Submission Form Preview](https://hackathon.genai.works/resources?id=01a08ff1-55f6-7358-9501-cb7f1883e33c) asks teams to prepare more information than the current live form exposes. Reinspect immediately before submission.
+**Editorial update: 24 October 2026. NOT SUBMITTED.** The final field limits and the actual accepted release SHA must be checked before pasting. Director handles technical gates; founder approves product/deck/video/submission. One solo human contestant.
 
-## Working identity and track
+## Locked values
 
-| Item | Draft value | Form treatment |
-| --- | --- | --- |
-| Project name | **PHIS Open Agent** | No separate project-name input was visible in the current form. Use in the first line of Description and deck/video title; adjust if the form adds the field. |
-| Team name | **PHIS Open Agent** | Auto-populated by HackOS; verify roster before first saved submission because it locks. |
-| Primary track | **The Agent That Can Explain Why — PROPOSED, PENDING FOUNDER SELECTION** | Choose one dropdown option only after founder decision. Wildcard remains a conservative alternate for the declared preexisting PHIS product. |
-| Public repository | `https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026` | Validate public access and final merged/reviewed code from a logged-out browser. A Draft PR branch is not the submission state. |
-| Video | **[PENDING — final real 1–4 minute demo URL or upload]** | Record only after final technical trace and visual QA; test permissionless playback with audio. |
-| Pitch deck | **[PENDING — final deck URL or upload]** | The live form marks the field optional, but Official Rules and the form preview require the deck as a submission component. Include it. |
+| Field | Value / gate |
+| --- | --- |
+| Team / project | PHIS Open Agent; verify actual HackOS team label |
+| Primary track | **Track 02 — The Agent That Can Explain Why (FINAL)** |
+| Github Solution | https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026 — public `main` only AFTER accepted merge + clean clone validation |
+| Description | 150–2000 characters; use draft below after consistency verification |
+| Video | Final real MP4, 1–4 minutes, publicly accessible; NOT YET RECORDED |
+| Pitch Deck | Submit final PPTX or PDF/link even though live preview labels it optional; guidelines require it |
+| Team roster | Solo; founder is sole contestant and primary contact |
+| Preexisting declaration | Must be INSIDE actual **Description**, per organizer track clarification |
+| Submission | Not saved/submitted; obtain HackOS receipt + timestamp when complete |
 
-## Concise description
+## Current self-contained Description draft (under 2,000 characters)
 
-> PHIS Open Agent investigates a synthetic longitudinal question—“Why has my energy changed lately?”—with traceable source records, specialized deterministic science, persistent agent context, and explicit abstention when the evidence is insufficient.
+> PHIS Open Agent — Track 02: The Agent That Can Explain Why.
+> 
+> Why does my energy change over time? PHIS turns that question into a traceable, uncertainty-aware investigation rather than a confident guess. In this fictional 180-day demonstration, the new agent selects bounded evidence tools, retrieves structured records through Zetaris, invokes deterministic scientific analysis, checks the strength and provenance of findings, and either explains qualified associations or explicitly withholds unsupported conclusions. The official Meterless World Model Engine preserves investigation decisions and changes a later sleep follow-up. The user sees longitudinal trends, missing data, source-linked evidence and limitations.
+> 
+> PRE-EXISTING: The original PHIS concept and five specialized Discovery v1.1 scientific modules existed before 22 October 2026; their methods and source are declared, not presented as work created during the event.
+> 
+> NEW DURING THE HACKATHON: The question-driven agent, orchestration and evidence-verification workflow, Zetaris and Meterless integrations, synthetic investigation scenario, browser interface, traceability and evaluation. NVIDIA Nemotron direct hosted planning/critique has also been verified separately in a synthetic local v4 run; it is not represented as Meterless Nightshift or as a combined live Zetaris/NVIDIA run without additional proof.
+> 
+> All demo records are synthetic. Associations do not establish causes; PHIS does not diagnose or provide autonomous treatment advice.
 
-## Live `Description*` field draft
+**Editorial state:** This text reflects distinct PR #33 Zetaris and World Model proofs and PR #35 Nemotron in a separate synthetic local run. If a later integrated SHA demonstrates a full single run with Nemotron + real Zetaris, update phrasing to that verified result; otherwise do not imply integration beyond separate evidence. Never paste an outdated claim.
 
-The text below is a working version for the **single 150–2000-character field**. It intentionally avoids unverified 180-day and Nightshift claims. Update only after the final release trace is accepted.
+## Sponsor contribution — exact claims for form, deck, script and README
 
-> PHIS Open Agent helps a person investigate “Why has my energy changed lately?” using clearly labeled synthetic longitudinal records. The agent plans and selects tools based on the question, data coverage and prior state. It makes the observation, candidate-factor, uncertainty and abstention states visible, and links each supported statement to source IDs and an execution trace. Specialized, deterministic PHIS Discovery evaluates predeclared scientific families and may withhold an attractive correlation when temporal, coverage or correction gates fail. The official Meterless World Model Engine persists an investigation decision that can change a later follow-up. A verified smaller local scenario queried fictional records through a real Zetaris service; the authentic Discovery evaluation and 180-day stochastic benchmark have separate local/offline evidence and are not presented as the same live run. This is a research prototype on synthetic data, not a medical diagnosis or a causal conclusion. The final video and repository disclose the exact sponsor paths that actually execute, the preexisting PHIS baseline, and any remaining setup limitations.
+- **Zetaris:** True authenticated REST-via-local-UI-proxy 180-day synthetic dataset with six bounded pages and 1,080 record IDs, scientific trace and request receipts in PR #33; no fictional live source or production patient data.
+- **Meterless:** Official World Model Agent Engine is integral to persistence, evidence provenance and state-affected follow-up. Engine NOT Nightshift inference, Meterless Power or Meterless Runtime; no claim of those.
+- **NVIDIA:** PR #35 authenticated *direct NVIDIA hosted Nemotron* plans for energy/sleep and critiques evidence on a 1,080-source-record **synthetic local** run. Final branch and integrated live-source validation pending. Do not claim Nemotron via Meterless.
+- **Cursor:** Official HackOS organizer explicitly made optional on 22 Oct; not used, do not fabricate Cursor evidence. AI-assisted development performed with Codex.
+- **Differentiator:** pre-existing deterministic scientific constraints make new agent output traceable and abstention-capable, with an evidence-aware real follow-up and clear claim boundaries.
 
-Before paste, verify the character counter, final track, final sponsor evidence and any newly integrated Nightshift route. If the Nightshift requirement remains unmet, this draft is **not submission-ready**; disclosure alone does not satisfy that gate.
+## Before/after disclosure
 
-## Long description / supporting narrative
+Original proprietary PHIS scientific Discovery v1.1 was written before the hackathon and its five-module source package is authorized under a scoped MIT license in PR #33. The permanent private PHIS repository, other original modules, real medical information and credentials are not included. The new agent integration/UI/evaluation work took place during the official build window.
 
-For a form revision, repository submission page, or reviewer note that allows longer prose:
+## Submission control
 
-> Personal data can show that energy changed without explaining what deserves attention. PHIS Open Agent is an evidence-centered investigation experience. A user poses one longitudinal question; the agent checks the available window and missingness, chooses an evidence path, invokes deterministic PHIS Discovery, verifies whether candidate associations meet frozen scientific gates, and either explains bounded observations or abstains. An auditable trace identifies tools, source records, uncertain steps and the official Meterless World Model event that informs a later follow-up. The UI gives the temporal pattern, linked evidence and limitations in professional English. All public demo records are fictional. The prior PHIS Discovery methods are declared as preexisting; the agent orchestration, sponsor adapters, proof lineage, English UX and benchmark work are new hackathon work. The current 180-day live integration and final browser QA are being verified separately. We do not claim a clinical benefit, causal explanation, automatic ingestion, Nightshift inference or NVIDIA use without the final run evidence.
+Do not submit until (a) [quality gate](JUDGE_QUALITY_GATE_2026-10-24.md) passes on one exact release SHA, (b) public main + sample/real integrations are verified as claimed, (c) final deck and video contain real screenshots and genuine sponsor receipts, (d) repo/deck/video links work logged out, (e) all secrets including the potentially exposed NVIDIA Build key are rotated/checked, and (f) founder reviews product, visual narrative and final submission.
 
-## Sponsor explanation — use only with the final evidence ledger
-
-- **Zetaris:** “A local Zetaris service answered a bounded real query over synthetic records in the verified fallback flow; source and query IDs are retained. The final video will identify whether the 180-day scientific route has its own live query proof.”
-- **Meterless:** “The official World Model Engine persists an investigation event and a later follow-up reads that event to change the selected work. Nightshift inference is **pending proof** and must not be claimed as connected until a real request/model trace and required setup pass.”
-- **Cursor:** “No verified Cursor development evidence is available for this draft. We will not attribute work to Cursor without a dated artifact. Organizer materials conflict: the older rule review and form preview request Cursor use; the newer checklist calls it optional.”
-- **NVIDIA:** “No Nemotron inference call is proven in this build. NVIDIA is not claimed as an implemented contribution.”
-- **Unique combination:** “PHIS binds retrieved synthetic records, frozen scientific-family outcomes and persistent agent state to auditable IDs. It visibly distinguishes observations from hypotheses and abstains when scientific gates reject a candidate.”
-
-## Preexisting-work declaration — retain verbatim substance
-
-> PHIS existed before the 22 October 2026 build window as a private product concept and codebase. PHIS Discovery v1.1's five scientific modules at private baseline commit `516e3388ce67061028c1b1b29afb4a4ed965a2e0` preexisted the event. Their original methods, code and prior development are **PREEXISTING**, not submitted as new hackathon invention. No private health records or source are published by this package. The public hackathon work after the window opened includes agent orchestration, Zetaris and Meterless integration work, typed synthetic data/evidence contracts, longitudinal UI, English judge experience, scientific adapters, benchmark/evaluation, and release safety gates. Publication of the five original scientific files remains subject to owner rights, exact scope and license approval. The final submission will identify the accepted commits and clarify which of these integrations are actually runnable from a clean public clone.
-
-## Team / optional fields from preview
-
-- **Roster and primary contact:** [FOUNDER TO VERIFY IN HACKOS BEFORE FIRST SAVE]. Do not paste names, email addresses or roles from assumptions.
-- **Google Colab links:** Not applicable unless the final agent runs in Colab.
-- **Licensing:** [OWNER APPROVAL PENDING] for the proposed five-file Discovery publication and final repository scope.
-- **Final actual submission timestamp and receipt:** [PENDING]. This package does not upload, save or submit to HackOS.
+For actual HackOS screen: the 23 Oct observed fields were **Track***, **Team Name** auto-populated, **Description***, **Video***, **Github Solution*** and **Pitch Deck (Optional)**. Live form supersedes generic preview where different; deck remains a required artifact according to the official submission guide.
