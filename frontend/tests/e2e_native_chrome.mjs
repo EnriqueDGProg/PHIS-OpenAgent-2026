@@ -43,11 +43,11 @@ try {
   await desktop.screenshot({ path: path.join(output, `${prefix}-evidence.png`), fullPage: true });
   await desktop.getByRole('button', { name: 'Close evidence panel' }).click();
   await desktop.reload();
-  await desktop.getByRole('button', { name: 'Investigate sleep' }).click();
+  await desktop.getByRole('button', { name: "What's next?" }).click();
   assert.match(await desktop.locator('#followup-context').textContent(), new RegExp(parent));
   await submit(desktop);
   assert.equal(await desktop.locator('#status-label').textContent(), 'OBSERVATION AVAILABLE');
-  assert.match(await desktop.locator('#trace-list').textContent(), /get_variable_coverage/);
+  assert.match(await desktop.locator('#trace-list').textContent(), /meterless.world_model.read/);
   await desktop.screenshot({ path: path.join(output, `${prefix}-followup.png`), fullPage: true });
 
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true,
