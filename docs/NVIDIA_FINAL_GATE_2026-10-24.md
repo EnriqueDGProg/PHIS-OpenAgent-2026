@@ -1,5 +1,7 @@
 # NVIDIA final integration gate — 24 October 2026
 
+**Historical gate:** the later [bounded contract recovery](NEMOTRON_CONTRACT_RECOVERY_2026-10-24.md) succeeded on this branch. The BLOCKED results below document PR #34 before its exact PLAN/CRITIQUE prompt correction; use the recovery report for current sponsor status.
+
 Base: Draft PR #33, `fb806023a5fb7d84cba05e299b2384acfbb02250`. This branch changes only the documented hosted-model selection, Lightning direct-answer setting and bounded NVIDIA response length. No science, dataset, Zetaris, Docker, frontend design or private PHIS source changed.
 
 ## Authentic provider evidence
