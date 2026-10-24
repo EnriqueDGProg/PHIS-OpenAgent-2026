@@ -15,8 +15,9 @@ from urllib.request import Request, urlopen
 
 
 NVIDIA_BASE = "https://integrate.api.nvidia.com/v1"
-NVIDIA_MODEL = "stg/nvidia/nemotron-3.5-bolt-e4b"
-NVIDIA_MODELS = {NVIDIA_MODEL}
+NVIDIA_MODEL = "nvidia/nemotron-3.5-lightning-30b-a3b"
+NVIDIA_BOLT_MODEL = "stg/nvidia/nemotron-3.5-bolt-e4b"
+NVIDIA_MODELS = {NVIDIA_MODEL, NVIDIA_BOLT_MODEL}
 APP_ID = "phis-open-agent"
 PROBE_PROMPT = "Synthetic connectivity check. Reply with the single word READY. No health data is supplied."
 
