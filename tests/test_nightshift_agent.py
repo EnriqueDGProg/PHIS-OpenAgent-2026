@@ -64,6 +64,8 @@ class PlannerContractTests(unittest.TestCase):
                                 for req, _ in transport.requests))
             self.assertTrue(all(json.loads(req.data)["max_tokens"] == 512
                                 for req, _ in transport.requests))
+            self.assertTrue(all(json.loads(req.data)["response_format"] == {"type": "json_object"}
+                                for req, _ in transport.requests))
             for result in (first, second):
                 self.assertEqual(next(p for p in result["sponsor_proofs"]
                                       if p["sponsor"] == "nemotron")["status"], "NOT_CONNECTED")
@@ -94,6 +96,7 @@ class PlannerContractTests(unittest.TestCase):
             self.assertIsNone(result["scientific_evidence"])
             self.assertEqual(len(transport.requests), 3)  # models, plan, critique
             self.assertEqual(json.loads(transport.requests[1][0].data)["messages"][0]["role"], "system")
+            self.assertNotIn("response_format", json.loads(transport.requests[1][0].data))
             reopened = MeterlessRunWorldModel(Path(folder) / "agent.jsonl")
             saved = reopened.read(result["run_id"])
             self.assertEqual([item["kind"] for item in saved],

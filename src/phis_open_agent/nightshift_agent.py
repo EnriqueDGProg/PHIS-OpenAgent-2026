@@ -89,6 +89,10 @@ class NightshiftPlanner:
     def max_tokens(self):
         return 160
 
+    @property
+    def response_format(self):
+        return None
+
     def discover(self):
         models = self.client._request("/models")
         try:
@@ -102,12 +106,15 @@ class NightshiftPlanner:
     def _complete(self, user_payload):
         if not self.discovered:
             self.discover()
-        response = self.client._request("/chat/completions", body={
+        body = {
             "model": self.client.config.model,
             "messages": [{"role": "system", "content": SYSTEM},
                          {"role": "user", "content": json.dumps(user_payload, sort_keys=True)}],
             "stream": False, "temperature": 0, "max_tokens": self.max_tokens,
-        })
+        }
+        if self.response_format is not None:
+            body["response_format"] = self.response_format
+        response = self.client._request("/chat/completions", body=body)
         content = _chat_response(response)
         response_id = response.get("id") if isinstance(response.get("id"), str) else None
         request_id = response.get("_http_request_id") if isinstance(response.get("_http_request_id"), str) else None
@@ -162,6 +169,12 @@ class NvidiaPlanner(NightshiftPlanner):
     @property
     def max_tokens(self):
         return 512
+
+    @property
+    def response_format(self):
+        # NVIDIA documents JSON mode for Lightning. PHIS still validates the
+        # exact fields and allowlisted values after generation.
+        return {"type": "json_object"}
 
 
 def _decision_event(store, run_id, *, phase, plan, decision, receipt, digest,

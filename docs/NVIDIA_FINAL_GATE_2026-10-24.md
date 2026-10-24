@@ -33,4 +33,19 @@ One real installed-Chrome session exercised the local Python HTTP API at `http:/
 | NVIDIA agentic sponsor badge | **NOT CONNECTED** |
 | Meterless Power/Runtime and Zetaris proof in this run | **NOT CONNECTED** |
 
-Next technical gate: inspect the rejected synthetic-only plan response locally without retaining or publishing raw provider text, then make one schema-constrained adapter correction and seek approval before further hosted calls. Do not promote the badge from the successful connectivity probe alone.
+The agentic badge must not be promoted from the successful connectivity probe alone.
+
+## P0 JSON-mode follow-up on Draft PR #34
+
+The two earlier responses were authenticated, then rejected by `parse_plan`. Their raw content and validator subcategory were not retained, so the exact earlier shape cannot be recovered from sanitized evidence. The first exhausted its 160-token limit; the second used 205 of 512 tokens, excluding that limit as the explanation for the second rejection. Both safely recorded abstention in World Model.
+
+NVIDIA's [Nemotron Lightning guide](https://docs.nvidia.com/nim/large-language-models/2.0.10/get-started/advanced/get-started-nemotron-3.5-lightning.html) documents `response_format: {"type":"json_object"}` with subsequent schema validation. Its [hosted evaluation example](https://docs.nvidia.com/nemo-helix/documentation/evaluate-models/metrics/agentic-metrics) uses the same format with the Lightning hosted endpoint. The Lightning-specific hosted API reference does not document a `json_schema` request form, so this update uses documented JSON mode and retains the existing exact-key and allowlist validator. Only NVIDIA plan and critique requests receive the new parameter; the plain-text connectivity probe and Meterless route do not.
+
+| Genuine JSON-mode plan | Provider-issued response ID | Latency | Result |
+| --- | --- | ---: | --- |
+| Energy | `chatcmpl-415191b2-62fb-4e34-878a-66a98f97e9ad` | 2,804 ms | **BLOCKED**: `PlanRejected: Model response schema invalid`; 212 completion tokens. |
+| Sleep | `chatcmpl-cbe928f7-928c-4b33-b659-451369bdac9e` | 2,320 ms | **BLOCKED**: `PlanRejected: Model response schema invalid`; 204 completion tokens. |
+
+Both responses identified `nvidia/nemotron-3.5-lightning-30b-a3b`, but neither met the required exact `family` and `tool` shape. Raw output was neither printed nor retained; no invalid text was accepted. Per the owner's stop condition, there were no further hosted calls and no scientific v4 run or critique. The local deterministic fallback and the `nemotron: NOT_CONNECTED` agentic proof remain correct. Focused simulated inference/planner tests: **13/13 PASS**. No browser, full suite, scientific benchmark or Docker run was performed in this follow-up.
+
+**Release gate remains NO-GO for NVIDIA agentic verification.** Connectivity is genuinely verified by the earlier probe; model-driven plan, critique and World Model evidence based on a valid hosted plan remain BLOCKED.
