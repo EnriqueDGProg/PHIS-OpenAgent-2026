@@ -81,6 +81,10 @@ class NightshiftPlanner:
     def live(self):
         return type(self.client.transport) is UrlLibTransport
 
+    @property
+    def requires_http_request_id(self):
+        return True
+
     def discover(self):
         models = self.client._request("/models")
         try:
@@ -105,7 +109,8 @@ class NightshiftPlanner:
         request_id = response.get("_http_request_id") if isinstance(response.get("_http_request_id"), str) else None
         response_model = response.get("model") if isinstance(response.get("model"), str) else None
         # A live call without returned IDs is not a verified sponsor receipt.
-        status = ("VERIFIED" if self.live and request_id and response_id and response_model
+        status = ("VERIFIED" if self.live and response_id and response_model and
+                  (request_id or not self.requires_http_request_id)
                   else "SIMULATED" if not self.live else "BLOCKED")
         if status == "BLOCKED":
             raise InferenceBlocked("Inference response lacks verifiable provider IDs")
@@ -143,6 +148,12 @@ class NvidiaPlanner(NightshiftPlanner):
     def discover(self):
         # NVIDIA documents this hosted model/route, without a model-list preflight.
         self.discovered = True
+
+    @property
+    def requires_http_request_id(self):
+        # The hosted OpenAI-compatible response ID is documented; its HTTP
+        # request-ID header is not guaranteed by the NVIDIA model contract.
+        return False
 
 
 def _decision_event(store, run_id, *, phase, plan, decision, receipt, digest,

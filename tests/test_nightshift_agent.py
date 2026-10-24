@@ -46,6 +46,10 @@ class PlannerContractTests(unittest.TestCase):
                                           '{"decision":"replan_coverage"}')
             planner = NvidiaPlanner(NvidiaClient(
                 NvidiaConfig.from_env({"NVIDIA_API_KEY": "simulated-token"}), transport))
+            self.assertFalse(planner.requires_http_request_id)
+            self.assertTrue(NightshiftPlanner(MeterlessClient(
+                MeterlessConfig.from_env({"METERLESS_RUNTIME_TOKEN": "simulated-token"}),
+                ScriptedTransport())).requires_http_request_id)
             first = investigate_agentic("How has energy changed?", world_model=store, planner=planner)
             second = investigate_agentic("How is sleep coverage?", world_model=store,
                                         parent_run_id=first["run_id"], planner=planner)
