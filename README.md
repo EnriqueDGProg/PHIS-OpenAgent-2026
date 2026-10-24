@@ -4,9 +4,9 @@ Evidence-backed investigation of a fictional **180-day, 1,080-record** energy an
 
 ## Release candidate
 
-The integrated PR #31 candidate combines the 180-day scientific scenario, authenticated Zetaris adapter, official Meterless World Model Engine, bounded v4 planner and adversarial suite. The [PR #31 integration report](docs/SINGLE_SHA_PRODUCT_INTEGRATION_2026-10-23.md) records the earlier baseline. Each release claim needs verification on the final commit. No branch has been merged or deployed.
+Draft PR #37 is the consolidated release candidate, based on PR #35 `815ac9ef426cd632732f7b7f22a3a200a025e3c5` with the completed PR #36 `submission/**` package. It includes the 180-day scientific scenario, Zetaris adapter, official Meterless World Model Engine, bounded v4 planner, NVIDIA direct adapter and adversarial suite. The [final release gate](docs/FINAL_RELEASE_GATE_2026-10-24.md) separates current clean-clone proof from earlier sponsor receipts. No branch has been merged or deployed.
 
-The Python agent selects deterministic coverage, trend, and Discovery tools. Zetaris live mode reads and validates all 1,080 fictional source records in six bounded pages; a failed query abstains without substituting the local fixture. The World Model Engine persists synthetic decision events, reopens its state in a fresh process, and changes follow-up decisions. Discovery alone computes scientific results. Sponsor proofs have separate trace IDs; Meterless Runtime/Power, NVIDIA direct inference and Nightshift must never be inferred from Engine use.
+The Python agent selects deterministic coverage, trend, and Discovery tools. Zetaris live mode reads and validates all 1,080 fictional source records in six bounded pages; a failed query abstains without substituting the local fixture. The World Model Engine persists synthetic decision events, reopens its state in a fresh process, and changes follow-up decisions. Discovery alone computes scientific results. Sponsor proofs have separate trace IDs; Meterless Runtime/Power and Nightshift must never be inferred from Engine use. NVIDIA direct inference is verified only for the specific PR #35 receipt and is not implied by Engine use or a local fallback run.
 
 ## Run locally
 
@@ -15,7 +15,7 @@ Requires Python 3.11+ and Node.js 24. The core and Engine require no Python or n
 ```powershell
 git clone https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026.git
 cd PHIS-OpenAgent-2026
-git switch codex/phis-judge-release-20261024
+git switch codex/phis-final-release-20261024
 ```
 
 ```powershell

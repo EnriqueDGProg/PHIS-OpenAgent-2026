@@ -24,6 +24,6 @@ PHIS Open Agent investigates why a person’s energy or sleep pattern changed ac
 
 **Differentiation.** PHIS exposes provenance and scientific vetoes, not only a fluent explanation. It distinguishes descriptive change, qualified association, uncertainty and abstention. Separate run IDs and provider IDs permit independent audit.
 
-**Reproducibility.** The public README documents a clean-clone `SYNTHETIC_LOCAL_ONLY` run with fictional records. Live Zetaris requires authorized local service/config; direct NVIDIA requires a user-held key. The two sponsor receipts are documented separately. Include the final release SHA and demo run IDs after director sign-off.
+**Reproducibility.** Draft PR #37 and the public README document a clean-clone `SYNTHETIC_LOCAL_ONLY` run with fictional records. Live Zetaris requires authorized local service/config; direct NVIDIA requires a user-held key. The two sponsor receipts are documented separately on earlier SHAs. Include the exact approved release SHA and demo run IDs after director sign-off; this form draft is not yet submitted.
 
 **Limitations.** 1,080 variable-day records represent six variables across 180 fictional days, not a population. Missingness and temporal confounding remain; qualified same-day signals are not causal. No real health records, consented ingestion, clinical validation, Meterless Power/Runtime/Nightshift or Cursor provenance is claimed.

@@ -1,6 +1,6 @@
 # Evidence and claim ledger — separate receipts
 
-This ledger records authentic evidence already present in the repository. It does **not** certify that all paths ran together on a final release SHA. The latest accessible integrated branch is PR #35 `815ac9ef426cd632732f7b7f22a3a200a025e3c5`; its [director comment](https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026/pull/35) says GO to consolidate and NO-GO to submission pending final browser/packaging acceptance. Record the later Technical Release Codex 1 SHA here when supplied.
+This ledger records authentic evidence already present in the repository. It does **not** certify that all paths ran together on a final release SHA. Draft PR #37 consolidates PR #35 `815ac9ef426cd632732f7b7f22a3a200a025e3c5` and PR #36 submission files; its [release gate](../docs/FINAL_RELEASE_GATE_2026-10-24.md) records a new local synthetic Chrome run. The [director comment](https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026/pull/35) authorized consolidation, not HackOS submission. Hosted NVIDIA and live Zetaris remain separate earlier receipts.
 
 | Claim or asset | Mode / exact code anchor | Authentic receipt or file | Safe use |
 | --- | --- | --- | --- |

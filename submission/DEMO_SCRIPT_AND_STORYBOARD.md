@@ -1,6 +1,6 @@
 # Exact 03:00 demo narration and continuous storyboard
 
-**Production state:** script and shot plan only. No video is claimed. Record from the accepted final commit; preserve a continuous parent/follow-up run and label any cut to a separate PR #35 NVIDIA receipt. No fake footage, screenshot animation or manufactured provider badge. The signed-in [Demo Video Guide](https://hackathon.genai.works/resources?id=01a08ff1-562f-733f-9ae0-baf2c7ac152b) asks for a real running system, readable trace and a one-to-four-minute video. Target 180 seconds at a rehearsed, unhurried pace; footage and voice checkpoints below are fixed edit boundaries.
+**Production state:** script and shot plan only. No video is claimed. Record from the approved Draft PR #37 commit; preserve a continuous parent/follow-up run and label any cut to a separate PR #35 NVIDIA receipt. The current PR #37 Chrome proof is local synthetic with NVIDIA and Zetaris disconnected. No fake footage, screenshot animation or manufactured provider badge. The signed-in [Demo Video Guide](https://hackathon.genai.works/resources?id=01a08ff1-562f-733f-9ae0-baf2c7ac152b) asks for a real running system, readable trace and a one-to-four-minute video. Target 180 seconds at a rehearsed, unhurried pace; footage and voice checkpoints below are fixed edit boundaries.
 
 ## Narration master
 
