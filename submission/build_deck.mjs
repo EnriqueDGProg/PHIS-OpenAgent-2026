@@ -1,0 +1,172 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+// Editable, claim-bounded submission deck. All product images are placeholders.
+// Rebuild with the bundled Codex artifact runtime; see submission/README.md.
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const SKILL = process.env.PHIS_PRESENTATIONS_SKILL;
+const PYTHON = process.env.RUNTIME_PYTHON;
+const MODULES = process.env.RUNTIME_NODE_MODULES;
+if (!SKILL || !PYTHON || !MODULES) throw new Error('Set PHIS_PRESENTATIONS_SKILL, RUNTIME_PYTHON and RUNTIME_NODE_MODULES from the Codex bundled workspace runtime.');
+const { Presentation, PresentationFile } = await import(pathToFileURL(path.join(MODULES,'@oai/artifact-tool/dist/artifact_tool.mjs')).href);
+const OUT = path.join(HERE, 'deck', 'PHIS_Open_Agent_2026_Submission_Deck.pptx');
+const BUILD = path.join(HERE, '.deck-build');
+const W = 1280, H = 720;
+const C = { navy:'#0B1923', navy2:'#102A34', cream:'#F6F5F0', white:'#FFFFFF', teal:'#56CDB7', mint:'#B2F0DE', ink:'#132A32', muted:'#59717A', mist:'#DDE7E4', orange:'#E5AD79', border:'#C4D5D1' };
+const FONT = 'Arial';
+
+function shape(slide, geometry, x,y,w,h,fill='none',lineFill='none',lineWidth=0) {
+  return slide.shapes.add({geometry, position:{left:x,top:y,width:w,height:h},fill,
+    line:{style:'solid',fill:lineFill,width:lineWidth}});
+}
+function txt(slide,text,x,y,w,h,size=22,color=C.ink,bold=false,align='left') {
+  const s=shape(slide,'textbox',x,y,w,h);
+  s.text=text;
+  s.text.style={fontFamily:FONT,typeface:FONT,fontSize:size,color,bold,alignment:align,verticalAlignment:'middle',wrap:'word',autoFit:'shrinkText',insets:0};
+  return s;
+}
+function rule(slide,x,y,w,color=C.border,width=1) { shape(slide,'rect',x,y,w,width,color); }
+function base(dark=false) {
+  const s=deck.slides.add(); s.background.fill=dark?C.navy:C.cream;
+  txt(s,'PHIS  /  OPEN AGENT 2026',60,31,470,22,13,dark?C.mint:C.muted,true);
+  txt(s,'SYNTHETIC DEMO  •  DRAFT',930,31,290,22,12,dark?C.mint:C.muted,true,'right');
+  rule(s,60,63,1160,dark?'#31505A':C.border,1);
+  return s;
+}
+function heading(s,kicker,title,subtitle='',dark=false){
+  txt(s,kicker.toUpperCase(),60,92,560,25,14,dark?C.teal:C.muted,true);
+  txt(s,title,60,130,1140,78,46,dark?C.white:C.ink,true);
+  if(subtitle) txt(s,subtitle,60,214,1120,62,20,dark?C.mist:C.muted);
+}
+function footer(s,n,dark=false){
+  rule(s,60,666,1160,dark?'#31505A':C.border,1);
+  txt(s,'PROPOSED TRACK · THE AGENT THAT CAN EXPLAIN WHY',60,675,800,22,11,dark?C.mist:C.muted,true);
+  txt(s,String(n).padStart(2,'0'),1168,675,52,22,11,dark?C.mist:C.muted,true,'right');
+}
+function card(s,x,y,w,h,title,body,dark=false,tag=''){
+  shape(s,'rect',x,y,w,h,dark?C.navy2:C.white,dark?'#31505A':C.border,1);
+  if(tag) txt(s,tag.toUpperCase(),x+22,y+18,w-44,20,12,dark?C.teal:C.muted,true);
+  txt(s,title,x+22,y+(tag?50:23),w-44,46,25,dark?C.white:C.ink,true);
+  txt(s,body,x+22,y+(tag?103:78),w-44,h-(tag?120:92),18,dark?C.mist:C.muted);
+}
+function notes(s,body){s.speakerNotes.text=body;}
+
+const deck=Presentation.create({slideSize:{width:W,height:H}});
+
+// 01 — cover
+{
+ const s=base(true);
+ txt(s,'WHY HAS MY ENERGY\nCHANGED LATELY?',60,126,1110,185,58,C.white,true);
+ rule(s,60,336,153,C.teal,6);
+ txt(s,'An evidence-centered agent that can show what it knows,\nwhat it tested, and why it abstains.',60,375,1050,98,27,C.mist);
+ txt(s,'PHIS Open Agent',60,552,575,50,30,C.teal,true);
+ txt(s,'Track proposal pending founder selection',60,613,620,26,15,C.mist);
+ notes(s,'Sources: https://hackathon.genai.works/event/open-agent-hackathon-2026 ; https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026/issues/1 . The track is a proposal, not final. Synthetic data only.');
+}
+// 02 — problem
+{
+ const s=base(); heading(s,'01 / problem & users','A personal “why” question needs evidence.','For a person reviewing changing energy, longitudinal records are incomplete and easy to overread.');
+ card(s,60,314,355,272,'The user','Wants to understand a recent change without receiving an invented diagnosis.');
+ card(s,433,314,355,272,'The friction','Scattered time series, missing days and tempting raw correlations obscure what is supportable.');
+ card(s,806,314,414,272,'The standard','Show observation, tested association, uncertainty and source lineage in one investigation.');
+ footer(s,2); notes(s,'Product positioning and target user are a proposal, not a clinical outcome. Official track wording: https://hackathon.genai.works/event/open-agent-hackathon-2026 .');
+}
+// 03 — solution
+{
+ const s=base(true); heading(s,'02 / solution','PHIS turns a question into a bounded investigation.','One longitudinal experience; every conclusion must survive the evidence gate.',true);
+ const a=[['01','Observe','The time window, coverage and missing days are explicit.'],['02','Investigate','Select tools and candidate families from the question and state.'],['03','Verify','Discovery evaluates frozen scientific gates and source links.'],['04','Explain / abstain','Return what is supportable and say what remains unknown.']];
+ a.forEach((v,i)=>{const x=60+i*292; txt(s,v[0],x,312,265,50,34,C.teal,true); rule(s,x,373,247,'#31505A',1); txt(s,v[1],x,396,255,48,25,C.white,true); txt(s,v[2],x,458,255,112,18,C.mist);});
+ footer(s,3,true); notes(s,'Sources: https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026/pull/13 and /pull/18 . Do not say a specific factor caused an energy change.');
+}
+// 04 — agent workflow
+{
+ const s=base(); heading(s,'03 / genuine agentic workflow','A decision loop with a scientific veto.','The next step depends on question, coverage, tool result and persisted context.');
+ const blocks=[['PLAN','Choose family and window'],['TOOLS','Retrieve records and run Discovery'],['EVIDENCE','Bind IDs to every candidate'],['VERIFY','Check gates and provenance'],['RESPOND','Explain bounded observations'],['ABSTAIN','Stop on weak or failed evidence']];
+ blocks.forEach((b,i)=>{const col=i%3,row=Math.floor(i/3),x=60+col*390,y=304+row*146; shape(s,'rect',x,y,365,125,C.white,C.border,1);txt(s,b[0],x+18,y+16,329,21,13,C.teal,true);txt(s,b[1],x+18,y+47,330,63,22,C.ink,true);});
+ txt(s,'↳ Weak evidence returns to PLAN; persisted World Model state changes a later follow-up.',60,610,1110,32,17,C.muted);
+ footer(s,4);notes(s,'Sources: https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026/pull/13 ; https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026/pull/18 . Use executed trace in demo.');
+}
+// 05 — architecture
+{
+ const s=base(true); heading(s,'04 / technical architecture','A clear boundary between evidence and language.','The UI renders a typed result; it does not compute scientific findings.',true);
+ card(s,60,314,353,236,'Data & provenance','Synthetic typed records → Zetaris query IDs → immutable source IDs.',true,'Source');
+ card(s,463,314,353,236,'Agent & science','Planner and verifier call deterministic Discovery; World Model stores follow-up state.',true,'Decision');
+ card(s,866,314,353,236,'Experience','API result → longitudinal view, evidence panel, uncertainty and abstention.',true,'Presentation');
+ txt(s,'Runtime boundary: no private health data • no fabricated sponsor response • no LLM-authored measurements',60,583,1120,38,17,C.mist);
+ footer(s,5,true);notes(s,'Sources: https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026/pull/13 and /pull/18 . Private Discovery remains local-only pending https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026/pull/22 .');
+}
+// 06 — sponsors
+{
+ const s=base(); heading(s,'05 / Zetaris & Meterless','Show what each sponsor actually does.','A proof belongs to a specific run, source mode and time window.');
+ card(s,60,310,552,282,'Zetaris','VERIFIED LIVE for PR #13’s smaller fictional 156-row local query. The 180-day scientific path needs its own live readback and IDs.',false,'Data layer');
+ card(s,638,310,582,282,'Meterless World Model','VERIFIED LOCAL: official Engine event persists and a later follow-up reads it to alter selection. Nightshift inference remains unproven.',false,'Memory layer');
+ footer(s,6);notes(s,'Sources: https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026/pull/13 ; https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026/pull/18 ; authenticated HackOS checklist https://hackathon.genai.works/resources?id=01a08ff1-54d4-7755-a317-3c4167175ef8 .');
+}
+// 07 — unique sponsor use
+{
+ const s=base(true); heading(s,'06 / unique sponsor contribution','Source lineage meets persistent memory.','The meaningful combination is auditability across steps, not a list of logos.',true);
+ txt(s,'SOURCE-BOUND',60,321,540,40,29,C.teal,true);
+ txt(s,'A retrieved row has a source ID. A scientific child has a plan and family ID. The final statement must cite the evidence that generated it.',60,378,520,174,22,C.white);
+ rule(s,633,315,1,'#31505A',268);
+ txt(s,'STATE-DEPENDENT',676,321,540,40,29,C.teal,true);
+ txt(s,'A World Model event survives the first run. A subsequent question reads that event and selects different work—visible in the trace.',676,378,520,174,22,C.white);
+ txt(s,'Nightshift and Nemotron: no inference proof in this package.',60,594,1120,28,16,C.orange,true);
+ footer(s,7,true);notes(s,'Sources: https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026/pull/13 ; issue audit https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026/issues/1#issuecomment-6368899368 .');
+}
+// 08 — product experience, intentionally no fictional screenshot
+{
+ const s=base(); heading(s,'07 / product experience','Make the evidence legible.','Final browser captures must come from the accepted integrated run.');
+ shape(s,'rect',60,309,710,273,'#E8EEEA',C.border,1);
+ txt(s,'PENDING VERIFIED CAPTURE',86,335,650,36,21,C.muted,true);
+ txt(s,'Desktop: energy timeline, missing days, observation / hypothesis / abstention states.',86,396,650,116,22,C.ink);
+ shape(s,'rect',796,309,424,273,'#E8EEEA',C.border,1);
+ txt(s,'PENDING VERIFIED CAPTURE',819,335,372,36,19,C.muted,true);
+ txt(s,'Mobile: evidence drawer, source IDs, trace and keyboard checks.',819,396,370,116,22,C.ink);
+ footer(s,8);notes(s,'Screenshots intentionally omitted. PR #23 real Chrome desktop/mobile QA pending per https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026/issues/1#issuecomment-6369620404 . Do not substitute older fallback captures.');
+}
+// 09 — science/evidence boundary
+{
+ const s=base(true); heading(s,'Evidence integrity','An attractive correlation may still fail.','The benchmark reports opportunity, held-out failure and controls without cherry-picking.',true);
+ card(s,60,314,353,244,'84-day local science','Authentic Discovery returned 0 promoted candidates in both predeclared families.',true,'Verified local');
+ card(s,463,314,353,244,'180-day benchmark','An opportunity seed had qualified associations; a held-out seed had no qualified energy driver.',true,'Offline benchmark');
+ card(s,866,314,353,244,'Negative controls','Unrelated controls were not promoted in tested windows; this is not proof of universal specificity.',true,'Scope limit');
+ footer(s,9,true);notes(s,'Sources: https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026/pull/18 ; https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026/pull/21 ; issue audit https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026/issues/1#issuecomment-6368899368 .');
+}
+// 10 — roadmap
+{
+ const s=base(); heading(s,'08 / roadmap & impact','From inspectable prototype to consented insight.','The promise is better questions and clearer limits—not a clinical outcome claim.');
+ const items=[['NOW','One synthetic investigation; auditable evidence and abstention.'],['NEXT','Finish live 180-day proof, public clean clone, Nightshift and browser acceptance.'],['LATER','Consented automatic ingestion, privacy controls and prospective usefulness validation.']];
+ items.forEach((v,i)=>{const y=313+i*97;txt(s,v[0],60,y,180,36,22,i===0?C.ink:C.muted,true);rule(s,242,y+8,3,C.teal,62);txt(s,v[1],272,y,920,70,23,C.ink);});
+ txt(s,'Final submission only after founder track, rights and sponsor gates are resolved.',60,620,1120,30,17,C.muted,true);
+ footer(s,10);notes(s,'Roadmap is aspirational. Current gates: https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026/issues/1#issuecomment-6369620404 ; https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026/pull/22 .');
+}
+
+await fs.mkdir(BUILD,{recursive:true});
+await fs.mkdir(path.dirname(OUT),{recursive:true});
+for (const [i,s] of deck.slides.items.entries()) {
+  const png=await deck.export({slide:s,format:'png',scale:1});
+  await fs.writeFile(path.join(BUILD,`slide-${String(i+1).padStart(2,'0')}.png`),new Uint8Array(await png.arrayBuffer()));
+}
+const {finalizePresentation}=await import(pathToFileURL(path.join(SKILL,'container_tools/artifact_tool_utils.mjs')).href);
+const candidate=path.join(BUILD,'candidate.pptx');
+await (await PresentationFile.exportPptx(deck)).save(candidate);
+const finalizeOptions={
+  workspaceDir:HERE,candidatePath:candidate,finalPath:OUT,pythonExecutable:PYTHON,
+  integrityValidatorPath:path.join(SKILL,'container_tools/inspect_presentation_package_integrity.py'),
+  layoutValidatorPath:path.join(SKILL,'container_tools/inspect_presentation_layout_geometry.py'),
+  layoutArgs:['--expected-slide-size-emu','12192000,6858000','--validate-heading-fit'],
+  fontPolicy:{basis:'design',families:[FONT]},verifyArtifactToolImport:true,
+  receiptPath:path.join(BUILD,'validation.json'),
+};
+let result;
+try {
+  result=await finalizePresentation(finalizeOptions);
+} catch (error) {
+  // Windows workspace policy may deny the finalizer's atomic hardlink after
+  // it has already completed all package/layout/font/import checks.
+  if (error?.code !== 'EPERM' || error?.syscall !== 'link') throw error;
+  await fs.copyFile(candidate,OUT);
+  result={validation:'all finalizer checks completed; atomic publish hardlink denied by workspace, validated candidate copied byte-for-byte'};
+}
+console.log(JSON.stringify({output:OUT,slides:deck.slides.items.length,result},null,2));
