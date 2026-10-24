@@ -85,6 +85,17 @@ class NightshiftPlanner:
     def requires_http_request_id(self):
         return True
 
+    @property
+    def max_tokens(self):
+        return 160
+
+    @property
+    def response_format(self):
+        return None
+
+    def system_prompt(self, role):
+        return SYSTEM
+
     def discover(self):
         models = self.client._request("/models")
         try:
@@ -98,12 +109,15 @@ class NightshiftPlanner:
     def _complete(self, user_payload):
         if not self.discovered:
             self.discover()
-        response = self.client._request("/chat/completions", body={
+        body = {
             "model": self.client.config.model,
-            "messages": [{"role": "system", "content": SYSTEM},
+            "messages": [{"role": "system", "content": self.system_prompt(user_payload["role"])},
                          {"role": "user", "content": json.dumps(user_payload, sort_keys=True)}],
-            "stream": False, "temperature": 0, "max_tokens": 160,
-        })
+            "stream": False, "temperature": 0, "max_tokens": self.max_tokens,
+        }
+        if self.response_format is not None:
+            body["response_format"] = self.response_format
+        response = self.client._request("/chat/completions", body=body)
         content = _chat_response(response)
         response_id = response.get("id") if isinstance(response.get("id"), str) else None
         request_id = response.get("_http_request_id") if isinstance(response.get("_http_request_id"), str) else None
@@ -154,6 +168,37 @@ class NvidiaPlanner(NightshiftPlanner):
         # The hosted OpenAI-compatible response ID is documented; its HTTP
         # request-ID header is not guaranteed by the NVIDIA model contract.
         return False
+
+    @property
+    def max_tokens(self):
+        return 512
+
+    @property
+    def response_format(self):
+        # NVIDIA documents JSON mode for Lightning. PHIS still validates the
+        # exact fields and allowlisted values after generation.
+        return {"type": "json_object"}
+
+    def system_prompt(self, role):
+        if role == "planner":
+            return (SYSTEM + " PLAN output contract: return exactly two top-level JSON keys, "
+                    "family and tool, each a string. No parameters, arguments, nested objects, "
+                    "extra keys, prose or Markdown. Valid examples: "
+                    '{"family":"energy","tool":"discovery"}, '
+                    '{"family":"sleep","tool":"coverage"}, '
+                    '{"family":"none","tool":"abstain"}. '
+                    "family must be energy or sleep unless tool is abstain; then family must be none. "
+                    "tool must be discovery, trend, coverage or abstain. Select a tool only; "
+                    "do not execute it or invent findings.")
+        if role == "evidence_verifier":
+            return (SYSTEM + " CRITIQUE output contract: return exactly one top-level JSON key, "
+                    "decision, whose value is a string. The only valid complete outputs are "
+                    '{"decision":"accept"}, {"decision":"replan_coverage"}, or '
+                    '{"decision":"abstain"}. No parameters, explanation, extra keys, '
+                    "prose or Markdown. Accept only grounded tool evidence; request coverage "
+                    "when evidence needs checking; abstain if evidence is missing or invalid. "
+                    "Do not calculate, alter or invent measurements or statistical results.")
+        raise InferenceBlocked("Unknown NVIDIA planner role")
 
 
 def _decision_event(store, run_id, *, phase, plan, decision, receipt, digest,
