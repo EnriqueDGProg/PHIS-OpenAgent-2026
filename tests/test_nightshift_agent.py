@@ -66,6 +66,12 @@ class PlannerContractTests(unittest.TestCase):
                                 for req, _ in transport.requests))
             self.assertTrue(all(json.loads(req.data)["response_format"] == {"type": "json_object"}
                                 for req, _ in transport.requests))
+            plan_system = json.loads(transport.requests[0][0].data)["messages"][0]["content"]
+            critique_system = json.loads(transport.requests[1][0].data)["messages"][0]["content"]
+            self.assertIn('exactly two top-level JSON keys, family and tool', plan_system)
+            self.assertIn('No parameters, arguments, nested objects', plan_system)
+            self.assertIn('exactly one top-level JSON key, decision', critique_system)
+            self.assertIn('{"decision":"abstain"}', critique_system)
             for result in (first, second):
                 self.assertEqual(next(p for p in result["sponsor_proofs"]
                                       if p["sponsor"] == "nemotron")["status"], "NOT_CONNECTED")
@@ -74,6 +80,7 @@ class PlannerContractTests(unittest.TestCase):
 
     def test_strict_schema_rejects_hallucinated_numbers_and_tools(self):
         for text in ('{"family":"energy","tool":"discovery","r":0.9}',
+                     '{"tool":"discovery","parameters":{"family":"energy"}}',
                      '{"family":"energy","family":"sleep","tool":"discovery"}',
                      '{"family":"energy","tool":"shell"}',
                      '```json\n{"family":"sleep","tool":"coverage"}\n```',
