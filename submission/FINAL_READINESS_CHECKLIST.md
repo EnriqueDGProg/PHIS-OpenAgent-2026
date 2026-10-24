@@ -1,41 +1,33 @@
-# Final submission readiness — owner sign-off sheet
+# PHIS Open Agent — director release acceptance / GO-NO GO
 
-**State on 23 October 2026: NOT READY FOR HACKOS SUBMISSION.** Check boxes only against the **same final commit and real run**. `PASS` requires a link, command output, receipt or screenshot; “worker in progress” is not PASS. The hard deadline on the official event page is **27 October 2026, 23:45 UTC**. Build in hours of margin. The founder owns track selection, source publication, license, merge and actual submission.
+**Updated:** 24 October 2026. Track **02** LOCKED. **Not yet ready to submit.** Founder has approved scoped MIT publication of exactly five PREEXISTING Discovery modules, not final merge/submission. Technical/administrative GitHub decisions are director-owned. Current planned deadline Sunday 25 (internal); hard 27 October 23:45 UTC.
 
-| Gate | Acceptance evidence | Current state / owner |
+| Gate | Current state / evidence | Must be true before GO |
 | --- | --- | --- |
-| One primary track | Founder selects one track; deck, demo, README and HackOS match. Record rationale if Track 02 vs Wildcard. | **PENDING — founder** |
-| Final team roster | Verify every HackOS member/primary contact and prize split before first saved submission; team locks at creation. | **PENDING — founder** |
-| Public source rights and licensing | Owner approves exact five preexisting Discovery blobs, copyright holder, scope and final license/NOTICE; independent review of release PR diff and history. | **BLOCKED — owner decision** ([PR #22](https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026/pull/22)) |
-| Public clean clone | Clone without private checkout, hidden package, local database or credentials; follow README exactly; run sample mode with no sponsors and real logic; run live mode with documented authorized settings; no undocumented manual setup. | **PENDING — integration** |
-| Source and dependency disclosure | README covers startup, usage, Python/Node/runtime, Zetaris setup, Nightshift setup, authentic Discovery dependency, sample inputs/outputs and precise limits. Public repository contains all code required for its submitted runnable path. | **PENDING — final release review** |
-| Backend tests and contracts | Unit, integration, failure, adversarial and state-persistence/restart tests pass at the final SHA; inspect `investigation.v1` or versioned contract, windows, coverage, source IDs, abstention and error states. | **PENDING — integration** |
-| Agent collaboration evidence | Final trace shows at least two distinct decision/evaluation roles, a real branch/critique/retry or state-dependent handoff, and input-bound logs; no decorative sequence of agent labels. | **PENDING — final trace review** |
-| Real 180-day sponsor path | A fresh 1,080-slot synthetic source is read from real local Zetaris in bounded pages; capture query/request IDs, exact row/source IDs and digest; authentic Discovery output feeds response; official Engine receipt and recovered follow-up alter selection after restart; no fixture fallback. | **PENDING — backend Codex**. PR #13's 156-row proof is a fallback only. |
-| Meterless Engine | Official World Model source pinned/licensed, conformance passes, real feature writes/reads state and trace links event to run. | **PR #13 local proof exists; revalidate final SHA** |
-| Meterless Nightshift | A real request through Nightshift as primary AI provider, model/response trace, failure handling, documented configuration and clean-clone setup. | **BLOCKED / no proof reviewed**. Authenticated HackOS disqualification guidance treats this as a hard sponsor gate. |
-| NVIDIA | If claimed, actual Nemotron request, model name and response through supported route. If absent, say absent. | **NOT CONNECTED — do not claim** |
-| Cursor | If claimed, dated evidence of real development use. Recheck organizer clarification because older rule/form text conflicts with newer “optional” checklist. | **UNVERIFIED — do not claim** |
-| Scientific integrity | Frozen plan and family IDs; selected vs held-out seeds; negative controls and pure-null caveat; no unsupported contributor or causal claim; original Discovery outputs determine UI; no simulation ground truth leaks to answer. | **PENDING — final run review** ([PR #18](https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026/pull/18), [PR #21](https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026/pull/21)) |
-| Desktop Chrome acceptance | Real browser on final integrated app: primary run, evidence drawer, trace, abstention, sponsor disconnect, tool error, retry/follow-up; no console/page errors; screenshots with run mode and provenance. | **PENDING — PR #23 QA not done** |
-| Mobile Chrome acceptance | Real 390 px mobile browser: 180-day plot, missing gaps, evidence IDs, long text, focus/keyboard, no horizontal overflow; screenshots and report. | **PENDING — PR #23 QA not done** |
-| Accessibility | Keyboard only through full flow, visible focus, semantic status announcements, chart/evidence alternatives, readable contrast, zoom and reduced motion as applicable. | **PENDING — browser QA** |
-| Visual evidence | Replace deck placeholders only with authentic screenshots from accepted final run; cite commit, mode, viewport and run ID; ensure no synthetic fixture is presented as live sponsor output. | **PENDING VERIFIED CAPTURE** |
-| Secret and private-data scan | Scan final tree **and Git history** for tokens, keys, `.env`, private SQLite/exports, real health data, personal IDs, proprietary PHIS source not approved; inspect binary images, deck and every video frame. Rotate any exposed credential before history cleanup. | **PENDING — independent security review** |
-| Reproducibility | From clean public clone, run documented commands and at least three different inputs; compare generated outputs/traces to inputs; confirm local sample mode is clearly labeled and does not replay saved answers. | **PENDING — release QA** |
-| Deck | Editable PPTX covers all eight official subjects, claim review complete, product visuals real or marked pending, all sponsor states accurate; accessible PDF/export if desired. | **DRAFT in this PR; final proof swap pending** |
-| Video | Real 1–4 minute run, target 03:00; readable screen, clear audio, track, problem, agent branching, Zetaris, Meterless Engine/Nightshift, output and limitations; no fictional run or credential exposure. | **SCRIPT ONLY — no recording** |
-| Link access | Public repo, video and deck open logged out / private window, with no permission prompt or expiring link; video plays with audio; backup copy exists. | **PENDING — after artifacts exist** |
-| HackOS live form | Reinspect current fields, length limits and official rules; paste updated description; verify founder track and roster; include deck even if UI calls it optional; do not rely on template alone. | **PREVIEWED, NOT SAVED** (0 submissions after inspection) |
-| Actual submission | Founder submits before deadline and stores HackOS receipt/time plus final URL; keep a copy of submitted text and asset hashes. | **NOT SUBMITTED — founder** |
+| Eligibility/track | **PASS**: organizer #use-case help approved Track 02 with declared preexisting components. Cursor optional per organizer update. | Description + public README + deck/video consistently say Track 02; solo participant. |
+| Source permission | **PASS**: founder explicit MIT authorization for exact five modules in PR22; PR33 exact-byte/Windows checkout and scoped notice. | No additional PHIS private code, real health data, third-party licensing conflicts or secrets. |
+| Clean public clone | **PASS on PR33 branch/predecessor**: source and golden science reproducible; 90 Python, 16 frontend, 8 engine, 12 adversarial tests reported. | Repeat at FINAL merged/release SHA without private path; offline sample works without credentials; 3 different example inputs/outputs. |
+| Scientific validity of output | **PASS for fixed synthetic scenario PR33**: true engine, frozen gates, qualifiable evidence/abstention, missingness and negative test. | No fake statistics, no guarantee clinical outcomes, no unsupported causal/temporal conclusion; verify chosen answer and source IDs. |
+| Zetaris | **VERIFIED separately**: PR33 authenticated local service six pages × 1080 source slots, actual request IDs, source/Engine linked. | Final verified run shows actual live sponsor and evidence, not synthetic-local fixture relabeled LIVE. |
+| Meterless World Model | **VERIFIED separately**: official reference Engine persists event and changes next investigation. | Final evidence shows durable memory readback and a genuinely changed follow-up. |
+| NVIDIA Nemotron | **VERIFIED HOSTED on local synthetic run (PR35)**: strict energy/sleep PLAN, CRITIQUE accept, real provider IDs; focus tests 13/13. | Full tests and browser at release SHA, accurate direct hosted badge, ideally one combined live Zetaris+Nemotron trace; no promise unless proved. |
+| Nightshift | **NOT_CONNECTED**, do not develop without evidence of rule necessity. | Never falsely label as Power/Runtime or inferred from Engine. |
+| Cursor | **OPTIONAL**, Codex used, confirmed by organizer. | No fictitious use. |
+| Dynamic collaboration | **PARTIAL**: question-driven planner, model critique; World Model alters later family; evidence in PR33/35 separate runs. | Actual final demo shows cross-step change, critique/abstention, coherent trace, not only agent labels. |
+| User interface | **PASS prior branch**: real Chrome desktop/mobile browser captures. | Real final Chrome 390px/desktop; focus/accessibility, long evidence, no overflow and readable status. |
+| Deck | **DRAFT only**, 10-slide editable, meets outline, placeholder captures. | Replace screenshots with real final accepted SHA, cover all 8 required elements and disclose preexisting code, actual sponsors, new capabilities. |
+| Script/video | **DRAFT only**, old 84d story now corrected editorially. | Genuine final 180d footage, 1–4 minutes, 1080p where feasible, narration and visible sponsor+agent proof, checked no keys, link anonymously accessible. |
+| HackOS Description | Revised 24 Oct, 1516-char draft, explicitly declares preexisting Discovery. | Paste tested final version 150–2000 chars; verify actual form/solo roster; include deck even if shown Optional. |
+| Main branch / branch guard | **PENDING**: PR31/33/34/35 stack, PR25 editorial branch not merged. GitHub connector lacks branch protection API; worker route recorded in #28. | Main contains one approved exact SHA, PR-only guard if possible, no force push, healthy CI and judge README/deck links. |
+| Security | Historical PR33 scan reported; PR35 Build tab **may have exposed NVIDIA trial key**. | Revoke/rotate key in NVIDIA provider and DPAPI local copy before more hosted calls. Full final tree+history scan, PPTX/screenshots/video scan. |
+| Submission | **NOT SUBMITTED**. | Public repo, video and deck available anonymously; HackOS receipt/time captured before deadline. |
 
-## No-go triggers
+### Priority to close without founder manual coding
 
-- Final public clone requires unpublished private Discovery files for the promised workflow, or license/rights are unresolved.
-- The final video/deck says “live 180-day” without a same-run real Zetaris → Discovery → Engine trace.
-- Nightshift is required under current organizer guidance but no real request succeeds; an Engine event alone is insufficient.
-- Browser screenshots are from an old/fallback flow but are presented as the new 180-day integrated app.
-- Scientific output is hardcoded, a weak candidate is promoted, a source ID cannot be traced, or low coverage returns a confident answer.
-- Any real health data, secret, credential, private PHIS source or identifiable user information appears in the repo, deck, trace or video.
+1. Release worker: integrate PR35 into PR33 stack at one SHA, perform final cross-sponsor E2E if feasible and all tests; rotate exposed key and handle provider prerequisites with owner only if unavoidable.
+2. Submission worker/editor: apply this source matrix + [quality gate](JUDGE_QUALITY_GATE_2026-10-24.md) to update slide script/screenshots and produce final editable deck and video. No bogus chat/run traces.
+3. Director: inspect real code/CI/evidence, commit chain, browser QA, actual slide visuals, finalized copy, final file/link accessibility; only then merge/GO. Founder approves visual/product narrative and HackOS final submission, not technical steps.
 
-The authenticated [Submission Form Preview](https://hackathon.genai.works/resources?id=01a08ff1-55f6-7358-9501-cb7f1883e33c), [Demo Video Guide](https://hackathon.genai.works/resources?id=01a08ff1-562f-733f-9ae0-baf2c7ac152b), and [Disqualification Checklist](https://hackathon.genai.works/resources?id=01a08ff1-54d4-7755-a317-3c4167175ef8) are preparation guidance; the [Official Rules](https://hackathon.genai.works/event/open-agent-hackathon-2026) and current form govern where wording differs.
+### Critical no-go
+
+Missing genuine load-bearing Zetaris/Meterless, no source rights/declaration, private/non-executable repo, missing deck or 1–4 minute video, fabricated agent/log/model output, leaked credentials, mismatched proof between video and code, or submission after deadline. A speculative scoring estimate is NOT a substitute for actual evidence.
