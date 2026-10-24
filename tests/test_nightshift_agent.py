@@ -62,6 +62,8 @@ class PlannerContractTests(unittest.TestCase):
                                 for req, _ in transport.requests))
             self.assertTrue(all(json.loads(req.data)["model"] == NVIDIA_MODEL
                                 for req, _ in transport.requests))
+            self.assertTrue(all(json.loads(req.data)["max_tokens"] == 512
+                                for req, _ in transport.requests))
             for result in (first, second):
                 self.assertEqual(next(p for p in result["sponsor_proofs"]
                                       if p["sponsor"] == "nemotron")["status"], "NOT_CONNECTED")

@@ -75,7 +75,9 @@ class InferenceSimulatedTests(unittest.TestCase):
         self.assertIsNone(proof["trace_id"])
         request, timeout = transport.requests[0]
         self.assertEqual(request.full_url, "https://integrate.api.nvidia.com/v1/chat/completions")
-        self.assertEqual(json.loads(request.data)["model"], config.model)
+        body = json.loads(request.data)
+        self.assertEqual(body["model"], config.model)
+        self.assertEqual(body["chat_template_kwargs"], {"enable_thinking": False})
         self.assertEqual(timeout, 180)
 
     def test_only_documented_nemotron_models_are_allowed(self):

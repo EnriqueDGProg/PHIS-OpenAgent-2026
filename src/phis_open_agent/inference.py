@@ -163,6 +163,10 @@ class NvidiaClient:
     def _request(self, route, *, body):
         if route != "/chat/completions":
             raise InferenceBlocked("Unsupported NVIDIA inference route")
+        if self.config.model == NVIDIA_MODEL:
+            # Lightning otherwise spends the small bounded output on reasoning,
+            # leaving no final content. NVIDIA documents this direct-answer flag.
+            body = {**body, "chat_template_kwargs": {"enable_thinking": False}}
         request = Request(NVIDIA_BASE + route, data=json.dumps(body).encode("utf-8"),
                           headers={"Authorization": "Bearer " + self.config.api_key,
                                    "Content-Type": "application/json", "Accept": "application/json"},
@@ -178,7 +182,11 @@ class NvidiaClient:
         if answer.upper().strip(". ") != "READY":
             raise InferenceBlocked("NVIDIA did not return the expected synthetic probe answer")
         live = type(self.transport) is UrlLibTransport
+        response_id = result.get("id") if live and isinstance(result.get("id"), str) else None
+        response_model = result.get("model") if live and isinstance(result.get("model"), str) else None
+        if live and (not response_id or not response_model):
+            raise InferenceBlocked("NVIDIA response lacks verifiable provider IDs")
         return {"status": "PASS" if live else "SIMULATED", "provider": "nvidia_direct",
                 "model": self.config.model,
-                "trace_id": result.get("id") if live and isinstance(result.get("id"), str) else None,
+                "trace_id": response_id, "response_model": response_model,
                 "meterless_power_verified": False}

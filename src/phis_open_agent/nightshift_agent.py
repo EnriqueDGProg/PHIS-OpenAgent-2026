@@ -85,6 +85,10 @@ class NightshiftPlanner:
     def requires_http_request_id(self):
         return True
 
+    @property
+    def max_tokens(self):
+        return 160
+
     def discover(self):
         models = self.client._request("/models")
         try:
@@ -102,7 +106,7 @@ class NightshiftPlanner:
             "model": self.client.config.model,
             "messages": [{"role": "system", "content": SYSTEM},
                          {"role": "user", "content": json.dumps(user_payload, sort_keys=True)}],
-            "stream": False, "temperature": 0, "max_tokens": 160,
+            "stream": False, "temperature": 0, "max_tokens": self.max_tokens,
         })
         content = _chat_response(response)
         response_id = response.get("id") if isinstance(response.get("id"), str) else None
@@ -154,6 +158,10 @@ class NvidiaPlanner(NightshiftPlanner):
         # The hosted OpenAI-compatible response ID is documented; its HTTP
         # request-ID header is not guaranteed by the NVIDIA model contract.
         return False
+
+    @property
+    def max_tokens(self):
+        return 512
 
 
 def _decision_event(store, run_id, *, phase, plan, decision, receipt, digest,
