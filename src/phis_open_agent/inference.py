@@ -15,8 +15,8 @@ from urllib.request import Request, urlopen
 
 
 NVIDIA_BASE = "https://integrate.api.nvidia.com/v1"
-NVIDIA_MODEL = "nvidia/nemotron-3.5-lightning-30b-a3b"
-NVIDIA_MODELS = {NVIDIA_MODEL, "nvidia/nemotron-3-super-120b-a12b"}
+NVIDIA_MODEL = "stg/nvidia/nemotron-3.5-bolt-e4b"
+NVIDIA_MODELS = {NVIDIA_MODEL}
 APP_ID = "phis-open-agent"
 PROBE_PROMPT = "Synthetic connectivity check. Reply with the single word READY. No health data is supplied."
 
@@ -159,15 +159,20 @@ class NvidiaClient:
         self.config = config
         self.transport = transport if transport is not None else UrlLibTransport()
 
+    def _request(self, route, *, body):
+        if route != "/chat/completions":
+            raise InferenceBlocked("Unsupported NVIDIA inference route")
+        request = Request(NVIDIA_BASE + route, data=json.dumps(body).encode("utf-8"),
+                          headers={"Authorization": "Bearer " + self.config.api_key,
+                                   "Content-Type": "application/json", "Accept": "application/json"},
+                          method="POST")
+        return self.transport.send(request, timeout=180)
+
     def probe(self):
         body = {"model": self.config.model,
                 "messages": [{"role": "user", "content": PROBE_PROMPT}],
                 "stream": False, "max_tokens": 128}
-        request = Request(NVIDIA_BASE + "/chat/completions", data=json.dumps(body).encode("utf-8"),
-                          headers={"Authorization": "Bearer " + self.config.api_key,
-                                   "Content-Type": "application/json", "Accept": "application/json"},
-                          method="POST")
-        result = self.transport.send(request, timeout=180)
+        result = self._request("/chat/completions", body=body)
         answer = _chat_response(result)
         if answer.upper().strip(". ") != "READY":
             raise InferenceBlocked("NVIDIA did not return the expected synthetic probe answer")

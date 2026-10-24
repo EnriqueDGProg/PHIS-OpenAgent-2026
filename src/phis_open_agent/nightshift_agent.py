@@ -8,11 +8,13 @@ from __future__ import annotations
 
 import json
 import hashlib
+import os
 import re
 from collections import Counter
 from uuid import uuid4
 
-from .inference import InferenceBlocked, MeterlessClient, MeterlessConfig, UrlLibTransport, _chat_response
+from .inference import (InferenceBlocked, MeterlessClient, MeterlessConfig,
+                        NvidiaClient, NvidiaConfig, UrlLibTransport, _chat_response)
 from .scenario_contract_180d import DATASET_ID, DAYS, START, ObservationRejected, canonical_digest, daily_series
 from datetime import timedelta
 from .scientific_180d import _intent, _longitudinal, investigate_scientific
@@ -79,6 +81,10 @@ class NightshiftPlanner:
     def live(self):
         return type(self.client.transport) is UrlLibTransport
 
+    @property
+    def requires_http_request_id(self):
+        return True
+
     def discover(self):
         models = self.client._request("/models")
         try:
@@ -103,8 +109,11 @@ class NightshiftPlanner:
         request_id = response.get("_http_request_id") if isinstance(response.get("_http_request_id"), str) else None
         response_model = response.get("model") if isinstance(response.get("model"), str) else None
         # A live call without returned IDs is not a verified sponsor receipt.
-        status = ("VERIFIED" if self.live and request_id and response_id and response_model
+        status = ("VERIFIED" if self.live and response_id and response_model and
+                  (request_id or not self.requires_http_request_id)
                   else "SIMULATED" if not self.live else "BLOCKED")
+        if status == "BLOCKED":
+            raise InferenceBlocked("Inference response lacks verifiable provider IDs")
         raw_usage = response.get("usage") if self.live else None
         usage = ({key: value for key in ("prompt_tokens", "completion_tokens", "total_tokens")
                   if type(value := raw_usage.get(key)) is int and value >= 0}
@@ -128,6 +137,23 @@ class NightshiftPlanner:
                                            "plan": plan, "evidence": evidence,
                                            "schema": {"decision": ["accept", "replan_coverage", "abstain"]}})
         return parse_critique(content), receipt
+
+
+class NvidiaPlanner(NightshiftPlanner):
+    """The documented NVIDIA hosted route uses the same bounded v4 planner."""
+
+    def __init__(self, client: NvidiaClient):
+        super().__init__(client)
+
+    def discover(self):
+        # NVIDIA documents this hosted model/route, without a model-list preflight.
+        self.discovered = True
+
+    @property
+    def requires_http_request_id(self):
+        # The hosted OpenAI-compatible response ID is documented; its HTTP
+        # request-ID header is not guaranteed by the NVIDIA model contract.
+        return False
 
 
 def _decision_event(store, run_id, *, phase, plan, decision, receipt, digest,
@@ -250,14 +276,18 @@ def investigate_agentic(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY",
                "coverage": counts, "parent_family": parent_family,
                "parent_evidence_id": parent_evidence_id}
     trace = []
-    planner_mode = "NIGHTSHIFT_VERIFIED" if planner is not None and planner.live else "LOCAL DETERMINISTIC MODE"
+    provider = "nvidia" if isinstance(planner, NvidiaPlanner) or (
+        planner is None and os.environ.get("PHIS_INFERENCE_PROVIDER") == "nvidia_direct") else "nightshift"
+    verified_mode = "NVIDIA_VERIFIED" if provider == "nvidia" else "NIGHTSHIFT_VERIFIED"
+    planner_mode = verified_mode if planner is not None and planner.live else "LOCAL DETERMINISTIC MODE"
     blocked_receipt = {"status": "BLOCKED", "request_id": None, "response_id": None, "model": None,
                        "route": None, "usage": None}
     try:
         if planner is None:
-            planner = NightshiftPlanner(MeterlessClient(MeterlessConfig.from_env()))
+            planner = (NvidiaPlanner(NvidiaClient(NvidiaConfig.from_env())) if provider == "nvidia"
+                       else NightshiftPlanner(MeterlessClient(MeterlessConfig.from_env())))
         plan, plan_receipt = planner.plan(question, context)
-        planner_mode = {"VERIFIED": "NIGHTSHIFT_VERIFIED", "SIMULATED": "SIMULATED",
+        planner_mode = {"VERIFIED": verified_mode, "SIMULATED": "SIMULATED",
                         "BLOCKED": "BLOCKED"}[plan_receipt["status"]]
     except InferenceBlocked:
         plan, plan_receipt = _fallback(question, parent_family), blocked_receipt
@@ -273,7 +303,7 @@ def investigate_agentic(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY",
                                  decision="planned", receipt=plan_receipt, digest=digest,
                                  evidence_event_id=parent_evidence_id,
                                  parent_run_id=parent_run_id, source_ids=source_ids)
-    trace.append({"phase": "PLAN", "tool": "nightshift.planner" if planner_mode in {"NIGHTSHIFT_VERIFIED", "SIMULATED"}
+    trace.append({"phase": "PLAN", "tool": provider + ".planner" if planner_mode in {verified_mode, "SIMULATED"}
                   else "local.deterministic_planner", "status": planner_mode,
                   "provider_response_id": plan_receipt["response_id"],
                   "provider_request_id": plan_receipt["request_id"],
@@ -336,14 +366,14 @@ def investigate_agentic(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY",
                         "tool_evidence_event_id": tool_event["event_id"],
                         "candidate_count": candidate_count, "coverage": counts}
     try:
-        if planner_mode in {"NIGHTSHIFT_VERIFIED", "SIMULATED"}:
+        if planner_mode in {verified_mode, "SIMULATED"}:
             decision, critique_receipt = planner.critique(question, plan, evidence_summary)
         else:
             decision, critique_receipt = ("accept" if result["status"] == "PASS" else "abstain"), blocked_receipt
     except (InferenceBlocked, PlanRejected):
         decision, critique_receipt = "abstain", blocked_receipt
-    if planner_mode == "NIGHTSHIFT_VERIFIED" and critique_receipt["status"] != "VERIFIED":
-        planner_mode = "NIGHTSHIFT_PARTIAL"
+    if planner_mode == verified_mode and critique_receipt["status"] != "VERIFIED":
+        planner_mode = "NVIDIA_PARTIAL" if provider == "nvidia" else "NIGHTSHIFT_PARTIAL"
     # The deterministic verifier can only narrow the model's decision.
     if result["status"] != "PASS" or (plan["tool"] == "discovery" and science_event_id is None):
         decision = "abstain"
@@ -379,7 +409,7 @@ def investigate_agentic(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY",
                                    parent_run_id=parent_run_id, source_ids=source_ids)
     local_verifier = critique_receipt["status"] == "BLOCKED"
     trace.append({"phase": "VERIFY", "tool": "local.evidence_verifier" if local_verifier
-                  else "nightshift.evidence_verifier",
+                  else provider + ".evidence_verifier",
                   "status": ("PASS" if decision == "accept" else "BLOCKED") if local_verifier
                   else critique_receipt["status"],
                   "provider_status": critique_receipt["status"], "decision": decision,
@@ -393,7 +423,8 @@ def investigate_agentic(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY",
                    "window": {"start": START.isoformat(), "end": (START + timedelta(days=DAYS - 1)).isoformat()},
                    "planner_mode": planner_mode, "plan": plan, "verification": decision,
                    "tool_trace": trace,
-                   "nightshift_receipts": getattr(planner, "receipts", []),
+                   "nightshift_receipts": getattr(planner, "receipts", []) if provider == "nightshift" else [],
+                   "inference_receipts": getattr(planner, "receipts", []),
                    "source_digest_sha256": digest})
     result.setdefault("comparison", None)
     result.setdefault("longitudinal", None)
@@ -407,6 +438,7 @@ def investigate_agentic(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY",
         proofs = [{"sponsor": "meterless_engine", "status": "VERIFIED" if getattr(world_model, "engine_verified", False)
                    else "NOT_CONNECTED", "trace_id": verify_event["event_id"] if getattr(world_model, "engine_verified", False) else None}]
     proofs = [proof for proof in proofs if proof["sponsor"] != "meterless_runtime"]
+    proofs = [proof for proof in proofs if proof["sponsor"] != "nemotron"]
     if readback is not None:
         proofs = [proof for proof in proofs if proof["sponsor"] != "zetaris"]
         proofs.append(readback["sponsor_proof"])
@@ -414,6 +446,9 @@ def investigate_agentic(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY",
         proofs.append({"sponsor": "zetaris", "status": "NOT_CONNECTED", "trace_id": None})
     proofs.append({"sponsor": "meterless_runtime", "status": "VERIFIED" if planner_mode == "NIGHTSHIFT_VERIFIED"
                    and critique_receipt["status"] == "VERIFIED" else "NOT_CONNECTED",
-                   "trace_id": critique_receipt["response_id"] if critique_receipt["status"] == "VERIFIED" else None})
+                   "trace_id": critique_receipt["response_id"] if planner_mode == "NIGHTSHIFT_VERIFIED" else None})
+    proofs.append({"sponsor": "nemotron", "status": "VERIFIED" if planner_mode == "NVIDIA_VERIFIED"
+                   and critique_receipt["status"] == "VERIFIED" else "NOT_CONNECTED",
+                   "trace_id": critique_receipt["response_id"] if planner_mode == "NVIDIA_VERIFIED" else None})
     result["sponsor_proofs"] = proofs
     return result
