@@ -1,26 +1,32 @@
-# Capability and sponsor evidence matrix
+# PHIS Open Agent — verified capability and sponsor evidence (24 October 2026)
 
-**Snapshot: 23 October 2026.** “Verified” below means supported by the cited branch report or source inspection, not a fresh execution by this submission-production workstream. Revalidate against the final release candidate and real trace before recording or submitting. All datasets discussed here are **synthetic**.
+**Scope:** Synthetic 180-day scenario (six variables, 1,080 date-variable source slots). Independent execution receipts from PRs #33, #34 and #35; they have not yet been combined and rerun on the same final SHA. This matrix does **not** confer release GO.
 
-| Capability | Evidence tier | Exact supported claim | What remains open |
-| --- | --- | --- | --- |
-| PR #13 local Zetaris read | **VERIFIED LIVE** | A bounded real HTTP query against an authorized local Zetaris service returned and validated 156 fictional rows; the report records distinct request/query IDs and source IDs feeding the agent. | This is the smaller fallback scenario. It is not a live 180-day, 1,080-slot Discovery run. Preserve the report and show actual trace if used in video. |
-| PR #13 official World Model readback | **VERIFIED LOCAL** | The official Meterless World Model Engine persisted a decision and a later follow-up, including after restart, read it to choose subsequent work. | This does not establish Meterless Nightshift/Runtime or model inference. |
-| PR #18 authentic Discovery v1.1 | **VERIFIED LOCAL** | Owner-authorized isolated local package executed frozen 84-day synthetic plans. Both families returned 16 children; no candidate passed promotion. API/Engine follow-up worked locally. | Private five-file source is not yet public or clean-clone runnable. Local test ≠ live Zetaris proof. |
-| PR #21 stochastic 84/180-day cases | **OFFLINE BENCHMARK** | Predeclared case×seed evaluation includes selected 180-day associations, a held-out seed without a qualified energy driver, negative controls and stated timing/scientific caveats. | No 180-day live Zetaris read or general clinical validity; selected seed cannot be shown as universal behavior. |
-| PR #22 Discovery release gate | **INTEGRATED BUT BLOCKED** | Exact-hash allowlist and fail-closed packaging checks were built and locally tested. | Owner rights, copyright/license wording, approval of exact bytes, Python 3.11/wheel and clean-clone release remain open. |
-| PR #23 premium English frontend | **INTEGRATED BUT BLOCKED** | Design PR exists with longitudinal/evidence experience. | Real desktop/mobile Chrome GUI QA, source-state correction, keyboard and long-series checks, and final integration are pending; screenshots stay **PENDING VERIFIED CAPTURE**. |
-| Concurrent 180-day Zetaris → Discovery → World Model integration | **INTEGRATED BUT BLOCKED** | Separate backend worker is implementing the 1,080-slot live path. | Do not promote to VERIFIED LIVE without actual paginated readback, source IDs, Discovery output, World Model receipt, restart/follow-up, error handling and reproducible run. |
-| Consented automatic ingestion and quality-of-life outcomes | **ROADMAP** | Product vision only. | Requires consent architecture, real source integrations, privacy/security review and prospective outcome validation. |
-
-## Sponsor ledger
-
-| Technology | What it genuinely contributes today | Required claim boundary and evidence to retain |
+| Component / claim | What is genuinely supported | What remains |
 | --- | --- | --- |
-| **Zetaris** | In PR #13, an actual local service answered a bounded query over a fictional table and returned rows used by the agent. It is a data access/provenance layer in that scope. | A mocked transport, CSV export or source adapter is not a live Zetaris query. For the 180-day story, require real six-page readback, query/request IDs and row-source linkage. Do not conflate PR #13 proof with PR #18/21 science. |
-| **Meterless World Model Engine** | The pinned official, Apache-2.0 Engine persists an event and makes a later follow-up choose another investigation family; conformance passed in PR #13/#18 reports. | Say **Engine** precisely. The Engine is not Meterless Nightshift, Runtime, Power or NVIDIA inference. |
-| **Meterless Nightshift** | **No proven request in evidence reviewed for this pack.** | The authenticated 23 Oct HackOS Disqualification Checklist says Nightshift is the primary AI provider. Treat the missing request/model trace and clean-clone setup as a **release blocker**. Do not write “every model call uses Meterless.” |
-| **Cursor** | **No verified usage evidence reviewed.** | The older expanded Official Rules/Submission Form Preview say Cursor required or ask how it was used; the newer Disqualification Checklist and current Academy wording say it is optional / any AI coding tool may be used. Do not claim use. Founder should resolve the conflicting materials with the organizer or submit an accurate “not used” disclosure. |
-| **NVIDIA / Nemotron** | **No implemented inference call or model output proven here.** | Do not claim NVIDIA inference, routing or award eligibility. If later integrated, retain the actual Nightshift request, model name and response trace before adding a claim. |
+| Preexisting scientific PHIS Discovery | Five exact pre-window files, founder-authorized scoped MIT, byte-pinned private baseline match and golden scientific output equivalence. PR #33 public clean clone tested. | Integrate reviewed PR chain into public `main` and preserve NOTICE/license. Declare in HackOS Description. |
+| Scientific engine / reproducibility | PR #33 reports 90/90 Python, 16/16 frontend, 8/8 official World Model conformance, 12/12 adversarial PASS on predecessor; 180-day energy and sleep, scientific/temporal gates and abstention real. | Rerun FULL suite on final consolidated SHA, plus clean clone with no private dependencies. |
+| Zetaris | PR #33 genuine authenticated local service, six fresh bounded query pages per 180-day investigation, total 1,080 fictional records, actual HTTP request IDs and source IDs/digest. Live energy and sleep follow-up. | Do not label a synthetic local run as Zetaris verified. Final live-source/browser E2E on chosen SHA. |
+| Meterless World Model Engine | PR #33 official pinned engine stores scientific/evidence state and changes a follow-up family across processes; not a decorative logo. | Persisted trace + state-recovery visible in accepted demo; do not conflate with Nightshift/Runtime/Power. |
+| Agent planning and critique | PR #35 genuine hosted NVIDIA Lightning Nemotron strict PLAN (energy+sleep) and CRITIQUE accept, response IDs; one local synthetic v4 run, World Model-linked provider critique ID. | Same-final-SHA full suite, Chrome, ideally Nemotron + live Zetaris in same genuine workflow; prove at least one consequential critic/branch/follow-up visibly. |
+| NVIDIA Nemotron | Direct hosted model `nvidia/nemotron-3.5-lightning-30b-a3b`, genuine IDs `chatcmpl-6fd512f9...`, `chatcmpl-24110c1b...` energy/sleep planning and `chatcmpl-424b1863...` critique. | PR35 is draft and tested locally; do not assert a live Zetaris+Nemotron combination yet. Safety: shared Build tab potentially exposed trial key; rotate before final release. |
+| Frontend | PR #33 Chrome desktop/mobile 390px screenshots, local and actual Zetaris source path, follow-up, source failure/abstention and evidence drawers. | Final SHA visual and accessibility QA, correct PHIS branding, replace deck placeholders with real final captures. |
+| Nightshift | **NOT_CONNECTED**. | Do not claim inference; not required by explicit recent sponsor guidance for the implemented official Meterless Engine path. |
+| Cursor | Organizer Help Cursor clarified **OPTIONAL**, Codex used. | No claim of Cursor development or its credits. |
+| Real clinical/automatic ingestion | **ROADMAP**, not built. | No healthcare effectiveness, diagnosis, device, consented Apple Health, clinical outcome or causality claims. |
+| Deck/video/HackOS | PR25 editable 10-slide deck and conditional demo script exist as DRAFTS. | New images, final integrated evidence, video with audio, verified public access and actual HackOS submit receipt. |
+| Track | Organizer #use-case help confirms Track 02 permitted with preexisting code disclosed; founder LOCKED Track 02. | Apply to all final artifacts + HackOS Description; no Track ambiguity. |
 
-The [official event page](https://hackathon.genai.works/event/open-agent-hackathon-2026) remains the binding source when supporting documents disagree. Its dynamically expanded §5/§6 should be rechecked at final submission. The authenticated [Disqualification Checklist](https://hackathon.genai.works/resources?id=01a08ff1-54d4-7755-a317-3c4167175ef8) was read on 23 October and describes the Engine + Nightshift requirement and Cursor as optional. Earlier exact-rule text is retained in [the repository audit](https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026/blob/main/docs/OFFICIAL_RULES_VERIFIED_2026-10-18.md). Do not silently resolve the discrepancy in the direction of a stronger sponsor claim.
+## Why this is not yet Strong Submission certified
+
+Four official guidance resources were reviewed: Strong Submission Examples, Weak Submission Examples, Demo Video Guide, Submission Form Preview. They demand demonstrable non-linear agent collaboration, actual load-bearing sponsor integration, a clean public clone, inspectable input-tied traces, 3 variable example requests, legible 1–4m live demo, full original vs new work disclosure and consistent README/deck/form.
+
+- PR35 demonstrates authentic model-driven `plan -> discovery -> critique accept` with local synthetic evidence. It has **not** yet established a critic-requested *replan* in a hosted production trace; a World Model memory-driven follow-up is genuine and must be shown.
+- The example ChurnWhy architecture routes all Nemotron model calls via Meterless. PHIS **does not**. Do not copy the example's language into our README, deck or script; the real Meterless use is World Model Engine.
+- None of these separate reports is certification of the finally merged branch or proof the video and all slides match it.
+
+## Evidence sources
+
+- [PR #33 judge release](https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026/pull/33), [full release gate](https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026/blob/codex/phis-judge-release-20261024/docs/JUDGE_RELEASE_GATE_2026-10-24.md), source and actual screenshots.
+- [PR #35 Nemotron contract recovery](https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026/pull/35), [genuine hosted receipt report](https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026/blob/codex/phis-nemotron-contract-20261024/docs/NEMOTRON_CONTRACT_RECOVERY_2026-10-24.md).
+- [Director full Strong-vs-Weak acceptance gate](JUDGE_QUALITY_GATE_2026-10-24.md).
