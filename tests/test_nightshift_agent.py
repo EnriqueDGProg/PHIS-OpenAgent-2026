@@ -54,7 +54,8 @@ class PlannerContractTests(unittest.TestCase):
             second = investigate_agentic("How is sleep coverage?", world_model=store,
                                         parent_run_id=first["run_id"], planner=planner)
             self.assertEqual([first["plan"]["tool"], second["plan"]["tool"]], ["trend", "coverage"])
-            self.assertEqual(second["verification"], "replan_coverage")
+            self.assertEqual((second["verification"], second["status"], second["reason_code"]),
+                             ("abstain", "BLOCKED", "evidence_review_required"))
             self.assertEqual(first["planner_mode"], "SIMULATED")
             self.assertEqual(second["planner_mode"], "SIMULATED")
             self.assertEqual(len(transport.requests), 4)
@@ -119,16 +120,18 @@ class PlannerContractTests(unittest.TestCase):
             followup = investigate_agentic("Could coffee affect sleep?", world_model=reopened,
                                            parent_run_id=result["run_id"], planner=second)
             self.assertEqual(followup["plan"], {"family": "sleep", "tool": "coverage"})
-            self.assertEqual(followup["verification"], "replan_coverage")
-            self.assertEqual(followup["status"], "INSUFFICIENT_DATA")
+            self.assertEqual((followup["verification"], followup["status"], followup["reason_code"]),
+                             ("abstain", "BLOCKED", "evidence_review_required"))
             self.assertNotEqual(result["plan"], followup["plan"])
             followup_events = reopened.read(followup["run_id"])
             self.assertEqual([event["kind"] for event in followup_events],
                              ["agent_decision_180d", "agent_tool_evidence_180d",
-                              "agent_tool_evidence_180d", "agent_decision_180d"])
-            self.assertEqual(followup_events[2]["payload"]["tool"], "coverage")
-            self.assertEqual(followup_events[3]["payload"]["evidence_event_id"],
-                             followup_events[2]["event_id"])
+                              "agent_decision_180d", "agent_tool_evidence_180d",
+                              "agent_decision_180d"])
+            self.assertEqual(followup_events[2]["payload"]["decision"], "replan")
+            self.assertEqual(followup_events[3]["payload"]["tool"], "coverage")
+            self.assertEqual(followup_events[4]["payload"]["evidence_event_id"],
+                             followup_events[3]["event_id"])
 
     def test_model_injection_and_invalid_response_abstain(self):
         with tempfile.TemporaryDirectory() as folder:

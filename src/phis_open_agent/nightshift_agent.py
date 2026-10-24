@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import math
 import os
 import re
 from collections import Counter
@@ -17,7 +18,8 @@ from .inference import (InferenceBlocked, MeterlessClient, MeterlessConfig,
                         NvidiaClient, NvidiaConfig, UrlLibTransport, _chat_response)
 from .scenario_contract_180d import DATASET_ID, DAYS, START, ObservationRejected, canonical_digest, daily_series
 from datetime import timedelta
-from .scientific_180d import _intent, _longitudinal, investigate_scientific
+from .scientific_180d import (MIN_COMPARISON_OBSERVED, _intent, _longitudinal,
+                               investigate_scientific)
 from .zetaris import ZetarisBlocked, live_zetaris_client
 from .zetaris_180d import read_verified_180d
 
@@ -197,6 +199,11 @@ class NvidiaPlanner(NightshiftPlanner):
                     '{"decision":"abstain"}. No parameters, explanation, extra keys, '
                     "prose or Markdown. Accept only grounded tool evidence; request coverage "
                     "when evidence needs checking; abstain if evidence is missing or invalid. "
+                    "Use the supplied PHIS signal classifications, effect, N, lag, q and "
+                    "robustness metadata, coverage and provenance to judge the bounded claim. "
+                    "Distinguish ordinary non-causal uncertainty from a failed data gate. "
+                    "A coverage_recheck reports the existing deterministic threshold outcome; "
+                    "do not treat a high observed count alone as proof of causation. "
                     "Do not calculate, alter or invent measurements or statistical results.")
         raise InferenceBlocked("Unknown NVIDIA planner role")
 
@@ -224,6 +231,127 @@ def _coverage(rows, family):
            if values[i] is not None]
     return {"variable": variable, "observed": len(ids), "eligible": len(days),
             "source_record_ids": ids}
+
+
+def _critic_evidence_packet(result, plan, digest, science_event, tool_event, coverage):
+    """Copy bounded, typed Discovery facts into a model-visible packet.
+
+    The packet carries no raw observations and rejects mismatched provenance.
+    Model output cannot add or change any scientific value in the response.
+    """
+    packet = {"schema": "phis-critic-evidence.v1", "status": result["status"],
+              "reason_code": result.get("reason_code"), "family": plan["family"],
+              "tool": plan["tool"], "source_digest_sha256": digest,
+              "tool_evidence_event_id": tool_event["event_id"],
+              "scientific_evidence_event_id": science_event["event_id"] if science_event else None,
+              "coverage": {"variable": coverage["variable"], "observed": coverage["observed"],
+                           "eligible": coverage["eligible"]} if coverage else None,
+              "signals": [], "classification_counts": {}, "comparison_window_observed": None,
+              "uncertainty": []}
+    package = result.get("scientific_evidence")
+    if plan["tool"] != "discovery" or result["status"] != "PASS":
+        return packet
+    if (not isinstance(package, dict) or science_event is None or
+            package.get("family") != plan["family"] or
+            package.get("record_digest_sha256") != digest or
+            science_event["payload"]["record_digest_sha256"] != digest or
+            package.get("family_id") != science_event["payload"]["family_id"] or
+            package.get("plan_sha256") != science_event["payload"]["plan_sha256"] or
+            package.get("temporal_policy_sha256") != science_event["payload"]["temporal_policy_sha256"] or
+            package.get("source_query", {}).get("mode") != science_event["payload"]["source_mode"]):
+        raise PlanRejected("Discovery evidence provenance mismatch")
+    signals = package.get("signals")
+    if not isinstance(signals, list) or len(signals) != 16:
+        raise PlanRejected("Discovery signal count invalid")
+    allowed = {"candidate_signal", "unstable_candidate", "weak_candidate", "insufficient_data"}
+    ids = set()
+    counts = Counter()
+    clean = []
+    for item in signals:
+        if not isinstance(item, dict):
+            raise PlanRejected("Discovery signal invalid")
+        sid, cls = item.get("signal_id"), item.get("classification")
+        effect, n, lag = item.get("effect"), item.get("raw_n"), item.get("lag_days")
+        if (not isinstance(sid, str) or not re.fullmatch(r"[0-9a-f]{64}", sid) or sid in ids or
+                cls not in allowed or type(n) is not int or not 0 <= n <= 180 or
+                type(lag) is not int or not -30 <= lag <= 30 or
+                type(effect) not in (int, float) or not math.isfinite(effect)):
+            raise PlanRejected("Discovery signal identity or measure invalid")
+        ids.add(sid)
+        counts[cls] += 1
+        q = {}
+        for field in ("q_primary_child_by", "q_selection_child_by", "q_selection_parent_by"):
+            value = item.get(field)
+            if value is not None and (type(value) not in (int, float) or
+                                      not math.isfinite(value) or not 0 <= value <= 1):
+                raise PlanRejected("Discovery q metadata invalid")
+            if value is not None:
+                q[field] = value
+        flags = item.get("flags")
+        if (not isinstance(flags, list) or len(flags) > 12 or
+                any(not isinstance(flag, str) or len(flag) > 100 for flag in flags) or
+                type(item.get("block_stable")) is not bool or
+                not isinstance(item.get("temporal_state"), str) or
+                len(item["temporal_state"]) > 100 or
+                not isinstance(item.get("exposure"), str) or
+                len(item["exposure"]) > 100 or
+                item.get("route") not in {"levels", "first_differences"}):
+            raise PlanRejected("Discovery robustness metadata invalid")
+        clean.append({"signal_id": sid, "classification": cls,
+                      "exposure": item["exposure"], "route": item["route"],
+                      "lag_days": lag, "effect": effect, "raw_n": n,
+                      "q": q, "temporal_state": item["temporal_state"],
+                      "block_stable": item["block_stable"], "flags": flags})
+    scientific_counts = science_event["payload"]["classification_counts"]
+    if (dict(counts) != scientific_counts or
+            {x["signal_id"] for x in clean if x["classification"] == "candidate_signal"} !=
+            set(science_event["payload"]["candidate_signal_ids"])):
+        raise PlanRejected("Discovery signals disagree with persisted science")
+    candidates = sorted((x for x in clean if x["classification"] == "candidate_signal"),
+                        key=lambda x: (-abs(x["effect"]), x["signal_id"]))
+    challenged = sorted((x for x in clean if x["classification"] == "unstable_candidate"),
+                        key=lambda x: (-abs(x["effect"]), x["signal_id"]))
+    controls = sorted((x for x in clean if x["exposure"] == "unrelated_count"),
+                      key=lambda x: x["signal_id"])
+    selected = candidates[:3] + challenged[:1]
+    selected += [x for x in controls[:1] if x["signal_id"] not in {v["signal_id"] for v in selected}]
+    if not selected:
+        selected = sorted(clean, key=lambda x: x["signal_id"])[:3]
+    comparison = result.get("comparison")
+    if (not isinstance(comparison, dict) or
+            not isinstance(comparison.get("baseline"), dict) or
+            not isinstance(comparison.get("comparison"), dict)):
+        raise PlanRejected("Discovery comparison missing")
+    prior = comparison["baseline"].get("observed")
+    recent = comparison["comparison"].get("observed")
+    if any(type(value) is not int or not 0 <= value <= 28 for value in (prior, recent)):
+        raise PlanRejected("Discovery window coverage invalid")
+    uncertainty = [item.get("text") for item in result.get("findings", [])
+                   if isinstance(item, dict) and item.get("kind") == "uncertainty"]
+    if len(uncertainty) > 3 or any(not isinstance(x, str) or len(x) > 400 for x in uncertainty):
+        raise PlanRejected("Discovery uncertainty invalid")
+    packet.update({"family_id": package["family_id"],
+                   "source_mode": science_event["payload"]["source_mode"],
+                   "source_query_request_ids": science_event["payload"]["source_query_request_ids"],
+                   "plan_sha256": package["plan_sha256"],
+                   "temporal_policy_sha256": package["temporal_policy_sha256"],
+                   "classification_counts": dict(counts), "signals": selected,
+                   "comparison_window_observed": {"prior": prior, "recent": recent,
+                                                   "eligible_each": 28,
+                                                   "min_observed_each": MIN_COMPARISON_OBSERVED},
+                   "uncertainty": uncertainty})
+    return packet
+
+
+def _comparison_coverage_passes(result):
+    """Recheck the existing Discovery comparison gate without a new threshold."""
+    comparison = result.get("comparison")
+    if not isinstance(comparison, dict):
+        return False
+    windows = (comparison.get("baseline"), comparison.get("comparison"))
+    return all(isinstance(window, dict) and window.get("eligible") == 28 and
+               type(window.get("observed")) is int and
+               window["observed"] >= MIN_COMPARISON_OBSERVED for window in windows)
 
 
 def _fallback(question, parent_family):
@@ -404,53 +532,111 @@ def investigate_agentic(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY",
                   "engine_event_id": tool_event.get("engine_event_id"),
                   "output_sha256": output_sha256, "source_digest_sha256": digest})
     package = result.get("scientific_evidence")
-    candidate_count = (sum(item["classification"] == "candidate_signal" for item in package["signals"])
-                       if isinstance(package, dict) else 0)
-    evidence_summary = {"status": result["status"], "reason_code": result.get("reason_code"),
-                        "source_digest_sha256": digest, "scientific_evidence_event_id": science_event_id,
-                        "tool_evidence_event_id": tool_event["event_id"],
-                        "candidate_count": candidate_count, "coverage": counts}
-    try:
-        if planner_mode in {verified_mode, "SIMULATED"}:
-            decision, critique_receipt = planner.critique(question, plan, evidence_summary)
-        else:
-            decision, critique_receipt = ("accept" if result["status"] == "PASS" else "abstain"), blocked_receipt
-    except (InferenceBlocked, PlanRejected):
+    science_event = science[-1] if science else None
+    packet = None
+    critique_failure = None
+    if result["status"] == "PASS":
+        try:
+            packet = _critic_evidence_packet(result, plan, digest, science_event,
+                                             tool_event, selected_coverage)
+        except PlanRejected:
+            critique_failure = "evidence_packet_invalid"
+    if result["status"] != "PASS" or (plan["tool"] == "discovery" and science_event is None):
         decision, critique_receipt = "abstain", blocked_receipt
+    elif critique_failure:
+        decision, critique_receipt = "abstain", blocked_receipt
+    else:
+        try:
+            if planner_mode in {verified_mode, "SIMULATED"}:
+                decision, critique_receipt = planner.critique(question, plan, packet)
+            else:
+                decision, critique_receipt = "accept", blocked_receipt
+        except InferenceBlocked:
+            decision, critique_receipt = "abstain", blocked_receipt
+            critique_failure = "model_unavailable"
+        except PlanRejected:
+            decision, critique_receipt = "abstain", blocked_receipt
+            critique_failure = "invalid_critique"
     if planner_mode == verified_mode and critique_receipt["status"] != "VERIFIED":
         planner_mode = "NVIDIA_PARTIAL" if provider == "nvidia" else "NIGHTSHIFT_PARTIAL"
-    # The deterministic verifier can only narrow the model's decision.
-    if result["status"] != "PASS" or (plan["tool"] == "discovery" and science_event_id is None):
-        decision = "abstain"
+
+    verification_evidence_id = tool_event["event_id"]
     if decision == "replan_coverage":
+        # The original model challenge is durable before any local recheck.
+        challenge_event = _decision_event(world_model, run_id, phase="VERIFY", plan=plan,
+                                          decision="replan", receipt=critique_receipt,
+                                          digest=digest, evidence_event_id=tool_event["event_id"],
+                                          parent_run_id=parent_run_id, source_ids=source_ids)
+        trace.append({"phase": "VERIFY", "tool": provider + ".evidence_verifier",
+                      "status": critique_receipt["status"], "decision": "replan_coverage",
+                      "provider_response_id": critique_receipt["response_id"],
+                      "provider_request_id": critique_receipt["request_id"],
+                      "event_id": challenge_event["event_id"],
+                      "engine_event_id": challenge_event.get("engine_event_id"),
+                      "evidence_event_id": tool_event["event_id"]})
         coverage = _coverage(rows, plan["family"])
+        gate_passed = (plan["tool"] == "discovery" and result["status"] == "PASS" and
+                       science_event is not None and _comparison_coverage_passes(result))
+        windows = packet.get("comparison_window_observed") if packet else None
         coverage_material = {"tool": "coverage", "variable": coverage["variable"],
-                             "observed": coverage["observed"], "eligible": coverage["eligible"]}
+                             "observed": coverage["observed"], "eligible": coverage["eligible"],
+                             "comparison_window_observed": windows,
+                             "existing_scientific_gate_passed": gate_passed,
+                             "source_digest_sha256": digest,
+                             "scientific_evidence_event_id": science_event_id}
         coverage_sha256 = hashlib.sha256(json.dumps(coverage_material, sort_keys=True,
-                                                   separators=(",", ":")).encode()).hexdigest()
+                                                   separators=(",", ":"), allow_nan=False).encode()).hexdigest()
         replan_event = world_model.append(
             run_id=run_id, kind="agent_tool_evidence_180d",
-            payload={"family": plan["family"], "tool": "coverage", "status": "PASS",
+            payload={"family": plan["family"], "tool": "coverage",
+                     "status": "PASS" if gate_passed else "BLOCKED",
                      "source_digest_sha256": digest, "output_sha256": coverage_sha256,
                      "observed_days": coverage["observed"], "eligible_days": coverage["eligible"],
-                     "descriptive_difference": None, "scientific_event_id": None},
+                     "descriptive_difference": None, "scientific_event_id": science_event_id},
             source_record_ids=coverage["source_record_ids"])
-        trace.append({"phase": "REPLAN", "tool": "coverage", "status": "PASS",
+        verification_evidence_id = replan_event["event_id"]
+        trace.append({"phase": "REPLAN", "tool": "coverage",
+                      "status": "PASS" if gate_passed else "BLOCKED",
                       "event_id": replan_event["event_id"],
                       "engine_event_id": replan_event.get("engine_event_id"),
-                      "source_digest_sha256": digest, "output_sha256": coverage_sha256})
-        result = {"status": "INSUFFICIENT_DATA", "reason_code": "evidence_replanned",
-                  "summary": "Evidence was challenged; inspect source coverage before another scientific claim.",
-                  "coverage": coverage, "scientific_evidence": None,
-                  "findings": [], "tool_trace": result.get("tool_trace", [])}
-    elif decision == "abstain":
-        result = {"status": "BLOCKED", "reason_code": result.get("reason_code") or "evidence_rejected",
+                      "source_digest_sha256": digest, "output_sha256": coverage_sha256,
+                      "existing_scientific_gate_passed": gate_passed,
+                      "comparison_window_observed": windows})
+        if gate_passed:
+            rechecked_packet = {**packet, "coverage_recheck": coverage_material,
+                                "prior_decision": "replan_coverage"}
+            try:
+                final_decision, final_receipt = planner.critique(question, plan, rechecked_packet)
+            except InferenceBlocked:
+                final_decision, final_receipt = "abstain", blocked_receipt
+                critique_failure = "model_unavailable"
+            except PlanRejected:
+                final_decision, final_receipt = "abstain", blocked_receipt
+                critique_failure = "invalid_critique"
+            if final_receipt["status"] != "VERIFIED" and planner_mode == verified_mode:
+                planner_mode = "NVIDIA_PARTIAL" if provider == "nvidia" else "NIGHTSHIFT_PARTIAL"
+            decision, critique_receipt = final_decision, final_receipt
+            if decision != "accept":
+                decision = "abstain"
+                result = {"status": "BLOCKED", "reason_code": critique_failure or "evidence_review_required",
+                          "summary": "The scientific coverage gate passed, but evidence review did not accept a finding.",
+                          "coverage": coverage, "scientific_evidence": None, "findings": [],
+                          "tool_trace": result.get("tool_trace", [])}
+        else:
+            decision, critique_receipt = "abstain", blocked_receipt
+            result = {"status": "BLOCKED", "reason_code": "evidence_review_required",
+                      "summary": "The requested coverage recheck did not establish an accepted scientific result.",
+                      "coverage": coverage, "scientific_evidence": None, "findings": [],
+                      "tool_trace": result.get("tool_trace", [])}
+    elif decision == "abstain" and result["status"] == "PASS":
+        result = {"status": "BLOCKED", "reason_code": critique_failure or "evidence_rejected",
                   "summary": "The evidence verifier abstained; no scientific finding is presented.",
                   "scientific_evidence": None, "findings": [], "tool_trace": result.get("tool_trace", [])}
+    # A deterministic weak-coverage result is retained verbatim. No model can
+    # convert a failing PHIS gate to PASS or label adequate data insufficient.
     verify_event = _decision_event(world_model, run_id, phase="VERIFY", plan=plan,
-                                   decision="replan" if decision == "replan_coverage" else decision,
-                                   receipt=critique_receipt, digest=digest,
-                                   evidence_event_id=(replan_event if decision == "replan_coverage" else tool_event)["event_id"],
+                                   decision=decision, receipt=critique_receipt, digest=digest,
+                                   evidence_event_id=verification_evidence_id,
                                    parent_run_id=parent_run_id, source_ids=source_ids)
     local_verifier = critique_receipt["status"] == "BLOCKED"
     trace.append({"phase": "VERIFY", "tool": "local.evidence_verifier" if local_verifier
@@ -461,7 +647,8 @@ def investigate_agentic(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY",
                   "provider_response_id": critique_receipt["response_id"],
                   "provider_request_id": critique_receipt["request_id"],
                   "engine_event_id": verify_event.get("engine_event_id"),
-                  "event_id": verify_event["event_id"], "evidence_event_id": tool_event["event_id"]})
+                  "event_id": verify_event["event_id"],
+                  "evidence_event_id": verification_evidence_id})
     result.update({"contract_version": "investigation.v4", "run_id": run_id,
                    "parent_run_id": parent_run_id, "mode": mode, "synthetic": True,
                    "dataset_id": DATASET_ID, "scenario": "opportunity", "timezone": "Europe/Madrid",

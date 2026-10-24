@@ -237,8 +237,9 @@ function renderChart(run) {
   // No series case
   if (!series?.points.length) {
     $('.chart-footer').classList.add('no-series');
-    pageTitle.textContent = run.status === 'BLOCKED' ? 'Question outside scope' : 'Result unavailable';
-    $('#breadcrumb-subject').textContent = run.status === 'BLOCKED' ? 'LIMIT' : 'NO RESULT';
+    const scopeBlocked = run.status === 'BLOCKED' && run.reason_code === 'unsupported_question';
+    pageTitle.textContent = scopeBlocked ? 'Question outside scope' : 'Result unavailable';
+    $('#breadcrumb-subject').textContent = scopeBlocked ? 'LIMIT' : 'NO RESULT';
     $('#chart-title').textContent = 'No series published';
     $('#chart-unit').textContent  = '—';
     container.innerHTML = `<div class="chart-placeholder">
