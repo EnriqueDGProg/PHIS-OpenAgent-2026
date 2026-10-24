@@ -1,22 +1,26 @@
-# PHIS Open Agent 2026 — submission production pack
+# PHIS Open Agent 2026 — Submission production pack
 
-**Editorial status: DRAFT, 23 October 2026. No HackOS submission has been made.** This folder is a working package for founder review. It does not certify the concurrent 180-day integration, PR #23 browser acceptance, source-release rights, or Meterless Nightshift.
+**Updated 24 Oct 2026 — DIRECTOR QUALITY REVIEW ACTIVE. NOT SUBMITTED.**
+Track **02 — The Agent That Can Explain Why** is LOCKED by founder decision and direct HackOS organizer clarification. The public claim is a newly built agentic application using five explicitly declared **PREEXISTING PHIS Discovery** scientific modules. The contestant is a solo human. **Cursor is optional** per organizer update, and development may accurately say Codex was used.
 
-## Use this pack
+## Editorial source of truth for future Codex workers
 
-1. Review [the track and narrative brief](NARRATIVE_AND_TRACK.md), then have the founder select one primary track.
-2. Replace only verified evidence in [the editable deck](deck/PHIS_Open_Agent_2026_Submission_Deck.pptx). Product screenshot frames are deliberately labeled **PENDING VERIFIED CAPTURE**.
-3. Record [the timed demo](DEMO_SCRIPT_AND_STORYBOARD.md) against a real, final candidate. Its conditional lines must be resolved using the final run trace.
-4. Paste the applicable text from [the HackOS form draft](HACKOS_FORM_DRAFT.md) into the actual form; the form itself controls its fields and limits.
-5. Reconcile [the capability and sponsor matrix](CAPABILITY_AND_SPONSOR_MATRIX.md) and close [the readiness checklist](FINAL_READINESS_CHECKLIST.md) before any submission.
+1. [Director judge-quality gate](JUDGE_QUALITY_GATE_2026-10-24.md) — mandatory crosswalk to uploaded **Strong Submission**, **Weak Submission**, **Demo Video Guide** and **Submission Form Preview**; PASS only by actual evidence from final accepted SHA.
+2. [Locked Track 02 narrative](NARRATIVE_AND_TRACK.md) — product value, original PHIS science versus new agent.
+3. [HackOS form Description](HACKOS_FORM_DRAFT.md) — under 2,000 characters, includes pre-existing-work disclosure inside Description per organizer.
+4. [Capability and sponsor evidence matrix](CAPABILITY_AND_SPONSOR_MATRIX.md) — reports PR #33 live Zetaris / original Discovery / Meterless Engine, PR #35 genuine hosted NVIDIA **local synthetic** receipts and explicit limits. No Nightshift/Power claim.
+5. [Final readiness gate](FINAL_READINESS_CHECKLIST.md) — exact-SHA, repo, security, UI, deck, video, links, actual submission.
+6. [Three-minute script / shot list](DEMO_SCRIPT_AND_STORYBOARD.md) — editorial 180-day version with clearly separated sponsor footage until one same-run proof is achieved.
+7. [Editable 10-slide deck](deck/PHIS_Open_Agent_2026_Submission_Deck.pptx) — **still older provisional visual asset**. It contains PENDING VERIFIED CAPTURE placeholders; never submit as is. See [DECK_QA](DECK_QA.md).
+8. [Sources and claims](SOURCES_AND_CLAIMS.md) — earlier trace references and source inventory; update to accepted release SHA before use.
 
-The PPTX contains editable text and diagrams. Its [source script](build_deck.mjs) can regenerate the provisional deck with the Codex bundled presentation runtime. Set `RUNTIME_NODE_MODULES` and `RUNTIME_PYTHON` to the paths returned by the desktop app's workspace-dependencies tool, set `PHIS_PRESENTATIONS_SKILL` to the installed Presentations skill directory if it differs from the authoring host, then run `node submission/build_deck.mjs` from the repository root. The script checks package structure, layout, fonts and re-import before writing the deck. On this Windows workspace, the finalizer's atomic hardlink was denied after validation; the script copied the already validated candidate byte for byte.
+## Work remaining before release GO
 
-## Evidence boundary
+- Update visual slide deck to final 180-day + Track02 copy and real accepted browser screenshots, with actual sponsor IDs/mode, brand and architecture.
+- Prove final reviewed public commit from clean checkout (3 distinct queries, full backend/frontend/Engine/adversarial, desktop/mobile, provenance, failures, no secrets). PR35 authentic NVIDIA PLAN/CRITIQUE happened on synthetic local v4, not yet together with Zetaris live on a final combined run.
+- Record a genuine, narratable 1–4 minute video and verify video/deck/repository URLs anonymously; check actual HackOS form and submit under founder final signoff.
+- Preserve old PR #13 fallback for engineering safety, but no 84-day/156-row results or preexisting-license holds in judge-facing final material.
 
-- **Verified live:** PR #13 documents a local 156-row fictional Zetaris read and genuine World Model follow-up. This is a smaller fallback scenario, not 180-day scientific proof.
-- **Verified local:** PR #18 documents authentic local PHIS Discovery v1.1 and official Meterless World Model Engine behavior on an 84-day synthetic case. Its scientific promotion gate failed; the route abstained from a supported contributor claim.
-- **Offline benchmark:** PR #21's predeclared 84/180-day stochastic study reports a selected 180-day opportunity seed and a held-out seed with no qualified energy driver. Those are offline results, not live Zetaris queries.
-- **Integrated but blocked:** PR #22's public-safe Discovery packaging remains unpublished pending rights, license and reproducibility gates. The concurrent 180-day live integration and PR #23 browser QA require independent acceptance. No Nightshift or NVIDIA inference proof was supplied for this pack.
+**No invented model calls or runs, no decorated sponsor logos without load-bearing traces, no proprietary material beyond the authorized five-file PHIS Discovery package. No merges or submission without acceptance.**
 
-The public [event page](https://hackathon.genai.works/event/open-agent-hackathon-2026) is the binding rules source. The authenticated HackOS [Submission Form Preview](https://hackathon.genai.works/resources?id=01a08ff1-55f6-7358-9501-cb7f1883e33c), [Demo Video Guide](https://hackathon.genai.works/resources?id=01a08ff1-562f-733f-9ae0-baf2c7ac152b), and [Disqualification Checklist](https://hackathon.genai.works/resources?id=01a08ff1-54d4-7755-a317-3c4167175ef8) were inspected on 23 October 2026 in the signed-in HackOS browser. The preview explicitly yields to the live form and official rules when they differ. See [the source ledger](SOURCES_AND_CLAIMS.md) for every claim and unresolved conflict.
+Deck script production uses `build_deck.mjs`. This folder currently includes an editable PowerPoint and preview contact sheet; regenerate only after updating proof and verified screens. The generated slides must be visually reviewed, not merely compiled.
