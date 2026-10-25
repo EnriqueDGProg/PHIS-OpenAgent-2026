@@ -48,6 +48,42 @@ export function plainDate(iso) {
   });
 }
 
+// Formats only the Python core's fixed six-window descriptive result. No
+// averages, scientific tests, trend fitting, or gap filling happen here.
+export function longitudinalPresentation(run) {
+  const result = run?.longitudinal;
+  const series = run?.series?.[0];
+  const coverage = run?.coverage?.find(item => item.variable === result?.variable);
+  if (run?.status !== 'PASS' || !series || result?.variable !== series.variable ||
+      result?.method !== 'arithmetic_mean_observed_days' ||
+      result?.inference !== 'descriptive_only' || result?.windows?.length !== 6 ||
+      coverage?.eligible !== 180 || !Number.isInteger(coverage.observed) ||
+      result.windows.some(window => !/^\d{4}-\d{2}-\d{2}$/.test(window.start) ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(window.end) || window.eligible !== 30 ||
+        !Number.isInteger(window.observed) || window.observed < 0 || window.observed > 30 ||
+        (window.mean !== null && !Number.isFinite(window.mean))) ||
+      result.windows.some((window, index) =>
+        Date.parse(window.start) !== Date.parse(run.window?.start) + index * 30 * 86400000 ||
+        Date.parse(window.end) !== Date.parse(window.start) + 29 * 86400000) ||
+      result.windows[5].end !== run.window?.end ||
+      result.windows.reduce((sum, window) => sum + window.observed, 0) !== coverage.observed)
+    return null;
+  const unit = series.unit === 'hours' ? 'h' : '/10';
+  const difference = result.first_to_last_difference;
+  return {
+    coverage: `${coverage.observed} of 180 days recorded`,
+    windows: result.windows.map((window, index) => ({
+      label: `Interval ${index + 1}`,
+      dates: `${plainDate(window.start)}–${plainDate(window.end)}`,
+      mean: window.mean === null ? 'No recorded mean' : `${window.mean.toFixed(2)}${unit}`,
+      coverage: `${window.observed} of 30 days recorded`,
+    })),
+    comparison: Number.isFinite(difference)
+      ? `First 30 days (${plainDate(result.windows[0].start)}–${plainDate(result.windows[0].end)}) to last 30 days (${plainDate(result.windows[5].start)}–${plainDate(result.windows[5].end)}): ${difference < 0 ? '−' : difference > 0 ? '+' : ''}${Math.abs(difference).toFixed(2)}${unit}. Descriptive difference only; no significance or cause is inferred.`
+      : 'A first-to-last difference was not available because at least one interval had no recorded mean.',
+  };
+}
+
 export function comparisonExplanation(run) {
   const comparison = run?.comparison;
   if (!comparison || run?.status !== 'PASS') return null;

@@ -4,7 +4,7 @@
  * Renders the 180-day v3 scientific result by default.
  */
 import { fetchInvestigation } from './client.mjs';
-import { windowDays, isOfflineScientificRun, sourceLabel, canContinueFrom,
+import { windowDays, isOfflineScientificRun, sourceLabel, canContinueFrom, longitudinalPresentation,
   comparisonExplanation, findingExplanation, plainDate, displayChange,
   trajectoryArrow, TRACE_GROUPS } from './presentation.mjs';
 
@@ -119,8 +119,33 @@ function renderPeriod(run) {
   }
 }
 
+function renderLongitudinal(run) {
+  const panel = $('#longitudinal-summary');
+  const view = longitudinalPresentation(run);
+  panel.hidden = !view;
+  $('#longitudinal-windows').replaceChildren();
+  $('#longitudinal-coverage').textContent = view?.coverage ?? 'No verified longitudinal summary';
+  $('#longitudinal-comparison').textContent = view?.comparison ?? '';
+  if (!view) return;
+  for (const window of view.windows) {
+    const card = document.createElement('div');
+    card.className = 'longitudinal-window';
+    card.setAttribute('role', 'listitem');
+    for (const [className, text] of [
+      ['longitudinal-window-label', window.label], ['longitudinal-window-dates', window.dates],
+      ['longitudinal-window-mean', window.mean], ['longitudinal-window-coverage', window.coverage],
+    ]) {
+      const item = document.createElement(className === 'longitudinal-window-mean' ? 'strong' : 'span');
+      item.className = className;
+      item.textContent = text;
+      card.append(item);
+    }
+    $('#longitudinal-windows').append(card);
+  }
+}
+
 // ─── Chart SVG ────────────────────────────────────────────────────────────────
-function chartSvg(series, comparison, width) {
+function chartSvg(series, width) {
   const data   = series.points;
   const height = 248, left = 32, right = 10, top = 28, bottom = 32;
   const plotW  = width - left - right;
@@ -143,9 +168,6 @@ function chartSvg(series, comparison, width) {
   }
   if (group.length) groups.push(group);
 
-  // The reference line is the Python core's earlier 28-day mean.
-  const mean = Number.isFinite(comparison?.baseline?.mean) ? comparison.baseline.mean : null;
-
   // Grid lines
   const gridVals = isHours ? [0, 3, 6, 9, 12] : [0, 2, 4, 6, 8, 10];
   const grid = gridVals.map(v =>
@@ -159,29 +181,6 @@ function chartSvg(series, comparison, width) {
       ? `<rect class="chart-gap" x="${x(i) - 3}" y="${top}" width="6" height="${plotH}" rx="2"/>`
       : ''
   ).join('');
-
-  // Shade only the two returned 28-day windows, not the earlier 124 days.
-  let boundary = '';
-  if (comparison && data.length > 0) {
-    const earlierIndex = data.findIndex(p => p.local_date === comparison.baseline.start);
-    const recentIndex = data.findIndex(p => p.local_date === comparison.comparison.start);
-    if (earlierIndex >= 0 && recentIndex > earlierIndex) {
-      const earlierX = x(earlierIndex) - 3;
-      const recentX = x(recentIndex) - 3;
-      boundary =
-        `<rect class="chart-shade-earlier" x="${earlierX}" y="${top}" width="${recentX - earlierX}" height="${plotH}"/>` +
-        `<rect class="chart-shade" x="${recentX}" y="${top}" width="${width - right - recentX}" height="${plotH}"/>` +
-        `<line class="chart-boundary" x1="${earlierX}" y1="${top}" x2="${earlierX}" y2="${top + plotH}"/>` +
-        `<line class="chart-boundary" x1="${recentX}" y1="${top}" x2="${recentX}" y2="${top + plotH}"/>` +
-        `<text class="chart-period-label" x="${earlierX + 3}" y="${top - 6}">EARLIER</text>` +
-        `<text class="chart-period-label" x="${recentX + 3}" y="${top - 6}">RECENT</text>`;
-    }
-  }
-
-  // Baseline mean line
-  const baseline = mean !== null
-    ? `<line class="chart-baseline" x1="${left}" y1="${y(mean)}" x2="${width - right}" y2="${y(mean)}"/>`
-    : '';
 
   // Polylines and points
   const lines  = groups.map(pts =>
@@ -211,8 +210,8 @@ function chartSvg(series, comparison, width) {
   return `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet"
     role="group" aria-labelledby="chart-svg-title chart-svg-desc">
     <title id="chart-svg-title">Synthetic daily series for ${series.variable}</title>
-    <desc id="chart-svg-desc">Days without measurements break the line. Each point maps to a synthetic source record. The earlier 28-day mean is shown as a dashed line.</desc>
-    ${grid}${gaps}${boundary}${baseline}${lines}${points}${ticks}
+    <desc id="chart-svg-desc">All 180 fictional days are shown. Days without measurements break the line. Each observed point maps to a synthetic source record.</desc>
+    ${grid}${gaps}${lines}${points}${ticks}
   </svg>`;
 }
 
@@ -226,15 +225,15 @@ function renderChart(run) {
   // Update page heading
   const pageTitle  = $('#page-title');
   pageTitle.innerHTML = isEnergy
-    ? 'What changed in my <em>energy?</em>'
-    : 'What changed in my <em>sleep?</em>';
+    ? 'What patterns appear in my <em>energy?</em>'
+    : 'What patterns appear in my <em>sleep?</em>';
   $('#breadcrumb-subject').textContent = label.toUpperCase();
   setTitle(`${label} investigation`);
 
   // Coverage
   const coverage = run.coverage.find(c => c.variable === variable);
   const days     = windowDays(run);
-  $('#chart-title').textContent = isEnergy ? 'Energy over time' : 'Sleep over time';
+  $('#chart-title').textContent = isEnergy ? 'Energy across 180 days' : 'Sleep across 180 days';
   $('#chart-unit').textContent  = series?.unit === 'hours' ? 'HOURS' : 'SCALE 1–10';
   $('#legend-label').textContent = isEnergy ? 'Recorded energy' : 'Recorded sleep';
   $('#coverage-label').textContent = coverage
@@ -260,7 +259,7 @@ function renderChart(run) {
   }
 
   $('.chart-footer').classList.remove('no-series');
-  container.innerHTML = chartSvg(series, run.comparison, Math.max(280, container.clientWidth || 400));
+  container.innerHTML = chartSvg(series, Math.max(280, container.clientWidth || 400));
   $('#chart-help').textContent = 'Activate a point to see its date, value, and synthetic record ID.';
 
   // Tooltip
@@ -364,34 +363,14 @@ const KIND_LABELS = {
   abstention:            'ABSTAINED',
 };
 
-function renderFindings(run) {
-  const grid = $('#findings');
-  grid.replaceChildren();
-  const visibleFindings = run.findings.filter(finding => finding.kind !== 'uncertainty');
-
-  $('#finding-count').textContent = `${visibleFindings.length} ${visibleFindings.length === 1 ? 'INSIGHT' : 'INSIGHTS'}`;
-  const tierLegend = $('#evidence-tier-legend');
-  tierLegend.hidden = visibleFindings.length === 0;
-
-  if (!visibleFindings.length) {
-    const empty = document.createElement('article');
-    empty.className = 'finding-card empty-card';
-    empty.setAttribute('role', 'listitem');
-    empty.innerHTML = `<span class="finding-index">01 / OBSERVATION</span>
-      <h4>No findings for this run.</h4>
-      <p>The agent did not produce a promotable result. See the status and agent trace for the reason.</p>`;
-    grid.append(empty);
-    return;
-  }
-
-  for (const [idx, finding] of visibleFindings.entries()) {
+function findingCard(run, finding, index) {
     const card = document.createElement('article');
     card.className = `finding-card ${finding.kind}`;
     card.setAttribute('role', 'listitem');
 
     const idxEl = document.createElement('span');
     idxEl.className = 'finding-index';
-    idxEl.textContent = `${String(idx + 1).padStart(2, '0')} / ${KIND_LABELS[finding.kind] ?? finding.kind.toUpperCase()}`;
+    idxEl.textContent = `${String(index + 1).padStart(2, '0')} / ${KIND_LABELS[finding.kind] ?? finding.kind.toUpperCase()}`;
 
     const title = document.createElement('h4');
     const explanation = findingExplanation(run, finding);
@@ -416,8 +395,7 @@ function renderFindings(run) {
     btn.addEventListener('click', () => openEvidence(finding.finding_id));
     actions.append(btn);
 
-    // Show signal detail link for scientific findings
-    if (finding.evidence_signal_id && currentRun?.scientific_evidence?.signals) {
+    if (finding.evidence_signal_id && run.scientific_evidence?.signals) {
       const sigBtn = document.createElement('button');
       sigBtn.type = 'button';
       sigBtn.textContent = 'View scientific test ↗';
@@ -427,8 +405,45 @@ function renderFindings(run) {
     }
 
     card.append(idxEl, title, body, prov, actions);
-    grid.append(card);
+    return card;
+}
+
+function renderFindings(run) {
+  const grid = $('#findings');
+  const exploratoryGrid = $('#exploratory-findings');
+  const recent = $('#recent-observation');
+  grid.replaceChildren(); exploratoryGrid.replaceChildren(); recent.replaceChildren();
+  const qualified = run.findings.filter(finding => finding.kind === 'candidate_contributor');
+  const exploratory = run.findings.filter(finding => finding.kind === 'association');
+  const observation = run.findings.find(finding => finding.kind === 'observation');
+  const other = run.findings.filter(finding =>
+    !['candidate_contributor', 'association', 'observation', 'uncertainty'].includes(finding.kind));
+
+  $('#finding-count').textContent = `${qualified.length} ${qualified.length === 1 ? 'SUPPORTED PATTERN' : 'SUPPORTED PATTERNS'}`;
+  const tierLegend = $('#evidence-tier-legend');
+  tierLegend.hidden = qualified.length + exploratory.length === 0;
+  $('#exploratory-details').hidden = exploratory.length === 0;
+  $('#recent-changes').hidden = !run.comparison;
+  $('#exploratory-details').open = false;
+  $('#recent-changes').open = false;
+
+  if (!qualified.length) {
+    const empty = document.createElement('article');
+    empty.className = 'finding-card empty-card';
+    empty.setAttribute('role', 'listitem');
+    const heading = document.createElement('h4');
+    heading.textContent = run.status === 'PASS' ? 'No association qualified for this outcome' : 'No verified findings for this run';
+    const body = document.createElement('p');
+    body.textContent = run.status === 'PASS'
+      ? 'The pre-planned PHIS Discovery checks did not qualify a tested factor. Inspect all 16 results in evidence.'
+      : 'The agent did not publish a scientific result. See the status and trace.';
+    empty.append(heading, body);
+    grid.append(empty);
   }
+  qualified.forEach((finding, index) => grid.append(findingCard(run, finding, index)));
+  exploratory.forEach((finding, index) => exploratoryGrid.append(findingCard(run, finding, index)));
+  if (observation) recent.append(findingCard(run, observation, 0));
+  other.forEach((finding, index) => grid.append(findingCard(run, finding, qualified.length + index)));
 }
 
 // ─── Sponsor proof bar ────────────────────────────────────────────────────────
@@ -486,6 +501,13 @@ function clearPresentation(message) {
     <span>No figures from a prior run are retained.</span>
   </div>`;
   $('#trajectory-strip').hidden = true;
+  $('#longitudinal-summary').hidden = true;
+  $('#longitudinal-windows').replaceChildren();
+  $('#longitudinal-comparison').textContent = '';
+  $('#exploratory-details').hidden = true;
+  $('#exploratory-findings').replaceChildren();
+  $('#recent-changes').hidden = true;
+  $('#recent-observation').replaceChildren();
   $('#period-earlier').textContent = '—';
   $('#period-recent').textContent  = '—';
   $('#period-earlier-dates').textContent = '—';
@@ -496,10 +518,11 @@ function clearPresentation(message) {
   $('#findings').replaceChildren();
   $('#finding-count').textContent = 'NO CURRENT FINDINGS';
   $('#evidence-tier-legend').hidden = true;
+  $('#findings-method').hidden = true;
   $('#sponsor-proof-bar').hidden = true;
   $('#followup-actions').hidden  = true;
   $('#global-study-limit').hidden = true;
-  $('#findings-title').textContent = 'What changed, and what might be related?';
+  $('#findings-title').textContent = 'Supported 180-day associations';
   setTitle(null);
 }
 
@@ -536,8 +559,8 @@ function wireFollowupChips(run) {
   $('#chip-next').textContent = `Follow up with prior context: ${nextFamily} ↗`;
   $('#chip-sleep').textContent = `Explore ${nextFamily} independently ↗`;
   $('#chip-sleep').dataset.question = nextFamily === 'sleep'
-    ? 'How did my recorded sleep change between the fixed earlier and recent 28-day periods?'
-    : 'How did my recorded energy change between the fixed earlier and recent 28-day periods?';
+    ? 'What patterns are associated with my sleep over the last 180 days?'
+    : 'What patterns are associated with my energy over the last 180 days?';
   for (const chip of $$('#followup-actions [data-question]')) {
     chip.onclick = () => {
       const q = chip.dataset.question;
@@ -1025,7 +1048,7 @@ const STATUS_STATES = {
     kind: '',
     label: 'RESULT READY',
     copy: (run) => run.scientific_evidence
-      ? 'PHIS Discovery analyzed the fictional records. See the measured change and supported patterns below.'
+      ? 'PHIS Discovery analyzed the fictional 180-day history. See the observed series and qualified patterns below.'
       : 'A recorded change is available below.',
   },
   EXECUTED_PARTIAL: { kind: 'warning', label: 'PARTIAL RESULT',  copy: (run) => run.summary },
@@ -1083,13 +1106,18 @@ form.addEventListener('submit', async event => {
 
     renderTrace(currentRun.tool_trace);
     renderChart(currentRun);
+    renderLongitudinal(currentRun);
     renderTrajectory(currentRun);
     renderPeriod(currentRun);
     renderFindings(currentRun);
     renderSponsorBar(currentRun);
     $('#global-study-limit').hidden = !(currentRun.status === 'PASS' && currentRun.scientific_evidence);
     $('#findings-title').textContent = currentRun.status === 'PASS' && currentRun.scientific_evidence
-      ? 'What PHIS Discovery found' : 'What changed, and what might be related?';
+      ? 'Supported 180-day associations' : 'No verified association published';
+    $('#findings-method').hidden = !(currentRun.status === 'PASS' && currentRun.scientific_evidence);
+    if (currentRun.status === 'PASS' && currentRun.scientific_evidence) {
+      $('#findings-method').textContent = `PHIS Discovery ran ${currentRun.scientific_evidence.hypothesis_count} pre-planned tests on the full record for this question. These cards show the qualified findings returned by Python; inspect all tests and exact source IDs in Evidence.`;
+    }
 
     // Status
     const state = STATUS_STATES[currentRun.status] || STATUS_STATES.ERROR;
@@ -1102,7 +1130,7 @@ form.addEventListener('submit', async event => {
     ctxEl.textContent = currentRun.parent_run_id
       ? `Follow-up based on the prior investigation saved in agent memory. Inspect the technical trace for the linked run.`
       : currentRun.status === 'PASS'
-        ? `180 days of fictional records, ${plainDate(currentRun.window.start)}–${plainDate(currentRun.window.end)}. The comparison dates were fixed before this question.`
+        ? `The full fictional 180-day history, ${plainDate(currentRun.window.start)}–${plainDate(currentRun.window.end)}. The six descriptive intervals and scientific tests use the full returned record.`
         : 'No scientific result was published for this run. The status and evidence panel explain why.';
 
     // Enable evidence drawer and follow-up chips
