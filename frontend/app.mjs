@@ -446,6 +446,40 @@ function renderFindings(run) {
   other.forEach((finding, index) => grid.append(findingCard(run, finding, qualified.length + index)));
 }
 
+function renderModelReview(run) {
+  const panel = $('#model-review');
+  const review = run.contract_version === 'investigation.v4' ? run.review : null;
+  const modelUsed = run.contract_version === 'investigation.v4' &&
+    !['LOCAL DETERMINISTIC MODE', 'BLOCKED'].includes(run.planner_mode);
+  panel.hidden = !modelUsed;
+  $('#model-review-details').open = false;
+  $('#model-review-technical').replaceChildren();
+  if (!modelUsed) return;
+  const accepted = run.status === 'PASS' && run.verification === 'accept' && review?.decision === 'accept';
+  panel.classList.toggle('is-abstention', !accepted);
+  $('#model-review-title').textContent = accepted
+    ? 'Nemotron accepted the cited PHIS evidence'
+    : 'Nemotron did not endorse a scientific association';
+  const signals = run.scientific_evidence?.signals ?? run.scientific_audit?.scientific_evidence?.signals ?? [];
+  const cited = review?.evidence_signal_ids?.map(id => signals.find(item => item.signal_id === id)).filter(Boolean) ?? [];
+  const names = cited.map(item => item.exposure.replaceAll('_', ' '));
+  const check = run.tool_trace?.find(step => step.phase === 'REPLAN');
+  $('#model-review-summary').textContent = accepted
+    ? `The model accepted ${names.join(', ')} as ${names.length === 1 ? 'a qualified association' : 'qualified associations'} in the 180-day PHIS Discovery result. It did not establish a cause.${check ? ` A ${check.tool.replaceAll('_', ' ')} check was performed first.` : ''}`
+    : run.scientific_audit
+      ? `PHIS completed its 180-day scientific checks, but the model review did not accept a user-facing association.${check ? ` The requested ${check.tool.replaceAll('_', ' ')} check is recorded below.` : ''} Inspect the PHIS output separately in Evidence.`
+      : 'The investigation did not produce an endorsed scientific finding. Inspect the recorded status and tool trace.';
+  const details = $('#model-review-technical');
+  for (const [label, value] of [
+    ['Review decision', review?.decision ?? run.verification ?? 'unavailable'],
+    ['Validated reason', review?.reason_code ?? run.reason_code ?? 'unavailable'],
+    ['Cited PHIS signal IDs', review?.evidence_signal_ids?.join(', ') || 'none'],
+    ['Model rationale (reviewed metadata, not a scientific measurement)', review?.explanation ?? 'No valid model rationale was returned.'],
+    ['Deterministic check', check ? `${check.tool}: ${check.status}; event ${check.event_id}` : 'none requested'],
+    ['World Model review events', run.review_event_ids?.join(', ') || 'none'],
+  ]) details.append(el('p', {}, `${label}: ${value}`));
+}
+
 // ─── Sponsor proof bar ────────────────────────────────────────────────────────
 const SPONSOR_LABELS = {
   zetaris:           'Zetaris',
@@ -519,6 +553,7 @@ function clearPresentation(message) {
   $('#finding-count').textContent = 'NO CURRENT FINDINGS';
   $('#evidence-tier-legend').hidden = true;
   $('#findings-method').hidden = true;
+  $('#model-review').hidden = true;
   $('#sponsor-proof-bar').hidden = true;
   $('#followup-actions').hidden  = true;
   $('#global-study-limit').hidden = true;
@@ -682,10 +717,14 @@ function renderEvidenceContent(run, findingId = null, sourceId = null, activeTab
   }
 
   const days = windowDays(run);
+  const audited = run.scientific_audit && ['tab-finding', 'tab-signals'].includes(activeTab)
+    ? { ...run, ...run.scientific_audit, status: 'PASS' } : run;
+  if (audited !== run) content.append(el('p', { className: 'evidence-limit' },
+    'PHIS Discovery completed these scientific checks. Nemotron did not endorse them as a user-facing finding in this run. This is the retained technical audit.'));
 
   switch (activeTab) {
-    case 'tab-finding':  renderFindingTab(run, findingId, sourceId, days); break;
-    case 'tab-signals':  renderSignalsTab(run, findingId); break;
+    case 'tab-finding':  renderFindingTab(audited, findingId, sourceId, days); break;
+    case 'tab-signals':  renderSignalsTab(audited, findingId); break;
     case 'tab-trace':    renderTraceTab(run); break;
     case 'tab-sponsors': renderSponsorsTab(run); break;
     case 'tab-meta':     renderMetaTab(run, days); break;
@@ -1110,6 +1149,7 @@ form.addEventListener('submit', async event => {
     renderTrajectory(currentRun);
     renderPeriod(currentRun);
     renderFindings(currentRun);
+    renderModelReview(currentRun);
     renderSponsorBar(currentRun);
     $('#global-study-limit').hidden = !(currentRun.status === 'PASS' && currentRun.scientific_evidence);
     $('#findings-title').textContent = currentRun.status === 'PASS' && currentRun.scientific_evidence

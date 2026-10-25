@@ -16,7 +16,7 @@ from pathlib import Path
 SCHEMA = "synthetic-run-event-v1"
 ALLOWED_KINDS = frozenset({"energy_comparison", "agent_state", "scientific_evidence",
                            "scientific_evidence_180d", "agent_decision_180d",
-                           "agent_tool_evidence_180d"})
+                           "agent_tool_evidence_180d", "agent_review_180d_v2"})
 PHASES = frozenset({"PLAN", "TOOLS", "EVIDENCE", "VERIFY", "RESPOND", "ABSTAIN"})
 STATES = frozenset({"PASS", "INSUFFICIENT_DATA", "BLOCKED", "ERROR"})
 INTENTS = frozenset({"energy", "sleep", "followup", "unsupported"})
@@ -96,6 +96,38 @@ def _make_event(run_id, kind, payload, source_record_ids):
                          and (payload["scientific_event_id"] is None or
                               isinstance(payload["scientific_event_id"], str) and
                               re.fullmatch(r"[0-9a-f]{64}", payload["scientific_event_id"])))
+    elif kind == "agent_review_180d_v2":
+        expected = {"stage", "decision", "reason_code", "evidence_signal_ids",
+                    "requested_check", "explanation", "provider_status",
+                    "provider_response_id", "source_digest_sha256", "scientific_event_id",
+                    "tool_event_id", "check_event_id", "parent_run_id"}
+        valid_payload = (isinstance(payload, dict) and set(payload) == expected and
+                         payload["stage"] in {"INITIAL", "FINAL"} and
+                         payload["decision"] in {"accept", "verify", "abstain"} and
+                         payload["reason_code"] in {"supported_pattern", "coverage_question",
+                                                    "signal_question", "trend_question",
+                                                    "insufficient_evidence", "invalid_critique",
+                                                    "model_unavailable", "scientific_gate_failed",
+                                                    "evidence_packet_invalid"} and
+                         isinstance(payload["evidence_signal_ids"], list) and
+                         len(payload["evidence_signal_ids"]) <= 3 and
+                         all(isinstance(sid, str) and re.fullmatch(r"[0-9a-f]{64}", sid)
+                             for sid in payload["evidence_signal_ids"]) and
+                         payload["requested_check"] in {"none", "coverage", "signal_consistency",
+                                                        "trend_consistency"} and
+                         isinstance(payload["explanation"], str) and
+                         len(payload["explanation"]) <= 220 and
+                         payload["provider_status"] in {"VERIFIED", "SIMULATED", "BLOCKED"} and
+                         all(payload[name] is None or isinstance(payload[name], str) and
+                             re.fullmatch(r"[0-9a-f]{64}", payload[name])
+                             for name in ("scientific_event_id", "tool_event_id", "check_event_id")) and
+                         isinstance(payload["source_digest_sha256"], str) and
+                         re.fullmatch(r"[0-9a-f]{64}", payload["source_digest_sha256"]) and
+                         (payload["provider_response_id"] is None or
+                          isinstance(payload["provider_response_id"], str) and
+                          re.fullmatch(r"[A-Za-z0-9_.:-]{1,160}", payload["provider_response_id"])) and
+                         (payload["parent_run_id"] is None or isinstance(payload["parent_run_id"], str) and
+                          re.fullmatch(r"SYN-RUN-[A-Za-z0-9_-]{1,64}", payload["parent_run_id"])))
     elif kind == "agent_decision_180d":
         expected = {"phase", "family", "tool", "decision", "provider_status",
                     "provider_request_id", "provider_response_id", "provider_model", "source_digest_sha256",

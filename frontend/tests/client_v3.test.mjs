@@ -50,3 +50,33 @@ test('v4 keeps local planner separate from live sponsor proof', () => {
   result.sponsor_proofs[0].status = 'NOT_CONNECTED';
   assert.throws(() => validateLongitudinalInvestigation(result), /source provenance/);
 });
+
+test('v4 review cites a qualified PHIS signal and abstention retains separate audit', () => {
+  const run = live();
+  run.contract_version = 'investigation.v4';
+  run.mode = 'SYNTHETIC_LOCAL_ONLY';
+  run.planner_mode = 'SIMULATED';
+  run.sponsor_proofs[0] = { sponsor: 'zetaris', status: 'NOT_CONNECTED', trace_id: null };
+  run.source_digest_sha256 = hash;
+  run.scientific_evidence.signals[0] = {
+    signal_id: hash, exposure: 'sleep_hours', classification: 'candidate_signal',
+  };
+  run.review = { schema: 'phis-critique.v2', decision: 'accept',
+    reason_code: 'supported_pattern', evidence_signal_ids: [hash],
+    requested_check: 'none', explanation: 'The cited test qualified.' };
+  run.scientific_audit = null;
+  assert.equal(validateLongitudinalInvestigation(run).review.decision, 'accept');
+  const invalid = structuredClone(run);
+  invalid.review.evidence_signal_ids = ['b'.repeat(64)];
+  assert.throws(() => validateLongitudinalInvestigation(invalid), /model review/);
+  const abstained = structuredClone(run);
+  abstained.status = 'BLOCKED';
+  abstained.review = { ...abstained.review, decision: 'abstain',
+    reason_code: 'insufficient_evidence', evidence_signal_ids: [] };
+  abstained.scientific_audit = { scientific_evidence: abstained.scientific_evidence,
+    scientific_event_id: hash };
+  abstained.scientific_evidence = null;
+  assert.equal(validateLongitudinalInvestigation(abstained).status, 'BLOCKED');
+  abstained.scientific_audit.scientific_event_id = 'invented';
+  assert.throws(() => validateLongitudinalInvestigation(abstained), /scientific audit/);
+});
