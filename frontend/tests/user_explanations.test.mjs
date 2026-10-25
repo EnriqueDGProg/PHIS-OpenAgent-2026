@@ -72,7 +72,7 @@ test('whole-history summary formats only six returned missing-aware 30-day means
   const view = longitudinalPresentation(longitudinal);
   assert.equal(view.windows.length, 6);
   assert.equal(view.coverage, '168 of 180 days recorded');
-  assert.match(view.comparison, /\+0\.50\/10.*Descriptive difference only/);
+  assert.match(view.comparison, /First 30 days.*last 30 days.*\+0\.50\/10.*Descriptive difference only/);
   assert.equal(longitudinalPresentation({ ...longitudinal,
     longitudinal: { ...longitudinal.longitudinal, windows: windows.slice(1) } }), null);
   assert.equal(longitudinalPresentation({ ...longitudinal,

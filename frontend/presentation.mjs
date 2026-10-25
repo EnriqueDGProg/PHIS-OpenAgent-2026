@@ -79,7 +79,7 @@ export function longitudinalPresentation(run) {
       coverage: `${window.observed} of 30 days recorded`,
     })),
     comparison: Number.isFinite(difference)
-      ? `First to last 30-day average: ${difference < 0 ? '−' : difference > 0 ? '+' : ''}${Math.abs(difference).toFixed(2)}${unit}. Descriptive difference only; no significance or cause is inferred.`
+      ? `First 30 days (${plainDate(result.windows[0].start)}–${plainDate(result.windows[0].end)}) to last 30 days (${plainDate(result.windows[5].start)}–${plainDate(result.windows[5].end)}): ${difference < 0 ? '−' : difference > 0 ? '+' : ''}${Math.abs(difference).toFixed(2)}${unit}. Descriptive difference only; no significance or cause is inferred.`
       : 'A first-to-last difference was not available because at least one interval had no recorded mean.',
   };
 }

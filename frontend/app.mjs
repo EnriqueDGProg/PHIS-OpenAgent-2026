@@ -518,6 +518,7 @@ function clearPresentation(message) {
   $('#findings').replaceChildren();
   $('#finding-count').textContent = 'NO CURRENT FINDINGS';
   $('#evidence-tier-legend').hidden = true;
+  $('#findings-method').hidden = true;
   $('#sponsor-proof-bar').hidden = true;
   $('#followup-actions').hidden  = true;
   $('#global-study-limit').hidden = true;
@@ -1113,6 +1114,10 @@ form.addEventListener('submit', async event => {
     $('#global-study-limit').hidden = !(currentRun.status === 'PASS' && currentRun.scientific_evidence);
     $('#findings-title').textContent = currentRun.status === 'PASS' && currentRun.scientific_evidence
       ? 'Supported 180-day associations' : 'No verified association published';
+    $('#findings-method').hidden = !(currentRun.status === 'PASS' && currentRun.scientific_evidence);
+    if (currentRun.status === 'PASS' && currentRun.scientific_evidence) {
+      $('#findings-method').textContent = `PHIS Discovery ran ${currentRun.scientific_evidence.hypothesis_count} pre-planned tests on the full record for this question. These cards show the qualified findings returned by Python; inspect all tests and exact source IDs in Evidence.`;
+    }
 
     // Status
     const state = STATUS_STATES[currentRun.status] || STATUS_STATES.ERROR;
