@@ -4,7 +4,8 @@
  * Renders the 180-day v3 scientific result by default.
  */
 import { fetchInvestigation } from './client.mjs';
-import { windowDays, isOfflineScientificRun, sourceLabel } from './presentation.mjs';
+import { windowDays, isOfflineScientificRun, sourceLabel, canContinueFrom,
+  comparisonExplanation, findingExplanation, plainDate, TRACE_GROUPS } from './presentation.mjs';
 
 // ─── DOM helpers ──────────────────────────────────────────────────────────────
 const $ = sel => document.querySelector(sel);
@@ -72,8 +73,9 @@ function renderTrajectory(run) {
   dirEl.textContent = diff < -0.05 ? '▼' : diff > 0.05 ? '▲' : '→';
   dirEl.className = 'trajectory-direction ' + (diff < -0.05 ? 'down' : diff > 0.05 ? 'up' : 'flat');
   deltaEl.textContent = `${diff < 0 ? '−' : diff > 0 ? '+' : ''}${absDiff}${unitLabel}`;
-  labelEl.textContent = `change in the most recent 28-day period vs. the prior 28 days`;
-  bValEl.textContent  = `${baseline.mean?.toFixed(1) ?? '—'}${unitLabel} (earlier period mean)`;
+  labelEl.textContent = `${plainDate(comparison.start)}–${plainDate(comparison.end)} vs ${plainDate(baseline.start)}–${plainDate(baseline.end)}`;
+  bValEl.textContent  = `${baseline.mean?.toFixed(2) ?? '—'}${unitLabel} (earlier 28-day mean)`;
+  $('#trajectory-baseline-label').textContent = 'Earlier 28-day mean';
 
   strip.hidden = false;
 }
@@ -92,20 +94,23 @@ function renderPeriod(run) {
   if (hasCmp) {
     const { baseline, comparison, difference, unit } = run.comparison;
     const unitLabel = unit === 'hours' ? ' h' : '/10';
-    earlierEl.textContent = `${baseline.mean?.toFixed(1) ?? '—'}${unitLabel}`;
-    recentEl.textContent  = `${comparison.mean?.toFixed(1) ?? '—'}${unitLabel}`;
+    earlierEl.textContent = `${baseline.mean?.toFixed(2) ?? '—'}${unitLabel}`;
+    recentEl.textContent  = `${comparison.mean?.toFixed(2) ?? '—'}${unitLabel}`;
+    $('#period-earlier-dates').textContent = `${plainDate(baseline.start)}–${plainDate(baseline.end)}`;
+    $('#period-recent-dates').textContent = `${plainDate(comparison.start)}–${plainDate(comparison.end)}`;
 
     const diff = typeof difference === 'number' ? difference : (comparison.mean - baseline.mean);
     diffVal.textContent = `${diff >= 0 ? '+' : ''}${diff.toFixed(2)}${unitLabel}`;
     diffVal.className   = 'diff-value ' + (diff < -0.05 ? 'negative' : diff > 0.05 ? 'positive' : 'neutral');
     diffEl.hidden = false;
-    $('#period-description').textContent =
-      `${baseline.observed} and ${comparison.observed} observed days respectively. ` +
-      `The numerical difference is descriptive — it does not establish a cause.`;
-    footnote.textContent = `Arithmetic mean of observed days · ${unit === 'hours' ? 'hours' : 'scale 1–10'} · source IDs in evidence`;
+    $('#period-description').textContent = comparisonExplanation(run)?.coverage ??
+      'Only recorded measurements are compared. The difference does not establish a cause.';
+    footnote.textContent = `Means rounded to 2 decimals; change uses unrounded means · source IDs in evidence`;
   } else {
     earlierEl.textContent = '—';
     recentEl.textContent  = '—';
+    $('#period-earlier-dates').textContent = '—';
+    $('#period-recent-dates').textContent = '—';
     diffEl.hidden = true;
     $('#period-description').textContent = run.status === 'PASS'
       ? 'The agent reviewed follow-up records without computing a period difference.'
@@ -138,9 +143,8 @@ function chartSvg(series, comparison, width) {
   }
   if (group.length) groups.push(group);
 
-  // Descriptive mean for baseline line
-  const observed = data.filter(p => p.value !== null).map(p => p.value);
-  const mean = observed.length ? observed.reduce((a, b) => a + b, 0) / observed.length : null;
+  // The reference line is the Python core's earlier 28-day mean.
+  const mean = Number.isFinite(comparison?.baseline?.mean) ? comparison.baseline.mean : null;
 
   // Grid lines
   const gridVals = isHours ? [0, 3, 6, 9, 12] : [0, 2, 4, 6, 8, 10];
@@ -156,17 +160,21 @@ function chartSvg(series, comparison, width) {
       : ''
   ).join('');
 
-  // Period shading and boundary
+  // Shade only the two returned 28-day windows, not the earlier 124 days.
   let boundary = '';
   if (comparison && data.length > 0) {
-    const bndIdx = data.findIndex(p => p.local_date === comparison.comparison.start);
-    if (bndIdx > 0) {
-      const bx = x(bndIdx) - 6;
+    const earlierIndex = data.findIndex(p => p.local_date === comparison.baseline.start);
+    const recentIndex = data.findIndex(p => p.local_date === comparison.comparison.start);
+    if (earlierIndex >= 0 && recentIndex > earlierIndex) {
+      const earlierX = x(earlierIndex) - 3;
+      const recentX = x(recentIndex) - 3;
       boundary =
-        `<rect class="chart-shade" x="${bx}" y="${top}" width="${width - right - bx}" height="${plotH}"/>` +
-        `<line class="chart-boundary" x1="${bx}" y1="${top}" x2="${bx}" y2="${top + plotH}"/>` +
-        `<text class="chart-period-label" x="${left + 4}" y="${top - 6}">EARLIER PERIOD</text>` +
-        `<text class="chart-period-label" x="${bx + 5}" y="${top - 6}">RECENT PERIOD</text>`;
+        `<rect class="chart-shade-earlier" x="${earlierX}" y="${top}" width="${recentX - earlierX}" height="${plotH}"/>` +
+        `<rect class="chart-shade" x="${recentX}" y="${top}" width="${width - right - recentX}" height="${plotH}"/>` +
+        `<line class="chart-boundary" x1="${earlierX}" y1="${top}" x2="${earlierX}" y2="${top + plotH}"/>` +
+        `<line class="chart-boundary" x1="${recentX}" y1="${top}" x2="${recentX}" y2="${top + plotH}"/>` +
+        `<text class="chart-period-label" x="${earlierX + 3}" y="${top - 6}">EARLIER</text>` +
+        `<text class="chart-period-label" x="${recentX + 3}" y="${top - 6}">RECENT</text>`;
     }
   }
 
@@ -203,7 +211,7 @@ function chartSvg(series, comparison, width) {
   return `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet"
     role="group" aria-labelledby="chart-svg-title chart-svg-desc">
     <title id="chart-svg-title">Synthetic daily series for ${series.variable}</title>
-    <desc id="chart-svg-desc">Missing days break the line. Each point is a real synthetic record. Baseline mean shown as a dashed line.</desc>
+    <desc id="chart-svg-desc">Days without measurements break the line. Each point maps to a synthetic source record. The earlier 28-day mean is shown as a dashed line.</desc>
     ${grid}${gaps}${boundary}${baseline}${lines}${points}${ticks}
   </svg>`;
 }
@@ -292,54 +300,54 @@ function renderTrace(steps) {
     return;
   }
 
-  const phaseLabels = {
-    PLAN: 'Planned', TOOLS: 'Executed', EVIDENCE: 'Recorded',
-    VERIFY: 'Verified', RESPOND: 'Responded', ABSTAIN: 'Abstained',
-  };
-
-  for (const step of steps) {
+  for (const group of TRACE_GROUPS) {
+    const actual = steps.filter(step => group.phases.includes(step.phase));
+    if (!actual.length) continue;
     const li = document.createElement('li');
-    li.className = step.status.toLowerCase();
+    const stateValue = actual.some(step => step.status === 'ERROR') ? 'ERROR'
+      : actual.some(step => step.status === 'BLOCKED') ? 'BLOCKED' : 'PASS';
+    li.className = stateValue.toLowerCase();
 
     const header = document.createElement('div');
     header.className = 'trace-step-header';
 
     const name = document.createElement('strong');
-    name.textContent = step.tool;
+    name.textContent = group.label;
 
     const state = document.createElement('span');
     state.className = 'trace-state';
-    state.textContent = step.status === 'ERROR' ? 'Failed'
-      : step.status === 'BLOCKED' ? 'Blocked'
-      : phaseLabels[step.phase] ?? 'Executed';
-
-    const phase = step.phase || 'TOOLS';
-    const phasePill = document.createElement('span');
-    phasePill.className = `trace-phase-pill ${phase.toLowerCase()}`;
-    phasePill.textContent = phase;
-
-    header.append(name, state, phasePill);
+    state.textContent = stateValue === 'ERROR' ? 'Failed'
+      : stateValue === 'BLOCKED' ? 'Stopped' : 'Completed';
+    header.append(name, state);
 
     const detail = document.createElement('small');
-    detail.textContent = step.detail || '';
-
-    li.append(header, detail);
-
-    if (step.source_record_ids?.length) {
-      const ids = document.createElement('small');
-      ids.textContent = `${step.source_record_ids.length} synthetic record IDs · event ${(step.trace_id || '').slice(0, 12)}`;
-      li.append(ids);
+    const completedCopy = {
+      'Plan investigation': 'Selected a bounded investigation from the question.',
+      'Analyze scientific evidence': 'Ran the recorded scientific tool on fictional records.',
+      'Save and check evidence': 'Saved or checked evidence in agent memory.',
+      'Prepare explained result': 'Prepared the result from recorded evidence.',
+    };
+    detail.textContent = stateValue === 'PASS' ? completedCopy[group.label] :
+      'This step did not complete; open the trace for the exact reason.';
+    const technical = document.createElement('details');
+    technical.className = 'trace-technical';
+    const summary = document.createElement('summary');
+    summary.textContent = 'Technical trace';
+    technical.append(summary);
+    for (const step of actual) {
+      const line = document.createElement('small');
+      line.textContent = [step.phase, step.tool, step.status, step.detail,
+        step.trace_id && `event ${step.trace_id}`,
+        step.engine_event_id && `Meterless event ${step.engine_event_id}`,
+        step.parent_event_id && `prior event ${step.parent_event_id}`,
+        step.query_id && `source query ${step.query_id}`,
+        step.provider_request_id && `provider request ${step.provider_request_id}`,
+        step.provider_response_id && `provider response ${step.provider_response_id}`,
+        step.source_record_ids?.length && `${step.source_record_ids.length} source IDs`]
+        .filter(Boolean).join(' · ');
+      technical.append(line);
     }
-    if (step.engine_event_id) {
-      const eid = document.createElement('small');
-      eid.textContent = `Meterless Engine event: ${step.engine_event_id.slice(0, 20)}…`;
-      li.append(eid);
-    }
-    if (step.parent_event_id) {
-      const pid = document.createElement('small');
-      pid.textContent = `Decision based on prior event: ${step.parent_event_id.slice(0, 20)}…`;
-      li.append(pid);
-    }
+    li.append(header, detail, technical);
 
     traceList.append(li);
   }
@@ -385,16 +393,17 @@ function renderFindings(run) {
     idxEl.textContent = `${String(idx + 1).padStart(2, '0')} / ${KIND_LABELS[finding.kind] ?? finding.kind.toUpperCase()}`;
 
     const title = document.createElement('h4');
-    title.textContent = finding.title;
+    const explanation = findingExplanation(run, finding);
+    title.textContent = explanation.title;
 
     const body = document.createElement('p');
-    body.textContent = finding.text;
+    body.textContent = explanation.text;
 
     const prov = document.createElement('span');
     prov.className = 'finding-provenance';
     prov.textContent = finding.source_record_ids?.length
-      ? `${finding.source_record_ids.length} synthetic source ID${finding.source_record_ids.length > 1 ? 's' : ''}`
-      : 'No records — limit or abstention';
+      ? 'Based on fictional records · inspect evidence'
+      : 'Interpretive limit · inspect evidence';
 
     const actions = document.createElement('div');
     actions.className = 'finding-actions';
@@ -469,7 +478,7 @@ function clearPresentation(message) {
   $('#coverage-label').textContent = 'NO COVERAGE';
   $('#window-badge').textContent = '— DAYS';
   $('.chart-footer').classList.add('no-series');
-  $('#chart-help').textContent = 'The series appears after a valid Python response.';
+  $('#chart-help').textContent = 'The series appears after a valid investigation result.';
   $('#chart-container').innerHTML = `<div class="chart-placeholder">
     <span class="placeholder-icon" aria-hidden="true">⬡</span>
     <strong>No current result</strong>
@@ -478,6 +487,8 @@ function clearPresentation(message) {
   $('#trajectory-strip').hidden = true;
   $('#period-earlier').textContent = '—';
   $('#period-recent').textContent  = '—';
+  $('#period-earlier-dates').textContent = '—';
+  $('#period-recent-dates').textContent = '—';
   $('#period-diff').hidden = true;
   $('#period-description').textContent = 'Awaiting a valid comparison.';
   $('#period-footnote').textContent = 'No figure to compare';
@@ -505,6 +516,11 @@ function updateFollowupBanner() {
 for (const chip of $$('[data-fill]')) {
   chip.addEventListener('click', () => {
     questionInput.value = chip.dataset.fill;
+    for (const option of $$('.entry-option')) {
+      const active = option === chip;
+      option.classList.toggle('active', active);
+      option.setAttribute('aria-pressed', String(active));
+    }
     pendingParentRunId = null;
     updateFollowupBanner();
     questionInput.focus();
@@ -514,19 +530,18 @@ for (const chip of $$('[data-fill]')) {
 // ─── Follow-up action chips (post-result) ─────────────────────────────────────
 function wireFollowupChips(run) {
   for (const chip of $$('#followup-actions [data-question]')) {
-    chip.onclick = null;
-    chip.addEventListener('click', () => {
+    chip.onclick = () => {
       const q = chip.dataset.question;
       questionInput.value = q;
       // Chips that continue the same investigation carry parent run ID
-      if (chip.id === 'chip-sleep' || chip.id === 'chip-next') {
+      if (chip.id === 'chip-next') {
         pendingParentRunId = run.run_id;
       } else {
         pendingParentRunId = null;
       }
       updateFollowupBanner();
       questionInput.focus();
-    });
+    };
   }
 }
 
@@ -535,8 +550,8 @@ function openEvidence(findingId = null, sourceId = null) {
   if (!currentRun) return;
   activateTab('tab-finding');
   renderEvidenceContent(currentRun, findingId, sourceId);
-  $('#dialog-title').textContent = sourceId ? 'Point source record.'
-    : findingId ? 'Finding evidence.' : 'Sources and limits.';
+  $('#dialog-description').textContent = sourceId ? 'Selected fictional record and its source ID.'
+    : findingId ? 'Selected finding and its original scientific support.' : 'Sources, scientific tests and run verification.';
   dialog.showModal();
 }
 
@@ -554,6 +569,13 @@ dialog.addEventListener('keydown', e => { if (e.key === 'Escape') dialog.close()
 
 // ─── Tab switching ────────────────────────────────────────────────────────────
 function activateTab(tabId) {
+  $('#dialog-title').textContent = 'Evidence & verification';
+  const subtitles = {
+    'tab-finding': 'Finding and source records', 'tab-signals': 'All pre-planned scientific tests',
+    'tab-trace': 'Tools and events actually recorded', 'tab-sponsors': 'Sponsor connection receipts',
+    'tab-meta': 'Run metadata and fixed windows',
+  };
+  $('#dialog-description').textContent = subtitles[tabId] ?? 'Sources and scientific checks';
   for (const tab of $$('.dialog-tab')) {
     const active = tab.id === tabId;
     tab.classList.toggle('active', active);
@@ -657,11 +679,16 @@ function renderFindingTab(run, findingId, sourceId, days) {
   const lead = mkBlock(sourceId ? 'SELECTED CHART RECORD' : 'SELECTED FINDING');
   const heading = el('h4', {}, point
     ? `${point.local_date} · ${point.value} ${point.unit}`
-    : selected?.title || 'No finding available');
+    : selected ? findingExplanation(run, selected).title : 'No finding available');
   const summary = el('p', {}, point
     ? 'This data point was returned by the Python core. The ID identifies a typed synthetic record.'
-    : (selected?.text || run.summary));
+    : (selected ? findingExplanation(run, selected).text : run.summary));
   lead.append(heading, summary);
+  if (selected) {
+    const raw = mkDisclosure('Original scientific wording and source IDs');
+    raw.append(el('p', {}, selected.text));
+    lead.append(raw);
+  }
 
   if (point) {
     lead.append(el('code', { className: 'selected-source' }, point.source_record_id));
@@ -684,9 +711,9 @@ function renderFindingTab(run, findingId, sourceId, days) {
       association:           'UNQUALIFIED ASSOCIATION — raw correlation did not pass every gate. Do not interpret as a cause.',
       hypothesis:            'HYPOTHESIS — exploratory. Requires further investigation and preregistration.',
       unsupported_hypothesis:'NO EVIDENCE — no tested factor met the required gates for this outcome.',
-      uncertainty:           'CONFOUNDING LIMIT — overlapping explanations exist; no adjusted or causal effect was estimated.',
+      uncertainty:           'UNCERTAINTY — overlapping factors may change together. The analysis cannot isolate a cause.',
       abstention:            'RESPONSIBLE ABSTENTION — the question or evidence falls outside the verifiable scope.',
-      observation:           'OBSERVATION — a descriptive measurement, no association tested.',
+      observation:           'RECORDED CHANGE — what happened in the observed periods, not why.',
     };
     kindBlock.append(el('p', {}, kindMap[selected.kind] ?? selected.kind));
     content.append(kindBlock);
@@ -714,22 +741,25 @@ function renderSignalsTab(run, findingId) {
     content.append(badge);
   }
 
-  const intro = mkBlock(`${hypothesis_count} PREDECLARED CHILDREN · FULL FAMILY`);
+  const intro = mkBlock(`${hypothesis_count} PRE-PLANNED SCIENTIFIC TESTS · ALL RESULTS SHOWN`);
   intro.append(el('p', {},
-    `These ${hypothesis_count} tests form the complete predeclared family. ` +
-    `All children are retained, including those that did not pass gates. ` +
-    `No post-hoc selection was made.`));
-  intro.append(mkDl([
+    `PHIS planned these ${hypothesis_count} tests before looking at the results. ` +
+    `Every result is shown, including tests that found no qualified signal. ` +
+    `A test is a statistical check, not a participant or a diagnosis.`));
+  const planDetails = mkDisclosure('Technical plan and source digests');
+  planDetails.append(mkDl([
     ['Engine', engine ?? '—'],
     ['Plan SHA-256', (plan_sha256 ?? '—').slice(0, 24) + '…'],
     ['Record digest SHA-256', (record_digest_sha256 ?? '—').slice(0, 24) + '…'],
   ]));
+  intro.append(planDetails);
   content.append(intro);
 
   // Signal table
-  const tableBlock = mkBlock('SIGNAL RESULTS (N / r / CI / p / q / gates)');
+  const tableBlock = mkBlock('ALL SCIENTIFIC TEST RESULTS');
   tableBlock.append(el('p', { className: 'evidence-limit' },
     'These are unadjusted pairwise observational associations in fictional synthetic data. Not causal or clinical claims.'));
+  tableBlock.append(el('p', {}, 'Technical statistics below: r is correlation, N is the number of paired observations, CI is an uncertainty interval, and p and q are statistical checks.'));
 
   const table = el('table', { className: 'signal-table' });
   const thead = el('thead');
@@ -785,7 +815,7 @@ function renderSignalsTab(run, findingId) {
 // Tab: Tool trace
 function renderTraceTab(run) {
   const content = $('#dialog-content');
-  const block = mkBlock('AGENT TOOL TRACE — EVERY STEP');
+  const block = mkBlock('TECHNICAL TRACE — EVERY RECORDED STEP');
   block.append(el('p', {},
     'Every tool call returned by the Python core. Blocked steps are explicitly recorded, never silently dropped.'));
 
@@ -834,7 +864,7 @@ function renderTraceTab(run) {
 function renderSponsorsTab(run) {
   const content = $('#dialog-content');
 
-  const intro = mkBlock('SPONSOR SERVICE CONNECTIONS');
+  const intro = mkBlock('TECHNICAL VERIFICATION — SPONSOR CONNECTIONS');
   intro.append(el('p', {},
     'Status is determined each run. A VERIFIED status means a real round-trip was traced. ' +
     'NOT_CONNECTED means the service is not wired in this run. ' +
@@ -903,7 +933,7 @@ function renderMetaTab(run, days) {
     cmpBlock.append(el('p', {},
       `${method}: ${baseline.start}–${baseline.end} (N=${baseline.observed}) ` +
       `versus ${comparison.start}–${comparison.end} (N=${comparison.observed}). ` +
-      `Missing days remain null. No proof of association or causality.`));
+      `Unrecorded measurements remain null. No proof of association or causality.`));
     content.append(cmpBlock);
   }
 
@@ -945,10 +975,10 @@ function updateModeUI(run) {
 const STATUS_STATES = {
   PASS: {
     kind: '',
-    label: 'OBSERVATION AVAILABLE',
+    label: 'RESULT READY',
     copy: (run) => run.scientific_evidence
-      ? `Scientific analysis complete. ${run.findings.filter(f => f.kind === 'candidate_contributor').length} qualified signal(s). Review the evidence tiers below.`
-      : 'A descriptive finding is available below. Cause is not established.',
+      ? 'See the recorded change and the patterns that passed scientific checks below. None proves a cause.'
+      : 'A recorded change is available below. Cause is not established.',
   },
   EXECUTED_PARTIAL: { kind: 'warning', label: 'PARTIAL RESULT',  copy: (run) => run.summary },
   INSUFFICIENT_DATA:{ kind: 'warning', label: 'INSUFFICIENT EVIDENCE', copy: (run) => run.summary },
@@ -957,7 +987,7 @@ const STATUS_STATES = {
 };
 
 const PHASE_LABELS = {
-  PASS: 'RESPONSE RECEIVED',
+  PASS: 'RESULT READY',
   EXECUTED_PARTIAL: 'PARTIAL RESULT',
   INSUFFICIENT_DATA: 'INSUFFICIENT COVERAGE',
   BLOCKED: 'ABSTENTION',
@@ -980,15 +1010,15 @@ form.addEventListener('submit', async event => {
 
   const parentRunId = pendingParentRunId;
 
-  clearPresentation('Querying synthetic data — please wait.');
+  clearPresentation('Analyzing the fictional records — please wait.');
   askButton.disabled = true;
-  askButton.querySelector('.ask-label').textContent = 'Querying Python…';
-  for (const chip of $$('[data-question], .suggestion-chip')) chip.disabled = true;
+  askButton.querySelector('.ask-label').textContent = 'Analyzing records…';
+  for (const chip of $$('[data-question], .entry-option')) chip.disabled = true;
   $('#main').setAttribute('aria-busy', 'true');
   agentPhase.className = 'phase-tag phase-running';
   agentPhase.textContent = 'IN PROGRESS';
-  traceList.innerHTML = '<li class="trace-empty">Waiting for the Python core — no tools confirmed yet.</li>';
-  setStatus('busy', 'INVESTIGATION IN PROGRESS', 'Waiting for the local run; no results or traces are confirmed yet.', 'IN PROGRESS');
+  traceList.innerHTML = '<li class="trace-empty">Working through the investigation. Completed steps will appear here.</li>';
+  setStatus('busy', 'INVESTIGATION IN PROGRESS', 'Analyzing the fictional records. No findings are confirmed yet.', 'IN PROGRESS');
 
   try {
     const params = new URLSearchParams(location.search);
@@ -1001,9 +1031,6 @@ form.addEventListener('submit', async event => {
     updateModeUI(currentRun);
     updateWindowLabel(currentRun);
 
-    if (currentRun.status === 'PASS' && currentRun.comparison) {
-      localStorage.setItem('phis.synthetic.lastRunId', currentRun.run_id);
-    }
     pendingParentRunId = null;
     updateFollowupBanner();
 
@@ -1023,18 +1050,14 @@ form.addEventListener('submit', async event => {
     // Result context line
     const ctxEl = $('#result-context');
     ctxEl.textContent = currentRun.parent_run_id
-      ? `Follow-up to ${currentRun.parent_run_id} · decision recovered from World Model · run ${currentRun.run_id}`
-      : `Run ${currentRun.run_id} · ${
-          currentRun.mode === 'LIVE_SYNTHETIC_ZETARIS'
-            ? (currentRun.sponsor_proofs?.find(p => p.sponsor === 'zetaris')?.status === 'VERIFIED'
-              ? 'synthetic rows verified from local Zetaris'
-              : 'Zetaris source unavailable; no records used')
-            : 'local synthetic records'
-        }`;
+      ? `Follow-up based on the prior investigation saved in agent memory. Inspect the technical trace for the linked run.`
+      : currentRun.status === 'PASS'
+        ? `180 days of fictional records, ${plainDate(currentRun.window.start)}–${plainDate(currentRun.window.end)}. The comparison dates were fixed before this question.`
+        : 'No scientific result was published for this run. The status and evidence panel explain why.';
 
     // Enable evidence drawer and follow-up chips
     evidenceBtn.disabled = false;
-    if (currentRun.status === 'PASS') {
+    if (canContinueFrom(currentRun)) {
       $('#followup-actions').hidden = false;
       wireFollowupChips(currentRun);
     }
@@ -1044,17 +1067,17 @@ form.addEventListener('submit', async event => {
 
     $('#main').focus();
   } catch (error) {
-    clearPresentation('The query did not return a valid result.');
+    clearPresentation('The investigation did not return a valid result.');
     agentPhase.className = 'phase-tag phase-error';
     agentPhase.textContent = 'NO RESPONSE';
     renderTrace([]);
     setStatus('error', 'CONNECTION OR CONTRACT ERROR',
-      'Could not get a valid response from the Python core. The contract validator rejected the payload or the server is unavailable.');
+      'Could not get a valid result. The local service may be unavailable, or the result did not pass validation.');
     console.error('[PHIS] API response rejected:', error);
   } finally {
     askButton.disabled = false;
     askButton.querySelector('.ask-label').textContent = 'Investigate records';
-    for (const chip of $$('[data-question], .suggestion-chip')) chip.disabled = false;
+    for (const chip of $$('[data-question], .entry-option')) chip.disabled = false;
     $('#main').removeAttribute('aria-busy');
   }
 });

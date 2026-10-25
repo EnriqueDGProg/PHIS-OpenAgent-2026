@@ -42,17 +42,20 @@
         <div class="hero-ornament" aria-hidden="true">
           <span></span><span></span><span></span>
         </div>
-        <p class="eyebrow">LONGITUDINAL INVESTIGATION · SYNTHETIC DEMO</p>
-        <h1>Investigate a change in your <em>health records.</em></h1>
+        <p class="eyebrow">PERSONAL HEALTH INTELLIGENCE SYSTEM · SYNTHETIC DEMO</p>
+        <h1>Understand a change in your <em>energy or sleep.</em></h1>
         <p class="hero-copy">
-          Ask about energy or sleep patterns. PHIS retrieves the fictional participant's
-          dated records, runs a pre-declared analysis, and tells you what
-          the evidence supports — and where it runs out.
+          Explore a fictional participant's records over 180 days. PHIS shows what changed,
+          which patterns passed scientific checks, and what remains uncertain.
         </p>
       </div>
 
       <!-- Question form -->
       <form id="question-form" class="question-panel" novalidate>
+        <div class="entry-options" aria-label="Choose a demo investigation">
+          <button type="button" class="entry-option active" data-fill="Why has my energy changed over the past few months?" aria-pressed="true">Explore my energy <span aria-hidden="true">↗</span></button>
+          <button type="button" class="entry-option" data-fill="How did my sleep change over the past few months?" aria-pressed="false">Explore my sleep <span aria-hidden="true">↗</span></button>
+        </div>
         <label for="question">01 / YOUR QUESTION</label>
         <div class="question-field">
           <textarea
@@ -66,14 +69,10 @@
           <span class="question-cursor" aria-hidden="true">↗</span>
         </div>
         <p id="question-hint" class="question-hint">
-          Scope: energy and sleep. Ask naturally — e.g.&nbsp;"What's been driving my fatigue?"
+          Demo scope: energy and sleep patterns in one fixed 180-day fictional record. Edit the question within that scope.
         </p>
+        <p class="fixed-window-note">Fixed demo dates: 25 Apr–21 Oct 2026. PHIS compares 27 Aug–23 Sep with 24 Sep–21 Oct; these periods cannot be changed by the question.</p>
         <div class="question-actions">
-          <div class="question-suggestions" aria-label="Question suggestions">
-            <button type="button" class="suggestion-chip" data-fill="Why has my energy changed over the past few months?">Energy trend</button>
-            <button type="button" class="suggestion-chip" data-fill="How did my sleep change during that period?">Sleep pattern</button>
-            <button type="button" class="suggestion-chip" data-fill="What should I investigate next?">What's next?</button>
-          </div>
           <button class="ask-button" type="submit" id="ask-button">
             <span class="ask-label">Investigate records</span>
             <span aria-hidden="true">↗</span>
@@ -93,11 +92,11 @@
       <!-- Follow-up action chips (shown after PASS result) -->
       <div id="followup-actions" class="followup-actions" hidden aria-label="Follow-up actions">
         <span class="followup-actions-label">CONTINUE INVESTIGATION</span>
-        <button type="button" class="text-chip" id="chip-sleep" data-question="How did my sleep change in that period?">
-          Investigate sleep ↗
+        <button type="button" class="text-chip" id="chip-sleep" data-question="How did my sleep change over the past few months?">
+          Explore sleep separately ↗
         </button>
         <button type="button" class="text-chip" id="chip-next" data-question="What should we investigate next?">
-          What's next? ↗
+          What's next? Use this run's memory ↗
         </button>
         <button type="button" class="text-chip" id="chip-abstain" data-question="Is there a clinical diagnosis here?">
           Test abstention ↗
@@ -121,8 +120,7 @@
           <span id="agent-phase" class="phase-tag phase-idle">NOT STARTED</span>
         </div>
         <p class="agent-caption">
-          Tool calls and phase decisions returned by the Python core.
-          Blocked steps are never shown as executed.
+          See each completed step. Open technical trace details for the exact tools, providers and event IDs.
         </p>
         <ol id="trace-list" class="trace-list" aria-label="Agent tool trace">
           <li class="trace-empty">Submit a question to see the execution trace and any limits.</li>
@@ -130,7 +128,7 @@
       </section>
 
       <div class="rail-footer">
-        <span>PHIS / PERSONAL HEALTH INTELLIGENCE</span>
+        <span>PHIS / PERSONAL HEALTH INTELLIGENCE SYSTEM</span>
         <span>2026 · DEMO</span>
       </div>
     </aside><!-- /rail -->
@@ -151,7 +149,7 @@
             <span id="mode-label">SYNTHETIC · MODE PENDING</span>
           </span>
           <span id="window-badge" class="window-badge" aria-label="Analysis window">180 DAYS</span>
-          <span class="avatar" aria-label="Fictional participant — synthetic data">SF</span>
+          <span class="avatar" aria-label="Demo participant — fictional synthetic data">DEMO</span>
         </div>
       </header>
 
@@ -170,7 +168,7 @@
               What changed in my <em>energy?</em>
             </h2>
             <p id="result-context" class="page-subtitle">
-              Submit a question to query the synthetic Python core.
+              Choose energy or sleep to investigate the fictional records.
             </p>
           </div>
           <button
@@ -193,7 +191,7 @@
             <span class="status-bloom" aria-hidden="true">✳</span>
             <div>
               <span id="status-label" class="status-label">READY TO EXPLORE</span>
-              <p id="status-copy">Run a question to query the synthetic core.</p>
+              <p id="status-copy">Choose an investigation to begin.</p>
             </div>
           </div>
           <span id="run-id" class="run-id" aria-label="Run ID">NO RUN</span>
@@ -227,7 +225,7 @@
               <div class="chart-placeholder">
                 <span class="placeholder-icon" aria-hidden="true">⬡</span>
                 <strong>The longitudinal series will appear here</strong>
-                <span>Missing days remain visible as gaps — not zeros.</span>
+                <span>Days without a measurement remain visible as gaps, not zeros.</span>
               </div>
             </div>
             <div class="chart-footer">
@@ -237,11 +235,11 @@
               </span>
               <span>
                 <i class="legend-dot legend-baseline" aria-hidden="true"></i>
-                Personal baseline mean
+                Earlier 28-day mean
               </span>
               <span>
                 <i class="legend-gap" aria-hidden="true"></i>
-                Missing record (gap, not zero)
+                No measurement recorded (gap, not zero)
               </span>
               <strong id="coverage-label" class="coverage-label" aria-live="polite">— / 180 days</strong>
             </div>
@@ -258,10 +256,12 @@
             <div id="period-values" class="period-values">
               <div>
                 <span>EARLIER PERIOD</span>
+                <small id="period-earlier-dates">—</small>
                 <strong id="period-earlier" aria-live="polite">—</strong>
               </div>
               <div class="period-recent">
                 <span>RECENT PERIOD</span>
+                <small id="period-recent-dates">—</small>
                 <strong id="period-recent" aria-live="polite">—</strong>
               </div>
             </div>
@@ -278,8 +278,8 @@
         <!-- Findings section -->
         <div class="findings-heading">
           <div>
-            <p class="card-eyebrow">INTERPRETATION</p>
-            <h3>What the evidence supports. What it does not.</h3>
+            <p class="card-eyebrow">YOUR INSIGHTS</p>
+            <h3>What changed, and what might be related?</h3>
           </div>
           <div class="findings-meta">
             <span id="finding-count" aria-live="polite">NO FINDINGS</span>
@@ -300,10 +300,10 @@
         </div>
 
         <!-- Sponsor proof surface (shown after run) -->
-        <div id="sponsor-proof-bar" class="sponsor-proof-bar" hidden aria-label="Sponsor connection proofs" role="region">
-          <span class="proof-bar-label">SPONSOR SERVICES</span>
+        <details id="sponsor-proof-bar" class="sponsor-proof-bar" hidden aria-label="Technical verification for reviewers">
+          <summary class="proof-bar-label">Technical verification (for reviewers)</summary>
           <div id="proof-badges" class="proof-badges"></div>
-        </div>
+        </details>
 
         <footer class="workbench-footer">
           <span>100% SYNTHETIC DATA · FICTIONAL PARTICIPANT · NO DIAGNOSIS</span>
@@ -323,9 +323,9 @@
     <div class="dialog-header">
       <div>
         <p class="card-eyebrow">LINEAGE / SOURCES / PROOFS</p>
-        <h2 id="dialog-title">Behind every finding.</h2>
+        <h2 id="dialog-title">Evidence &amp; verification</h2>
         <p id="dialog-description" class="dialog-description">
-          Every number here was returned by the Python core — not generated by the LLM.
+          Inspect the selected finding, source records and technical checks.
         </p>
       </div>
       <button id="dialog-close" class="close-button" type="button" aria-label="Close evidence panel">×</button>
