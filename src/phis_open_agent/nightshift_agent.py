@@ -71,6 +71,52 @@ def parse_critique(content):
     return obj["decision"]
 
 
+REVIEW_KEYS = {"decision", "reason_code", "signal_id", "direction", "lag_days", "uncertainty"}
+ABSTAIN_REASONS = {"unsupported_interpretation", "conflicting_signals",
+                   "causal_scope", "invalid_evidence"}
+
+
+def parse_nemotron_review(content, evidence):
+    """Validate model interpretation against the original, bounded PHIS signals."""
+    review = _strict_object(content, REVIEW_KEYS)
+    decision = review["decision"]
+    if decision not in {"accept", "replan_coverage", "abstain"}:
+        raise PlanRejected("Model selected a forbidden critique decision")
+    if review["uncertainty"] not in {"confounding_and_no_causality", "coverage",
+                                      "conflicting_signals", "provenance"}:
+        raise PlanRejected("Model review uncertainty invalid")
+    if decision == "replan_coverage":
+        if (review["reason_code"] != "coverage_recheck_needed" or
+                review["uncertainty"] != "coverage" or
+                evidence.get("coverage_recheck") is not None):
+            raise PlanRejected("Model coverage challenge invalid")
+    elif decision == "accept":
+        if (review["reason_code"] != "qualified_observational_association" or
+                review["uncertainty"] != "confounding_and_no_causality"):
+            raise PlanRejected("Model acceptance lacks observational limits")
+    elif review["reason_code"] not in ABSTAIN_REASONS:
+        raise PlanRejected("Model abstention reason invalid")
+    signal_id = review["signal_id"]
+    if signal_id is None:
+        if (decision == "accept" or review["direction"] != "none" or
+                review["lag_days"] is not None):
+            raise PlanRejected("Model review citation missing")
+    else:
+        if not isinstance(signal_id, str) or not re.fullmatch(r"[0-9a-f]{64}", signal_id):
+            raise PlanRejected("Model review signal ID invalid")
+        signal = next((item for item in evidence.get("signals", [])
+                       if item["signal_id"] == signal_id), None)
+        if signal is None or (decision == "accept" and signal["classification"] != "candidate_signal"):
+            raise PlanRejected("Model review cites unsupported signal")
+        if (review["direction"] != ("positive" if signal["effect"] > 0 else "negative") or
+                type(review["lag_days"]) is not int or
+                review["lag_days"] != signal["lag_days"]):
+            raise PlanRejected("Model review direction or timing contradicts PHIS")
+    if decision == "replan_coverage" and signal_id is not None:
+        raise PlanRejected("Coverage challenge must cite the coverage gate")
+    return review
+
+
 class NightshiftPlanner:
     """Use discovered Meterless route and retain only provider-supplied IDs."""
 
@@ -193,34 +239,71 @@ class NvidiaPlanner(NightshiftPlanner):
                     "tool must be discovery, trend, coverage or abstain. Select a tool only; "
                     "do not execute it or invent findings.")
         if role == "evidence_verifier":
-            return (SYSTEM + " CRITIQUE output contract: return exactly one top-level JSON key, "
-                    "decision, whose value is a string. The only valid complete outputs are "
-                    '{"decision":"accept"}, {"decision":"replan_coverage"}, or '
-                    '{"decision":"abstain"}. No parameters, explanation, extra keys, '
-                    "prose or Markdown. Accept only grounded tool evidence; request coverage "
-                    "when evidence needs checking; abstain if evidence is missing or invalid. "
-                    "Use the supplied PHIS signal classifications, effect, N, lag, q and "
-                    "robustness metadata, coverage and provenance to judge the bounded claim. "
-                    "Distinguish ordinary non-causal uncertainty from a failed data gate. "
-                    "A coverage_recheck reports the existing deterministic threshold outcome; "
-                    "do not treat a high observed count alone as proof of causation. "
+            return (SYSTEM + " CRITIQUE contract: return exactly six top-level JSON keys: "
+                    "decision, reason_code, signal_id, direction, lag_days, uncertainty. "
+                    "No nesting, prose, extra keys or invented numbers. Copy signal_id and "
+                    "lag_days exactly from evidence.signals; direction must match the sign "
+                    "of that signal's effect. For accept, cite a candidate_signal and use "
+                    "reason_code=qualified_observational_association and "
+                    "uncertainty=confounding_and_no_causality. Accept only the bounded "
+                    "observational interpretation, never a cause or clinical advice. "
+                    "For replan_coverage use reason_code=coverage_recheck_needed, "
+                    "uncertainty=coverage, signal_id=null, direction=none, lag_days=null; "
+                    'example: {"decision":"replan_coverage","reason_code":"coverage_recheck_needed",'
+                    '"signal_id":null,"direction":"none","lag_days":null,"uncertainty":"coverage"}. '
+                    "never request another recheck after coverage_recheck exists. "
+                    "For abstain use reason_code=unsupported_interpretation, "
+                    "conflicting_signals, causal_scope or invalid_evidence; cite an actual "
+                    "signal if relevant, otherwise use null/none/null. Uncertainty must be "
+                    "confounding_and_no_causality, coverage, conflicting_signals or provenance. "
+                    "Ordinary non-causal uncertainty does not negate PHIS scientific qualification. "
+                    "The coverage_recheck reports the deterministic threshold outcome. "
                     "Do not calculate, alter or invent measurements or statistical results.")
         raise InferenceBlocked("Unknown NVIDIA planner role")
 
+    def critique(self, question, plan, evidence):
+        content, receipt = self._complete({"role": "evidence_verifier", "question": question,
+                                           "plan": plan, "evidence": evidence,
+                                           "schema": {"decision": ["accept", "replan_coverage", "abstain"],
+                                                      "reason_code": ["qualified_observational_association",
+                                                                      "coverage_recheck_needed",
+                                                                      *sorted(ABSTAIN_REASONS)],
+                                                      "signal_id": "PHIS signal ID or null",
+                                                      "direction": ["positive", "negative", "none"],
+                                                      "lag_days": "PHIS lag_days or null",
+                                                      "uncertainty": ["confounding_and_no_causality",
+                                                                      "coverage", "conflicting_signals", "provenance"]}})
+        return parse_nemotron_review(content, evidence), receipt
+
 
 def _decision_event(store, run_id, *, phase, plan, decision, receipt, digest,
-                    evidence_event_id, parent_run_id, source_ids):
+                    evidence_event_id, parent_run_id, source_ids, review=None,
+                    review_reason_code=None):
+    payload = {"phase": phase, "family": plan["family"],
+               "tool": plan["tool"], "decision": decision,
+               "provider_status": receipt["status"],
+               "provider_request_id": receipt["request_id"],
+               "provider_response_id": receipt["response_id"],
+               "provider_model": receipt["model"],
+               "source_digest_sha256": digest,
+               "evidence_event_id": evidence_event_id,
+               "parent_run_id": parent_run_id}
+    if phase == "VERIFY":
+        payload.update({"review_reason_code": review["reason_code"] if review else review_reason_code,
+                        "cited_signal_id": review["signal_id"] if review else None,
+                        "direction": review["direction"] if review else "none",
+                        "lag_days": review["lag_days"] if review else None,
+                        "uncertainty": review["uncertainty"] if review else None})
     return store.append(run_id=run_id, kind="agent_decision_180d",
-                        payload={"phase": phase, "family": plan["family"],
-                                 "tool": plan["tool"], "decision": decision,
-                                 "provider_status": receipt["status"],
-                                 "provider_request_id": receipt["request_id"],
-                                 "provider_response_id": receipt["response_id"],
-                                 "provider_model": receipt["model"],
-                                 "source_digest_sha256": digest,
-                                 "evidence_event_id": evidence_event_id,
-                                 "parent_run_id": parent_run_id},
+                        payload=payload,
                         source_record_ids=source_ids)
+
+
+def _model_critique(planner, question, plan, packet):
+    answer, receipt = planner.critique(question, plan, packet)
+    if isinstance(answer, dict):
+        return answer["decision"], answer, receipt
+    return answer, None, receipt
 
 
 def _coverage(rows, family):
@@ -388,6 +471,12 @@ def investigate_agentic(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY",
                 "status": "ERROR" if reason == "source_error" else "BLOCKED",
                 "reason_code": reason, "mode": mode, "synthetic": True,
                 "planner_mode": "BLOCKED", "scientific_evidence": None,
+                 "scientific_qualification": {"status": "UNAVAILABLE", "evidence_event_id": None},
+                 "nemotron_review": {"status": "NOT_CONNECTED", "decision": None,
+                                     "reason_code": None, "signal_id": None, "direction": "none",
+                                     "lag_days": None, "uncertainty": None,
+                                     "provider_response_id": None, "event_id": None,
+                                     "coverage_recheck_event_id": None},
                 "comparison": None, "longitudinal": None, "series": [], "coverage": [],
                 "findings": [], "tool_trace": [],
                 "summary": "Verified source evidence is unavailable; no scientific finding was produced.",
@@ -396,7 +485,9 @@ def investigate_agentic(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY",
                                    {"sponsor": "meterless_engine", "status": "NOT_CONNECTED",
                                     "trace_id": None},
                                    {"sponsor": "meterless_runtime", "status": "NOT_CONNECTED",
-                                    "trace_id": None}]}
+                                     "trace_id": None},
+                                    {"sponsor": "nemotron", "status": "NOT_CONNECTED",
+                                     "trace_id": None}]}
     if mode == "LIVE_SYNTHETIC_ZETARIS":
         try:
             source_client = live_zetaris_client()
@@ -535,6 +626,8 @@ def investigate_agentic(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY",
     science_event = science[-1] if science else None
     packet = None
     critique_failure = None
+    review = None
+    replan_event = None
     if result["status"] == "PASS":
         try:
             packet = _critic_evidence_packet(result, plan, digest, science_event,
@@ -548,16 +641,18 @@ def investigate_agentic(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY",
     else:
         try:
             if planner_mode in {verified_mode, "SIMULATED"}:
-                decision, critique_receipt = planner.critique(question, plan, packet)
+                decision, review, critique_receipt = _model_critique(planner, question, plan, packet)
             else:
                 decision, critique_receipt = "accept", blocked_receipt
         except InferenceBlocked:
             decision, critique_receipt = "abstain", blocked_receipt
             critique_failure = "model_unavailable"
         except PlanRejected:
-            decision, critique_receipt = "abstain", blocked_receipt
+            decision = "abstain"
+            critique_receipt = (planner.receipts[-1] if getattr(planner, "receipts", [])
+                                and len(planner.receipts) > 1 else blocked_receipt)
             critique_failure = "invalid_critique"
-    if planner_mode == verified_mode and critique_receipt["status"] != "VERIFIED":
+    if planner_mode == verified_mode and (critique_receipt["status"] != "VERIFIED" or critique_failure):
         planner_mode = "NVIDIA_PARTIAL" if provider == "nvidia" else "NIGHTSHIFT_PARTIAL"
 
     verification_evidence_id = tool_event["event_id"]
@@ -566,7 +661,8 @@ def investigate_agentic(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY",
         challenge_event = _decision_event(world_model, run_id, phase="VERIFY", plan=plan,
                                           decision="replan", receipt=critique_receipt,
                                           digest=digest, evidence_event_id=tool_event["event_id"],
-                                          parent_run_id=parent_run_id, source_ids=source_ids)
+                                           parent_run_id=parent_run_id, source_ids=source_ids,
+                                           review=review, review_reason_code="coverage_recheck_needed")
         trace.append({"phase": "VERIFY", "tool": provider + ".evidence_verifier",
                       "status": critique_receipt["status"], "decision": "replan_coverage",
                       "provider_response_id": critique_receipt["response_id"],
@@ -606,38 +702,49 @@ def investigate_agentic(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY",
             rechecked_packet = {**packet, "coverage_recheck": coverage_material,
                                 "prior_decision": "replan_coverage"}
             try:
-                final_decision, final_receipt = planner.critique(question, plan, rechecked_packet)
+                final_decision, final_review, final_receipt = _model_critique(
+                    planner, question, plan, rechecked_packet)
             except InferenceBlocked:
                 final_decision, final_receipt = "abstain", blocked_receipt
+                final_review = None
                 critique_failure = "model_unavailable"
             except PlanRejected:
-                final_decision, final_receipt = "abstain", blocked_receipt
+                final_decision = "abstain"
+                final_receipt = (planner.receipts[-1] if getattr(planner, "receipts", [])
+                                 and len(planner.receipts) > 2 else blocked_receipt)
+                final_review = None
                 critique_failure = "invalid_critique"
-            if final_receipt["status"] != "VERIFIED" and planner_mode == verified_mode:
+            if (final_receipt["status"] != "VERIFIED" or critique_failure) and planner_mode == verified_mode:
                 planner_mode = "NVIDIA_PARTIAL" if provider == "nvidia" else "NIGHTSHIFT_PARTIAL"
-            decision, critique_receipt = final_decision, final_receipt
+            decision, review, critique_receipt = final_decision, final_review, final_receipt
             if decision != "accept":
                 decision = "abstain"
-                result = {"status": "BLOCKED", "reason_code": critique_failure or "evidence_review_required",
-                          "summary": "The scientific coverage gate passed, but evidence review did not accept a finding.",
-                          "coverage": coverage, "scientific_evidence": None, "findings": [],
-                          "tool_trace": result.get("tool_trace", [])}
+                # A model veto does not erase deterministic PHIS-qualified facts.
         else:
             decision, critique_receipt = "abstain", blocked_receipt
+            review = None
+            critique_failure = "recheck_failed"
             result = {"status": "BLOCKED", "reason_code": "evidence_review_required",
                       "summary": "The requested coverage recheck did not establish an accepted scientific result.",
                       "coverage": coverage, "scientific_evidence": None, "findings": [],
                       "tool_trace": result.get("tool_trace", [])}
     elif decision == "abstain" and result["status"] == "PASS":
-        result = {"status": "BLOCKED", "reason_code": critique_failure or "evidence_rejected",
-                  "summary": "The evidence verifier abstained; no scientific finding is presented.",
-                  "scientific_evidence": None, "findings": [], "tool_trace": result.get("tool_trace", [])}
+        if critique_failure == "evidence_packet_invalid" or (
+                plan["tool"] == "discovery" and science_event is None):
+            # A disagreement with persisted science is a provenance failure,
+            # distinct from a model refusing a valid observational result.
+            critique_failure = "evidence_packet_invalid"
+            result = {"status": "BLOCKED", "reason_code": critique_failure,
+                      "summary": "Scientific evidence provenance could not be verified.",
+                      "scientific_evidence": None, "findings": [],
+                      "tool_trace": result.get("tool_trace", [])}
     # A deterministic weak-coverage result is retained verbatim. No model can
     # convert a failing PHIS gate to PASS or label adequate data insufficient.
     verify_event = _decision_event(world_model, run_id, phase="VERIFY", plan=plan,
                                    decision=decision, receipt=critique_receipt, digest=digest,
                                    evidence_event_id=verification_evidence_id,
-                                   parent_run_id=parent_run_id, source_ids=source_ids)
+                                    parent_run_id=parent_run_id, source_ids=source_ids,
+                                    review=review, review_reason_code=critique_failure)
     local_verifier = critique_receipt["status"] == "BLOCKED"
     trace.append({"phase": "VERIFY", "tool": "local.evidence_verifier" if local_verifier
                   else provider + ".evidence_verifier",
@@ -658,6 +765,32 @@ def investigate_agentic(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY",
                    "nightshift_receipts": getattr(planner, "receipts", []) if provider == "nightshift" else [],
                    "inference_receipts": getattr(planner, "receipts", []),
                    "source_digest_sha256": digest})
+    scientific_pass = (plan["tool"] == "discovery" and result["status"] == "PASS" and
+                       science_event is not None and packet is not None)
+    result["scientific_qualification"] = {
+        "status": ("PASS" if scientific_pass else "NOT_APPLICABLE" if plan["tool"] != "discovery"
+                   else result["status"]),
+        "evidence_event_id": science_event_id if scientific_pass else None}
+    if provider != "nvidia" or planner_mode == "LOCAL DETERMINISTIC MODE":
+        review_status = "NOT_CONNECTED"
+    elif planner_mode == "SIMULATED" and review is not None:
+        review_status = "SIMULATED"
+    elif critique_failure:
+        review_status = "FAILED"
+    elif review is not None:
+        review_status = "ACCEPTED" if decision == "accept" else "ABSTAINED"
+    else:
+        review_status = "NOT_CONNECTED"
+    result["nemotron_review"] = {
+        "status": review_status, "decision": decision if review_status != "NOT_CONNECTED" else None,
+        "reason_code": review["reason_code"] if review else critique_failure,
+        "signal_id": review["signal_id"] if review else None,
+        "direction": review["direction"] if review else "none",
+        "lag_days": review["lag_days"] if review else None,
+        "uncertainty": review["uncertainty"] if review else None,
+        "provider_response_id": critique_receipt["response_id"],
+        "event_id": verify_event["event_id"],
+        "coverage_recheck_event_id": replan_event["event_id"] if replan_event else None}
     result.setdefault("comparison", None)
     result.setdefault("longitudinal", None)
     result.setdefault("series", [])
@@ -679,8 +812,12 @@ def investigate_agentic(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY",
     proofs.append({"sponsor": "meterless_runtime", "status": "VERIFIED" if planner_mode == "NIGHTSHIFT_VERIFIED"
                    and critique_receipt["status"] == "VERIFIED" else "NOT_CONNECTED",
                    "trace_id": critique_receipt["response_id"] if planner_mode == "NIGHTSHIFT_VERIFIED" else None})
-    proofs.append({"sponsor": "nemotron", "status": "VERIFIED" if planner_mode == "NVIDIA_VERIFIED"
-                   and critique_receipt["status"] == "VERIFIED" else "NOT_CONNECTED",
-                   "trace_id": critique_receipt["response_id"] if planner_mode == "NVIDIA_VERIFIED" else None})
+    nvidia_receipts = ([item for item in getattr(planner, "receipts", [])
+                        if item["status"] == "VERIFIED"] if provider == "nvidia" else [])
+    nvidia_status = ("VERIFIED" if review_status in {"ACCEPTED", "ABSTAINED"}
+                     and critique_receipt["status"] == "VERIFIED" else
+                     "PARTIAL" if nvidia_receipts else "NOT_CONNECTED")
+    proofs.append({"sponsor": "nemotron", "status": nvidia_status,
+                   "trace_id": nvidia_receipts[-1]["response_id"] if nvidia_receipts else None})
     result["sponsor_proofs"] = proofs
     return result

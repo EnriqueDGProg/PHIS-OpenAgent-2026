@@ -406,6 +406,14 @@ button:focus-visible, textarea:focus-visible, a:focus-visible, summary:focus-vis
 .secondary-panel > p { color: #62786a; font-size: 11px; line-height: 1.55; margin: 0 0 14px; }
 .secondary-panel .trajectory-strip { margin: 14px 0; }
 .secondary-panel .period-card { min-height: 0; box-shadow: none; }
+.nemotron-review { margin-top: 18px; padding: 18px 20px; border: 1px solid #cfded5; border-left: 4px solid #5a8066; border-radius: var(--radius-sm); background: #f8fbf8; }
+.nemotron-review[hidden] { display: none; }
+.nemotron-review h3 { margin: 7px 0 9px; color: var(--forest); font: 700 17px/1.3 'Manrope', sans-serif; }
+.nemotron-review p { color: #415c49; font-size: 12px; line-height: 1.5; }
+.nemotron-review-reason { margin-bottom: 0; font-weight: 600; }
+.nemotron-review details { margin-top: 12px; font-size: 11px; color: #526e5b; }
+.nemotron-review summary { cursor: pointer; }
+.nemotron-review details p { overflow-wrap: anywhere; margin: 7px 0 0; font-size: 10px; }
 .recent-observation .finding-card { min-height: 0; box-shadow: none; }
 .recent-observation .finding-card p { flex: none; }
 .chart-card, .period-card, .finding-card {
@@ -571,6 +579,8 @@ button:focus-visible, textarea:focus-visible, a:focus-visible, summary:focus-vis
 .proof-badge.verified   .badge-dot { background: #4c9060; }
 .proof-badge.verified   { border-color: #b4dab4; color: #2a5a38; background: #f0f8f0; }
 .proof-badge.not-connected .badge-dot { background: #b0b8b0; }
+.proof-badge.partial { border-color: #e6d4a5; color: #765b22; background: #fff9e9; }
+.proof-badge.partial .badge-dot { background: #be9643; }
 .proof-badge.failed     .badge-dot { background: #c05040; }
 .proof-badge.failed     { border-color: #e8b8b0; color: #8f3428; background: #fdf0ee; }
 

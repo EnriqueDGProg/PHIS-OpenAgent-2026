@@ -217,6 +217,56 @@ export function validateLongitudinalInvestigation(value) {
         'SIMULATED', 'LOCAL DETERMINISTIC MODE', 'BLOCKED']
         .includes(value.planner_mode))
     throw new Error('Unknown planner provenance');
+  if (value.contract_version === 'investigation.v4') {
+    const science = value.scientific_qualification;
+    const review = value.nemotron_review;
+    const nemotron = value.sponsor_proofs.find(p => p.sponsor === 'nemotron');
+    if (!science || !review || !nemotron ||
+        !['PASS', 'NOT_APPLICABLE', 'INSUFFICIENT_DATA', 'BLOCKED', 'ERROR', 'UNAVAILABLE']
+          .includes(science.status) ||
+        !['ACCEPTED', 'ABSTAINED', 'FAILED', 'SIMULATED', 'NOT_CONNECTED']
+          .includes(review.status) ||
+        !['VERIFIED', 'PARTIAL', 'NOT_CONNECTED'].includes(nemotron.status) ||
+        (science.status === 'PASS') !== !!value.scientific_evidence ||
+        (science.status === 'PASS' && (value.status !== 'PASS' ||
+          !/^[a-f0-9]{64}$/.test(science.evidence_event_id) ||
+          (value.source_digest_sha256 &&
+            value.source_digest_sha256 !== value.scientific_evidence.record_digest_sha256) ||
+          !value.tool_trace.some(step => step.trace_id === science.evidence_event_id))) ||
+        (science.status !== 'PASS' && science.evidence_event_id !== null))
+      throw new Error('Scientific qualification and review are not independent');
+    if (['ACCEPTED', 'ABSTAINED'].includes(review.status)) {
+      if (review.decision !== (review.status === 'ACCEPTED' ? 'accept' : 'abstain') ||
+          nemotron.status !== 'VERIFIED' ||
+          review.provider_response_id !== nemotron.trace_id ||
+          !value.tool_trace.some(step => step.provider_response_id === review.provider_response_id &&
+            step.event_id === review.event_id) ||
+          (review.status === 'ACCEPTED' && science.status !== 'PASS'))
+        throw new Error('Untraced or unsupported Nemotron review');
+      if (review.status === 'ACCEPTED' &&
+          (review.reason_code !== 'qualified_observational_association' ||
+           review.uncertainty !== 'confounding_and_no_causality') ||
+          review.status === 'ABSTAINED' &&
+          !['unsupported_interpretation', 'conflicting_signals', 'causal_scope', 'invalid_evidence']
+            .includes(review.reason_code))
+        throw new Error('Nemotron reason does not match its decision');
+      if (review.signal_id !== null) {
+        const signal = value.scientific_evidence?.signals?.find(s => s.signal_id === review.signal_id);
+        if (!signal || review.direction !== (signal.effect > 0 ? 'positive' : 'negative') ||
+            review.lag_days !== signal.lag_days ||
+            (review.status === 'ACCEPTED' && signal.classification !== 'candidate_signal'))
+          throw new Error('Nemotron citation contradicts PHIS evidence');
+      } else if (review.status === 'ACCEPTED' || review.direction !== 'none' || review.lag_days !== null) {
+        throw new Error('Nemotron citation missing');
+      }
+    } else if (nemotron.status === 'VERIFIED') {
+      throw new Error('Sponsor badge claims an unverified Nemotron review');
+    }
+    if (nemotron.status === 'PARTIAL' &&
+        (!nemotron.trace_id || !value.inference_receipts?.some(r =>
+          r.status === 'VERIFIED' && r.response_id === nemotron.trace_id)))
+      throw new Error('Untraced partial Nemotron call');
+  }
   return value;
 }
 
