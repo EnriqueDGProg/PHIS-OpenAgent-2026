@@ -14,12 +14,15 @@
 - [x] Five pre-existing PHIS Discovery modules and scoped MIT [NOTICE](../src/phis_master/NOTICE.md); vendored World Model Apache-2.0.
 - [x] [Sponsor matrix](CAPABILITY_AND_SPONSOR_MATRIX.md) distinguishes actual run modes and disconnected components.
 - [x] [Script and storyboard](DEMO_SCRIPT_AND_STORYBOARD.md) prepared for tomorrow; no video recorded tonight.
+- [x] Anonymous clean clone of submission branch at `d984d849392311a8910bad8f3ec5ac872286e14f`: application, scientific NOTICE, vendored Apache license and final deck present. Its own temporary no-key server returned HTTP 200, Energy PASS and parent-linked Sleep PASS; the temporary server was stopped.
+- [x] Frontend unit/contract tests: 25/25 PASS; official Meterless World Model conformance: 8/8 PASS; final deck: ten slides, structural validation with zero warnings; bounded changed-text secret scan and `git diff --check`: PASS.
+- [ ] Current focused Python suite: sandboxed run failed on Windows temporary-file permissions; a permission-corrected run produced no output for two minutes and was stopped. The authenticated browser run and clean-clone smoke passed, but this suite is **not claimed PASS** for the package branch. See its CI result before release approval.
 
 ## Final technical/public checks
 
 - [ ] Confirm this submission Draft PR CI passes and record its final SHA/CI URL.
-- [ ] Public clean clone of the final branch/default branch opens the app with documented Python/Node versions and no credentials; run a bounded smoke. Record exact SHA and result.
-- [ ] Bounded tracked-file secret scan and `git diff --check` on the final SHA; inspect every newly published screenshot/deck for credential fragments.
+- [ ] After final documentation commit, reconfirm clean-clone SHA and the default branch after reviewed merge; the published branch's no-key smoke already passed.
+- [ ] Recheck bounded secret scan and `git diff --check` on the final SHA; newly published screenshots/deck were visually inspected.
 - [ ] Verify the final approved public `main` includes application, five authorized modules, MIT/Apache notices, scripts, deck and current README. Review/merge is a founder action.
 - [ ] Inspect the actual signed-in HackOS form again: Track 02, solo roster, Description length, video limit, deck upload and deadline.
 - [ ] Browser QA on the final public SHA: both Energy/Sleep start with 180-day history; six intervals, source links, qualified vs exploratory patterns, separate Nemotron review, recent 28-day panel secondary, memory-linked follow-up, clinical abstention, truthful sponsor badges; desktop/mobile no overflow or console errors.
