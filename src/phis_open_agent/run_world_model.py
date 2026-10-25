@@ -100,7 +100,28 @@ def _make_event(run_id, kind, payload, source_record_ids):
         expected = {"phase", "family", "tool", "decision", "provider_status",
                     "provider_request_id", "provider_response_id", "provider_model", "source_digest_sha256",
                     "evidence_event_id", "parent_run_id"}
-        valid_payload = (isinstance(payload, dict) and set(payload) == expected
+        review_keys = {"review_reason_code", "cited_signal_id", "direction", "lag_days", "uncertainty"}
+        has_review = isinstance(payload, dict) and set(payload) == expected | review_keys
+        review_valid = (not has_review or
+                        payload["phase"] == "VERIFY" and
+                        (payload["review_reason_code"] is None or
+                         payload["review_reason_code"] in {
+                             "qualified_observational_association", "coverage_recheck_needed",
+                             "unsupported_interpretation", "conflicting_signals", "causal_scope",
+                             "invalid_evidence", "invalid_critique", "model_unavailable",
+                             "evidence_packet_invalid", "recheck_failed", "not_connected"}) and
+                        (payload["cited_signal_id"] is None or
+                         isinstance(payload["cited_signal_id"], str) and
+                         re.fullmatch(r"[0-9a-f]{64}", payload["cited_signal_id"])) and
+                        payload["direction"] in {"positive", "negative", "none"} and
+                        (payload["lag_days"] is None or
+                         type(payload["lag_days"]) is int and -30 <= payload["lag_days"] <= 30) and
+                        payload["uncertainty"] in {None, "confounding_and_no_causality",
+                                                   "coverage", "conflicting_signals", "provenance"} and
+                        (payload["cited_signal_id"] is not None or
+                         payload["direction"] == "none" and payload["lag_days"] is None))
+        valid_payload = (isinstance(payload, dict) and
+                         (set(payload) == expected or has_review) and review_valid
                          and payload["phase"] in {"PLAN", "VERIFY"}
                          and payload["family"] in {"energy", "sleep", "none"}
                          and payload["tool"] in {"discovery", "trend", "coverage", "abstain"}

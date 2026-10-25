@@ -162,6 +162,60 @@ export function canContinueFrom(run) {
       proof.sponsor === 'meterless_engine' && proof.status === 'VERIFIED') === true;
 }
 
+const REVIEW_REASONS = {
+  qualified_observational_association: 'A cited PHIS association supports an observational reading, with confounding and causal limits.',
+  coverage_recheck_needed: 'The model asked for a deterministic coverage check.',
+  unsupported_interpretation: 'The model found its proposed interpretation unsupported by the cited evidence.',
+  conflicting_signals: 'The model flagged conflicting signal interpretations.',
+  causal_scope: 'The model declined to infer a cause from observational associations.',
+  invalid_evidence: 'The model questioned the evidence supplied for interpretation.',
+  invalid_critique: 'The model output did not meet the strict review contract.',
+  model_unavailable: 'The hosted review was unavailable.',
+  recheck_failed: 'The deterministic coverage recheck did not pass.',
+  evidence_packet_invalid: 'The review packet did not match persisted scientific provenance.',
+};
+
+export function nemotronReviewPresentation(run) {
+  if (run?.contract_version !== 'investigation.v4') return null;
+  const review = run.nemotron_review;
+  if (!review) return null;
+  const sciencePassed = run.scientific_qualification?.status === 'PASS';
+  const cited = review.signal_id && run.scientific_evidence?.signals?.find(
+    item => item.signal_id === review.signal_id);
+  const citation = cited ? `PHIS signal ${cited.signal_id.slice(0, 12)}…` : null;
+  const base = {
+    reason: REVIEW_REASONS[review.reason_code] ?? 'No additional interpretation was verified.',
+    citation,
+    providerId: review.provider_response_id,
+    eventId: review.event_id,
+    signalId: cited?.signal_id ?? null,
+  };
+  if (review.status === 'ACCEPTED') return {
+    ...base, title: 'Nemotron reviewed the observational interpretation',
+    message: `${citation} was cited with its original ${review.direction} direction and ${review.lag_days === 0 ? 'same-day' : `${review.lag_days}-day lagged`} timing. Nemotron recognized confounding and did not establish a cause. PHIS owns the finding and statistics.`,
+  };
+  if (review.status === 'ABSTAINED') return {
+    ...base, title: 'Nemotron did not endorse another interpretation',
+    message: sciencePassed
+      ? 'PHIS-qualified observations and associations remain visible above. The model abstained from adding its interpretation.'
+      : 'The model abstained; no PHIS scientific result was qualified for this run.',
+  };
+  if (review.status === 'FAILED') return {
+    ...base, title: 'Nemotron review could not be verified',
+    message: sciencePassed
+      ? 'PHIS-qualified observations and associations remain visible above. No model interpretation is endorsed.'
+      : 'No model interpretation or PHIS scientific result is published for this run.',
+  };
+  return {
+    ...base, title: review.status === 'SIMULATED'
+      ? (review.decision === 'abstain' ? 'Simulated abstention test' : 'Simulated review only')
+      : 'Nemotron did not review this run',
+    message: sciencePassed
+      ? 'The visible results are PHIS Discovery findings. No hosted Nemotron interpretation is claimed.'
+      : 'No hosted Nemotron interpretation is claimed.',
+  };
+}
+
 export const TRACE_GROUPS = [
   { phases: ['PLAN'], label: 'Plan investigation' },
   { phases: ['TOOLS'], label: 'Analyze scientific evidence' },

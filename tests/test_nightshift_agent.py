@@ -41,9 +41,9 @@ class PlannerContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             store = MeterlessRunWorldModel(Path(folder) / "events.jsonl")
             transport = ScriptedTransport('{"family":"energy","tool":"trend"}',
-                                          '{"decision":"accept"}',
+                                          '{"decision":"abstain","reason_code":"unsupported_interpretation","signal_id":null,"direction":"none","lag_days":null,"uncertainty":"provenance"}',
                                           '{"family":"sleep","tool":"coverage"}',
-                                          '{"decision":"replan_coverage"}')
+                                          '{"decision":"replan_coverage","reason_code":"coverage_recheck_needed","signal_id":null,"direction":"none","lag_days":null,"uncertainty":"coverage"}')
             planner = NvidiaPlanner(NvidiaClient(
                 NvidiaConfig.from_env({"NVIDIA_API_KEY": "simulated-token"}), transport))
             self.assertFalse(planner.requires_http_request_id)
@@ -71,8 +71,8 @@ class PlannerContractTests(unittest.TestCase):
             critique_system = json.loads(transport.requests[1][0].data)["messages"][0]["content"]
             self.assertIn('exactly two top-level JSON keys, family and tool', plan_system)
             self.assertIn('No parameters, arguments, nested objects', plan_system)
-            self.assertIn('exactly one top-level JSON key, decision', critique_system)
-            self.assertIn('{"decision":"abstain"}', critique_system)
+            self.assertIn('exactly six top-level JSON keys', critique_system)
+            self.assertIn('coverage_recheck_needed', critique_system)
             for result in (first, second):
                 self.assertEqual(next(p for p in result["sponsor_proofs"]
                                       if p["sponsor"] == "nemotron")["status"], "NOT_CONNECTED")

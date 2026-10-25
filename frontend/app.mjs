@@ -5,7 +5,7 @@
  */
 import { fetchInvestigation } from './client.mjs';
 import { windowDays, isOfflineScientificRun, sourceLabel, canContinueFrom, longitudinalPresentation,
-  comparisonExplanation, findingExplanation, plainDate, displayChange,
+  comparisonExplanation, findingExplanation, nemotronReviewPresentation, plainDate, displayChange,
   trajectoryArrow, TRACE_GROUPS } from './presentation.mjs';
 
 // ─── DOM helpers ──────────────────────────────────────────────────────────────
@@ -446,6 +446,27 @@ function renderFindings(run) {
   other.forEach((finding, index) => grid.append(findingCard(run, finding, qualified.length + index)));
 }
 
+function renderNemotronReview(run) {
+  const panel = $('#nemotron-review');
+  const view = nemotronReviewPresentation(run);
+  panel.hidden = !view;
+  $('#nemotron-review-provenance').replaceChildren();
+  if (!view) return;
+  $('#nemotron-review-title').textContent = view.title;
+  $('#nemotron-review-message').textContent = view.message;
+  $('#nemotron-review-reason').textContent = view.reason;
+  const details = $('#nemotron-review-provenance');
+  for (const [label, value] of [
+    ['Provider response', view.providerId], ['World Model event', view.eventId],
+    ['Cited PHIS signal', view.signalId],
+  ]) {
+    if (!value) continue;
+    const line = document.createElement('p');
+    line.textContent = `${label}: ${value}`;
+    details.append(line);
+  }
+}
+
 // ─── Sponsor proof bar ────────────────────────────────────────────────────────
 const SPONSOR_LABELS = {
   zetaris:           'Zetaris',
@@ -464,7 +485,7 @@ function renderSponsorBar(run) {
   for (const proof of run.sponsor_proofs) {
     const badge = document.createElement('div');
     const statusClass = proof.status === 'VERIFIED' ? 'verified'
-      : proof.status === 'FAILED' ? 'failed' : 'not-connected';
+      : proof.status === 'FAILED' ? 'failed' : proof.status === 'PARTIAL' ? 'partial' : 'not-connected';
     badge.className = `proof-badge ${statusClass}`;
     badge.title = proof.trace_id ? `Trace ID: ${proof.trace_id}` : 'No trace ID';
 
@@ -516,6 +537,8 @@ function clearPresentation(message) {
   $('#period-description').textContent = 'Awaiting a valid comparison.';
   $('#period-footnote').textContent = 'No figure to compare';
   $('#findings').replaceChildren();
+  $('#nemotron-review').hidden = true;
+  $('#nemotron-review-provenance').replaceChildren();
   $('#finding-count').textContent = 'NO CURRENT FINDINGS';
   $('#evidence-tier-legend').hidden = true;
   $('#findings-method').hidden = true;
@@ -1110,10 +1133,11 @@ form.addEventListener('submit', async event => {
     renderTrajectory(currentRun);
     renderPeriod(currentRun);
     renderFindings(currentRun);
+    renderNemotronReview(currentRun);
     renderSponsorBar(currentRun);
     $('#global-study-limit').hidden = !(currentRun.status === 'PASS' && currentRun.scientific_evidence);
     $('#findings-title').textContent = currentRun.status === 'PASS' && currentRun.scientific_evidence
-      ? 'Supported 180-day associations' : 'No verified association published';
+      ? 'PHIS Discovery: qualified 180-day associations' : 'No verified association published';
     $('#findings-method').hidden = !(currentRun.status === 'PASS' && currentRun.scientific_evidence);
     if (currentRun.status === 'PASS' && currentRun.scientific_evidence) {
       $('#findings-method').textContent = `PHIS Discovery ran ${currentRun.scientific_evidence.hypothesis_count} pre-planned tests on the full record for this question. These cards show the qualified findings returned by Python; inspect all tests and exact source IDs in Evidence.`;

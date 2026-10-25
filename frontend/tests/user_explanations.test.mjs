@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { canContinueFrom, comparisonExplanation, displayChange, findingExplanation,
-  longitudinalPresentation,
+  longitudinalPresentation, nemotronReviewPresentation,
   signalExplanation, TRACE_GROUPS } from '../presentation.mjs';
 
 const run = {
@@ -98,6 +98,28 @@ test('follow-up action requires a verified persisted scientific parent', () => {
   assert.equal(canContinueFrom({ ...run, scientific_evidence: null }), false);
   assert.equal(canContinueFrom({ ...run, sponsor_proofs: [{ sponsor: 'meterless_engine', status: 'NOT_CONNECTED' }] }), false);
   assert.equal(canContinueFrom({ ...run, contract_version: 'investigation.v1' }), false);
+});
+
+test('PHIS findings remain distinct from accepted, abstained and failed Nemotron interpretation', () => {
+  const reviewed = { ...run, contract_version: 'investigation.v4',
+    scientific_qualification: { status: 'PASS' },
+    nemotron_review: { status: 'ACCEPTED', decision: 'accept',
+      reason_code: 'qualified_observational_association', signal_id: 'sleep',
+      direction: 'positive', lag_days: 0, provider_response_id: 'chatcmpl-real',
+      event_id: 'world-event' } };
+  const accepted = nemotronReviewPresentation(reviewed);
+  assert.match(accepted.message, /PHIS owns the finding and statistics/);
+  assert.match(accepted.message, /same-day timing/);
+  assert.doesNotMatch(accepted.message, /caused|diagnosis/i);
+  const abstained = nemotronReviewPresentation({ ...reviewed, nemotron_review: {
+    ...reviewed.nemotron_review, status: 'ABSTAINED', decision: 'abstain',
+    reason_code: 'causal_scope' } });
+  assert.match(abstained.message, /PHIS-qualified observations and associations remain visible/);
+  assert.match(abstained.reason, /declined to infer a cause/);
+  const failed = nemotronReviewPresentation({ ...reviewed, nemotron_review: {
+    ...reviewed.nemotron_review, status: 'FAILED', reason_code: 'invalid_critique' } });
+  assert.match(failed.message, /No model interpretation is endorsed/);
+  assert.equal(nemotronReviewPresentation(run), null);
 });
 
 test('primary trace groups only recorded phases and retains the four-step order', () => {

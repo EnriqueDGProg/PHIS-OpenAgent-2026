@@ -46,7 +46,41 @@ test('v4 keeps local planner separate from live sponsor proof', () => {
   const result = live(); result.contract_version = 'investigation.v4';
   result.planner_mode = 'LOCAL DETERMINISTIC MODE';
   result.sponsor_proofs.push({ sponsor: 'meterless_runtime', status: 'NOT_CONNECTED', trace_id: null });
+  result.sponsor_proofs.push({ sponsor: 'nemotron', status: 'NOT_CONNECTED', trace_id: null });
+  result.tool_trace.push({ tool: 'meterless.world_model.append', phase: 'EVIDENCE',
+    status: 'PASS', trace_id: hash });
+  result.scientific_qualification = { status: 'PASS', evidence_event_id: hash };
+  result.nemotron_review = { status: 'NOT_CONNECTED', decision: null, reason_code: null,
+    signal_id: null, direction: 'none', lag_days: null, uncertainty: null,
+    provider_response_id: null, event_id: null, coverage_recheck_event_id: null };
   assert.equal(validateLongitudinalInvestigation(result).planner_mode, 'LOCAL DETERMINISTIC MODE');
   result.sponsor_proofs[0].status = 'NOT_CONNECTED';
   assert.throws(() => validateLongitudinalInvestigation(result), /source provenance/);
+});
+
+test('v4 accepts independent PHIS science and cited Nemotron review, rejecting false endorsement', () => {
+  const result = live(); result.contract_version = 'investigation.v4';
+  result.planner_mode = 'NVIDIA_VERIFIED';
+  result.tool_trace.push({ tool: 'meterless.world_model.append', phase: 'EVIDENCE',
+    status: 'PASS', trace_id: hash });
+  result.tool_trace.push({ tool: 'nvidia.evidence_verifier', phase: 'VERIFY',
+    status: 'VERIFIED', event_id: 'b'.repeat(64), provider_response_id: 'chatcmpl-real' });
+  result.scientific_evidence.signals[0] = { signal_id: hash, exposure: 'sleep_hours',
+    classification: 'candidate_signal', effect: 0.56, lag_days: 0 };
+  result.scientific_qualification = { status: 'PASS', evidence_event_id: hash };
+  result.nemotron_review = { status: 'ACCEPTED', decision: 'accept',
+    reason_code: 'qualified_observational_association', signal_id: hash,
+    direction: 'positive', lag_days: 0, uncertainty: 'confounding_and_no_causality',
+    provider_response_id: 'chatcmpl-real', event_id: 'b'.repeat(64),
+    coverage_recheck_event_id: null };
+  result.sponsor_proofs.push({ sponsor: 'nemotron', status: 'VERIFIED', trace_id: 'chatcmpl-real' });
+  assert.equal(validateLongitudinalInvestigation(result).status, 'PASS');
+  result.nemotron_review.direction = 'negative';
+  assert.throws(() => validateLongitudinalInvestigation(result), /citation contradicts/);
+  result.nemotron_review.direction = 'positive';
+  result.nemotron_review.status = 'ABSTAINED'; result.nemotron_review.decision = 'abstain';
+  result.nemotron_review.reason_code = 'causal_scope';
+  assert.equal(validateLongitudinalInvestigation(result).scientific_qualification.status, 'PASS');
+  result.nemotron_review.status = 'FAILED';
+  assert.throws(() => validateLongitudinalInvestigation(result), /badge claims/);
 });
