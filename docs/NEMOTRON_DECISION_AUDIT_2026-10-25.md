@@ -1,5 +1,7 @@
 # P0 Nemotron decision audit — 25 October 2026
 
+> Historical audit of the PR #42 behavior. The subsequent [scientific facts and Nemotron review release gate](NEMOTRON_SCIENCE_REVIEW_GATE_2026-10-25.md) implements and verifies the narrow correction on Draft PR #43, based on PR #49. The observations and proposed target below describe the older PR #42 code, not the current PR #43 head.
+
 **Base:** Draft [PR #42](https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026/pull/42), exact application SHA `b6e3d48f66ba99b22aff91359771316208d52727`. This audit changes tests and documentation only. It does not change the scientific modules, dataset, thresholds, agent decision policy, provider adapter or UI. Earlier [PR #35](https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026/pull/35) proved a separate hosted *accept* on a local synthetic source; [PR #39](https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026/pull/39) introduced the typed evidence packet and one coverage recheck. Neither earlier run determines the decision of this combined run.
 
 ## Captured combined run: what happened
