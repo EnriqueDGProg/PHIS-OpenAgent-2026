@@ -6,9 +6,9 @@ The [judge guide to the fictional 180-day generator](docs/SYNTHETIC_GENERATOR_JU
 
 ## Release candidate
 
-This longitudinal-first review branch starts at PR #46, which layers the Issue #44 UX corrections on the integrated PR #42 candidate. The underlying release includes the 180-day scientific scenario, Zetaris adapter, official Meterless World Model Engine, bounded v4 planner, NVIDIA direct adapter and adversarial suite. The [final release gate](docs/FINAL_RELEASE_GATE_2026-10-24.md) separates earlier clean-clone proof from earlier sponsor receipts; this branch's own verification is recorded in its Draft PR. No branch has been merged or deployed.
+This submission branch is based on exact PR #43 application SHA `9c871532a2debd9877483dad9c937dbb881508ad`. The release includes the 180-day scientific scenario, Zetaris adapter, official Meterless World Model Engine, bounded v4 planner, NVIDIA direct adapter and adversarial suite. Its [authenticated same-run receipt](submission/FINAL_COMBINED_RECEIPT.md) and [submission package](submission/README.md) distinguish current proof from earlier historical gates. No branch has been merged or deployed. GitHub hosts source code, not a running application.
 
-The Python agent selects deterministic coverage, trend, and Discovery tools. Zetaris live mode reads and validates all 1,080 fictional source records in six bounded pages; a failed query abstains without substituting the local fixture. The World Model Engine persists synthetic decision events, reopens its state in a fresh process, and changes follow-up decisions. Discovery alone computes scientific results. Sponsor proofs have separate trace IDs; Meterless Runtime/Power and Nightshift must never be inferred from Engine use. NVIDIA direct inference is verified only for the specific PR #35 receipt and is not implied by Engine use or a local fallback run.
+The Python agent selects deterministic coverage, trend, and Discovery tools. Zetaris live mode reads and validates all 1,080 fictional source records in six bounded pages; a failed query abstains without substituting the local fixture. The World Model Engine persists synthetic decision events, reopens its state in a fresh process, and changes follow-up decisions. Discovery alone computes scientific results. The authenticated PR #43 Chrome run genuinely combined Zetaris, NVIDIA PLAN and CRITIQUE, PHIS Discovery and Meterless Engine on one application SHA. Meterless Runtime/Power and Nightshift remain disconnected. The credential-free local mode uses only synthetic fixtures; its Zetaris and NVIDIA statuses are `NOT_CONNECTED`.
 
 ## Run locally
 
@@ -17,7 +17,7 @@ Requires Python 3.11+ and Node.js 24. The core and Engine require no Python or n
 ```powershell
 git clone https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026.git
 cd PHIS-OpenAgent-2026
-git switch codex/phis-longitudinal-first-20261025
+git switch codex/phis-final-submission-20261025
 ```
 
 ```powershell
@@ -26,6 +26,8 @@ python -m phis_open_agent.api
 ```
 
 Open `http://127.0.0.1:4173`. The default `SYNTHETIC_LOCAL_ONLY` mode uses only fictional local rows. `/?analysis=v4` exercises the bounded agentic planner; the default `v3` route shows the deterministic scientific investigation. Engine state is under ignored `.local-state/.world/`. `PHIS_SYNTHETIC_STATE_FILE` chooses a different private local namespace. `GET /api/health` reports process health, not sponsor verification.
+
+Three [actual local example inputs and outputs](submission/EXAMPLE_INPUTS_OUTPUTS.md) show Energy PASS, a parent-linked Sleep PASS and clinical-scope abstention. This no-key judge path does not imply live sponsor calls.
 
 In v4, PHIS Discovery's qualified observational findings and the separate Nemotron interpretation have independent statuses: a model abstention or inference failure does not erase scientifically valid PHIS results. The model cannot turn an association into a causal or clinical claim. See the [scientific facts and review release gate](docs/NEMOTRON_SCIENCE_REVIEW_GATE_2026-10-25.md) for the exact genuine hosted receipt, simulated regression boundaries and screenshot.
 

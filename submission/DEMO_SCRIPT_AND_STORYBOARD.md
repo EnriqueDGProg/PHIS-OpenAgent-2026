@@ -1,34 +1,20 @@
-# 02:20 English demo script and truthful shot plan — PR #42 review
+# Recording-ready 2:45 English demo — record on 26 October
 
-**Production state: script and shot plan, not a finished PR #42 video.** The existing silent fallback WebM was recorded from older SHA `b79ba3f` and does not show the combined run. The authentic combined PR #42 investigation `SYN-RUN-c13b6edef2e0` has a screenshot and sanitized local receipt, but no continuous recording. Do not animate that still, recreate provider traffic, or cut it to appear part of the positive local run. The [official event page](https://hackathon.genai.works/event/open-agent-hackathon-2026) requires a genuine 1–4 minute demo. Target 140 seconds; adjust narration to actual captured timings and verify the exported media.
+**Script and shot order only. No video has been recorded tonight.** Use the authenticated localhost PR #43 app at `http://127.0.0.1:4208/?analysis=v4`. All records shown are fictional. Keep the run ID and current sponsor badges on screen. If a new hosted decision differs from the verified capture, narrate that actual decision; never splice it into the accepted archived run. The [official event page](https://hackathon.genai.works/event/open-agent-hackathon-2026) requires a genuine 1–4 minute demo.
 
-## Voice-over master
+## Timed narration and storyboard
 
-**00:00–00:12** “Why did my energy change? PHIS Open Agent examines fictional daily records and makes the limits of its evidence visible. This is a research prototype, not a medical service.”
-
-**00:12–00:40** “In this local synthetic run, I ask about the fixed 180-day period. The agent retrieves dated records and invokes deterministic PHIS Discovery. The chart preserves missing days as gaps. A recent 28-day mean difference is descriptive; it does not tell us the cause.”
-
-**00:40–01:00** “I open evidence. Each reported observation has source IDs, coverage and a trace. Qualified associations remain observational, and weaker candidates remain visible rather than disappearing from the audit.”
-
-**01:00–01:20** “The official Meterless World Model Engine stores the parent decision. My next question reads that persisted event, selects sleep and executes new tools. The follow-up has its own run and source IDs.”
-
-**01:20–01:35** “A clinical diagnosis question is outside the validated scope. PHIS abstains and publishes no invented series or treatment advice.”
-
-**01:35–02:00** “Now a clearly separate archived PR 42 run: authenticated local Zetaris returned six pages and 1,080 fictional variable-day records. PHIS Discovery passed. Hosted NVIDIA Nemotron produced one plan and two critiques; the official Meterless Engine persisted eight events. The first critique requested a coverage recheck, which passed. The second decision was abstain, so the final screen withheld the chart and findings.”
-
-**02:00–02:20** “The model's underlying reason was not saved, and I cannot claim it found a scientific flaw or accepted an explanation. Five PHIS Discovery modules existed before the event; the agent, source adapter, memory integration, evidence UI and model adapter are new hackathon work. This demo shows inspectable evidence and a safe stop on fictional data.”
-
-## Shot plan — exact 140-second target
-
-| Time | Screen action | Evidence gate |
+| Time | Browser shot and English narration | Truth gate |
 | --- | --- | --- |
-| 00:00–00:12 | Real PR #42 product idle screen, with synthetic label readable. | No new title card pretending to be app execution. |
-| 00:12–00:40 | Record a **fresh real** PR #42 `SYNTHETIC_LOCAL_ONLY` energy question, input, loading and returned local observation/chart. Existing PR #42 run `SYN-RUN-c95ec93f9de5` is reference, not footage to fabricate. | Record actual new run ID and exact visible number; revise script if different. Zetaris/NVIDIA must read `NOT_CONNECTED` in this scene. |
-| 00:40–01:00 | Open evidence drawer; show source IDs, missingness, uncertainty and tool trace at readable zoom. | No claim of causality, hidden weak signals or model-authored statistics. |
-| 01:00–01:20 | Click actual memory-linked follow-up; show `meterless.world_model.read`, sleep selection and returned new run ID. | Do not reload away the parent context or present an independent sleep query as linked. |
-| 01:20–01:35 | Enter a clinical question and show scope abstention and empty series. | Actual input/output, no staged response. |
-| 01:35–01:48 | Hard cut with a visible label **“Separate archived combined run · PR #42 SHA b6e3d48 · SYN-RUN-c13b6edef2e0”** to the genuine local combined safe-stop screenshot. | Display it as an archival still, never as animated execution or the continuation of the positive local run. Inspect the screenshot for secrets before use. |
-| 01:48–02:08 | Show the sanitized receipt or claim ledger as a **document**, with six Zetaris pages, three provider IDs, eight Engine events, coverage PASS, and final `BLOCKED/evidence_review_required` legible. | Claim only the observable decisions. The second critique's substantive rationale is unknown. No combined positive finding. |
-| 02:08–02:20 | Show public NOTICE/pre-existing declaration and repository URL, then end on actual product limit. | Five pre-existing modules explicitly separated from new competition-window code. |
+| 00:00–00:15 | Show Energy/Sleep entry and synthetic label. “Why has my energy changed? PHIS investigates a fictional daily record and shows the evidence behind what it can—and cannot—say.” | Show actual app, not a rendered mockup. |
+| 00:15–00:35 | Select Energy, submit in authenticated v4, show genuine progress. “Nemotron chooses a bounded plan. Zetaris retrieves dated source records; PHIS will not silently replace a failed live query.” | Genuine current run; loading may be shortened with a visible cut. |
+| 00:35–01:05 | Full 180-day chart and six 30-day intervals. “This history spans 180 fictional days. Energy was measured on 170 days; gaps remain visible. The six intervals describe the trajectory without claiming a significant trend.” | Do not lead with the secondary 28-day comparison. |
+| 01:05–01:30 | Qualified findings and source evidence drawer. “PHIS Discovery runs 16 pre-planned tests. It distinguishes a qualified same-day Sleep–Energy association from unstable exploratory patterns, with direction, lag, source IDs and uncertainty.” | The association is observational, not causal. Show exact original records. |
+| 01:30–01:52 | Nemotron review and trace details. “Nemotron reviewed the actual Discovery signals and cited one existing signal. Its accepted review still recognizes confounding; the model supplied no measurements or diagnosis.” | Show real PLAN and CRITIQUE IDs from this run; if current run abstains, describe it honestly. |
+| 01:52–02:12 | Meterless event trace or follow-up. “The official Meterless World Model Engine stores the source, science and review decision. A follow-up can read its parent event and choose a new Sleep investigation.” | If demonstrating a local follow-up, visibly switch to credential-free mode and label it as a separate run; do not imply hosted follow-up proof. |
+| 02:12–02:32 | Technical source/receipt details, then return to result. “This authenticated run contains six Zetaris pages and 1,080 fictional variable-day records with one frozen digest. Meterless Runtime and Power remain disconnected.” | Use [sanitized same-run receipt](FINAL_COMBINED_RECEIPT.md); never show credentials, Docker UI or raw provider console. |
+| 02:32–02:45 | Closing full view. “Five Discovery scientific modules existed before this event. We built the agent, evidence experience and integrations during the hackathon. PHIS aims to support consented personal investigations; real-world benefit still needs validation.” | No automatic ingestion or clinical claim. |
 
-**Edit boundary:** genuine loading time may be shortened with a visible cut; do not splice different runs into a continuous execution. Never show a key, DPAPI file, NVIDIA Build page, provider console, Docker credentials, private PHIS material or real health data. Keep `SYNTHETIC_LOCAL_ONLY` and `LIVE_SYNTHETIC_ZETARIS` labels tied to their own scenes. Test the final exported video end-to-end, under four minutes, with legible screen text and an anonymous playback link.
+## Production notes
+
+Record the real browser tomorrow, preferably at 16:9, with readable zoom and English narration. Capture an actual fresh run only once for the video; if it abstains, retain that result and adapt the line. The accepted PR #43 screenshots in the deck and [evidence folder](evidence/) are archived genuine stills from `SYN-RUN-64e7acc2fa5e`; label any insertion with its run ID and do not animate it as live traffic. Preserve sponsor badges for the run being shown. Export between 2:30 and 3:00, review the entire recording for clipping and secrets, then test the URL signed out. The founder approves and submits; no upload or HackOS action is performed here.
