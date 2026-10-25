@@ -1,29 +1,28 @@
-# HackOS form copy — Track 02
+# HackOS form draft — Track 02, 25 October 2026
 
-**Ready to paste after final link checks; not submitted.** The signed-in form inspected on 23 October exposed Track, Team Name, Description (150–2000 characters), Video (max four minutes), Github Solution and Pitch Deck (labelled optional). The [official event page](https://hackathon.genai.works/event/open-agent-hackathon-2026) is binding; recheck the live form before submission.
+**Draft only. Do not paste or submit until the founder approves the final public assets.** The [official event page](https://hackathon.genai.works/event/open-agent-hackathon-2026) still lists Track 02 and the 27 October 2026, 23:45 UTC deadline. The signed-in form last inspected on 23 October showed Track, Team Name, Description (150–2000 characters), Video (maximum four minutes), GitHub Solution and optional Pitch Deck. Its current signed-in field labels and limits need a final check.
 
-| Field | Value |
+| Form field | Prepared value / gate |
 | --- | --- |
-| Track | **Track 02 — The Agent That Can Explain Why** (founder decision locked). |
-| Team name | PHIS Open Agent, subject to checking the account’s prefilled team/solo roster in HackOS. |
-| GitHub Solution | `https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026` — use only after reviewed code and deck are visible in the public default branch. |
-| Video | Insert the real, playable 03:00 recording URL or upload after capture and anonymous playback test. |
-| Pitch Deck | Upload `PHIS_Open_Agent_2026_Track02_Review.pptx` only after director/founder final SHA and claim review; deck is editable. |
+| Track | **Track 02 — The Agent That Can Explain Why**; founder-selected. |
+| Team Name | **PHIS Open Agent**, after checking the account's team roster. |
+| Description | Use the paragraph below, after final SHA and link review. |
+| Video | **BLOCKED:** insert only a finished, playable 1–4 minute URL tested while signed out. The existing fallback WebM is a separate older-SHA local recording, not footage of the combined run. |
+| GitHub Solution | `https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026` only after reviewed code and submission files reach the public default branch. A Draft PR URL is not the final solution link. |
+| Pitch Deck | Keep `submission/deck/PHIS_Open_Agent_2026_Track02_Review.pptx` intact pending founder UX approval. Upload the reviewed final deck even if the form marks it optional. |
 
-## Description (copy the paragraph, not these instructions)
+## Description — paste only this paragraph
 
-PHIS Open Agent investigates why a person’s energy or sleep pattern changed across a fictional 180-day record. A question-driven agent selects bounded tools, retrieves source-linked records, invokes deterministic PHIS Discovery, checks the scientific result, and either explains an observation with uncertainty or abstains. Authenticated local Zetaris queries have supplied 1,080 synthetic variable-day records in a documented live run. The official Meterless World Model Agent Engine persists verified context and changes a later follow-up decision. In a separately verified local synthetic run, direct hosted NVIDIA Nemotron Lightning selected distinct energy/sleep plans and critiqued Discovery evidence; it never calculated statistics. These are separate receipts, not a claim that Zetaris and NVIDIA executed in one run. The English UI exposes missingness, source IDs, limits and a safe clinical-scope abstention.
+PHIS Open Agent investigates energy and sleep questions across 180 days of explicitly fictional records. A bounded agent retrieves source-linked data, runs deterministic PHIS Discovery, checks provenance and uncertainty, and either presents a qualified observation or abstains. On PR #42 code SHA b6e3d48f66ba99b22aff91359771316208d52727, one authentic combined run queried 1,080 fictional variable-day records through authenticated local Zetaris, executed Discovery successfully, used hosted NVIDIA Nemotron for one plan and two evidence critiques, and persisted eight Meterless World Model Engine events. The final Nemotron decision was abstain, so PHIS returned BLOCKED/evidence_review_required and published no chart, comparison or scientific finding. The model's substantive reason was not retained; the deterministic coverage recheck passed. A separate local synthetic run shows a positive descriptive observation and a World Model-linked sleep follow-up. All associations are observational; none proves cause or supports diagnosis. PRE-EXISTING before the build window: PHIS and five unchanged PHIS Discovery v1.1 scientific modules from private baseline 516e3388, released here with owner authorization. NEW during the hackathon: agent orchestration and typed API, synthetic scenario and validation, Zetaris adapter, World Model integration and follow-up, evidence UI, and Nemotron plan/critique adapter. Meterless Power/Runtime/Nightshift and real health-data ingestion are not demonstrated.
 
-**PRE-EXISTING:** PHIS existed before the 22 October 2026 build window. The five PHIS Discovery v1.1 scientific modules at private baseline `516e3388` are pre-existing methods and code, owner-authorized for this public MIT package. **NEW during the hackathon:** the agent orchestration and typed API, Zetaris adapter, Meterless World Model integration and stateful follow-up, evidence UI, synthetic validation scenario and hosted Nemotron plan/critique adapter. All public data are synthetic. Associations are not causes; this research prototype is not a diagnosis, treatment system, real-data ingestion service or demonstrated clinical benefit. Meterless Power/Runtime/Nightshift are not connected.
+## Optional expanded answers
 
-## Supporting copy for any expanded form field
+**Problem and user value.** Incomplete daily records invite confident but unsupported causal stories. PHIS makes the observed pattern, provenance, missingness and stop decision inspectable. Benefit for real users is unvalidated.
 
-**Problem / impact.** Fragmented daily observations make a “why did my energy change?” question easy to overinterpret. PHIS gives users an inspectable account of observed change, evidence gaps and tested associations, so the useful outcome is a better next question rather than a fabricated diagnosis. Benefit to real users remains unvalidated.
+**Agent workflow.** Question → bounded plan → authenticated source retrieval or explicitly local fixture → deterministic Discovery → provenance and coverage gates → bounded model critique → typed response or abstention. The World Model Engine persists decisions and a later local follow-up reads a parent event to choose sleep.
 
-**Agentic architecture.** User question → bounded planner → source retrieval → deterministic Discovery family → evidence verifier → typed response. A persisted World Model event is read by the next investigation and alters tool selection. Provider plans/critique are schema-validated and cannot invent measured values.
+**Sponsor roles.** Zetaris supplied six authenticated local query pages of fictional rows; NVIDIA supplied a genuine energy/Discovery plan and two strict decisions; Meterless World Model Engine persisted and read state. The final combined decision was a safe stop. It does not establish Meterless Power/Runtime, a hosted accepted scientific explanation, or the unknown reason for Nemotron's veto.
 
-**Differentiation.** PHIS exposes provenance and scientific vetoes, not only a fluent explanation. It distinguishes descriptive change, qualified association, uncertainty and abstention. Separate run IDs and provider IDs permit independent audit.
+**Reproducibility and limits.** The public README covers the local synthetic path. Live Zetaris needs authorized local service/configuration; hosted Nemotron needs a user-held key. Six variables across 180 fictional days means 1,080 variable-day records, not people. There is no real health data, clinical validation, causal conclusion, or automatic ingestion.
 
-**Reproducibility.** Draft PR #37 and the public README document a clean-clone `SYNTHETIC_LOCAL_ONLY` run with fictional records. Live Zetaris requires authorized local service/config; direct NVIDIA requires a user-held key. A same-code hosted NVIDIA Chrome run is documented, but its critique requested a coverage recheck and PHIS abstained; the live Zetaris receipt is from an earlier SHA. They are separate runs. Include the exact approved release SHA and demo run IDs after director sign-off; this form draft is not yet submitted.
-
-**Limitations.** 1,080 variable-day records represent six variables across 180 fictional days, not a population. Missingness and temporal confounding remain; qualified same-day signals are not causal. No real health records, consented ingestion, clinical validation, Meterless Power/Runtime/Nightshift or Cursor provenance is claimed.
+**Form QA:** count the final Description in the live form; confirm it stays within the displayed limit, that the final video is under four minutes, and that every public link works from a signed-out browser. This draft is not a submission receipt.
