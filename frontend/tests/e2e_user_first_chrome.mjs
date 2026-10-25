@@ -47,7 +47,10 @@ try {
   assert.match(await desktop.locator('.chart-footer').textContent(), /Earlier 28-day mean/);
   assert.equal(await desktop.locator('#trace-list > li').count(), 4);
   assert.equal(await desktop.locator('#followup-actions').isVisible(), true);
+  assert.match(await desktop.locator('#chip-next').textContent(), /Continue with sleep using this run's memory/);
   await desktop.screenshot({ path: path.join(output, 'user-first-energy-desktop.png'), fullPage: true });
+  await desktop.locator('#chip-sleep').click();
+  assert.equal(await desktop.locator('#followup-banner').isVisible(), false);
 
   await desktop.locator('#evidence-button').click();
   assert.equal(await desktop.locator('#dialog-title').textContent(), 'Evidence & verification');
@@ -65,6 +68,7 @@ try {
   assert.equal(followup.status, 'PASS');
   assert.equal(followup.family, 'sleep');
   assert.equal(followup.parent_run_id, energy.run_id);
+  assert.match(await desktop.locator('#chip-next').textContent(), /Continue with energy using this run's memory/);
   assert.ok(followup.tool_trace.some(step => step.tool === 'meterless.world_model.read'));
   assert.match(await desktop.locator('#result-context').textContent(), /prior investigation saved in agent memory/);
   assert.match(await desktop.locator('#period-earlier').textContent(), /^\d+\.\d{2} h$/);

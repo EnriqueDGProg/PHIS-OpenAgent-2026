@@ -529,6 +529,7 @@ for (const chip of $$('[data-fill]')) {
 
 // ─── Follow-up action chips (post-result) ─────────────────────────────────────
 function wireFollowupChips(run) {
+  $('#chip-next').textContent = `Continue with ${run.family === 'energy' ? 'sleep' : 'energy'} using this run's memory ↗`;
   for (const chip of $$('#followup-actions [data-question]')) {
     chip.onclick = () => {
       const q = chip.dataset.question;

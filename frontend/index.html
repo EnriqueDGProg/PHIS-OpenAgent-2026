@@ -53,8 +53,8 @@
       <!-- Question form -->
       <form id="question-form" class="question-panel" novalidate>
         <div class="entry-options" aria-label="Choose a demo investigation">
-          <button type="button" class="entry-option active" data-fill="Why has my energy changed over the past few months?" aria-pressed="true">Explore my energy <span aria-hidden="true">↗</span></button>
-          <button type="button" class="entry-option" data-fill="How did my sleep change over the past few months?" aria-pressed="false">Explore my sleep <span aria-hidden="true">↗</span></button>
+          <button type="button" class="entry-option active" data-fill="How did my recorded energy change between the fixed earlier and recent 28-day periods?" aria-pressed="true">Explore my energy <span aria-hidden="true">↗</span></button>
+          <button type="button" class="entry-option" data-fill="How did my recorded sleep change between the fixed earlier and recent 28-day periods?" aria-pressed="false">Explore my sleep <span aria-hidden="true">↗</span></button>
         </div>
         <label for="question">01 / YOUR QUESTION</label>
         <div class="question-field">
@@ -65,7 +65,7 @@
             maxlength="240"
             spellcheck="true"
             aria-describedby="question-hint"
-          >Why has my energy changed over the past few months?</textarea>
+          >How did my recorded energy change between the fixed earlier and recent 28-day periods?</textarea>
           <span class="question-cursor" aria-hidden="true">↗</span>
         </div>
         <p id="question-hint" class="question-hint">
@@ -91,12 +91,12 @@
 
       <!-- Follow-up action chips (shown after PASS result) -->
       <div id="followup-actions" class="followup-actions" hidden aria-label="Follow-up actions">
-        <span class="followup-actions-label">CONTINUE INVESTIGATION</span>
-        <button type="button" class="text-chip" id="chip-sleep" data-question="How did my sleep change over the past few months?">
-          Explore sleep separately ↗
+        <span class="followup-actions-label">NEXT QUESTIONS · CLICK INVESTIGATE AFTER SELECTING</span>
+        <button type="button" class="text-chip" id="chip-sleep" data-question="How did my recorded sleep change between the fixed earlier and recent 28-day periods?">
+          Start separate sleep investigation (no memory link) ↗
         </button>
         <button type="button" class="text-chip" id="chip-next" data-question="What should we investigate next?">
-          What's next? Use this run's memory ↗
+          Continue with this run's memory ↗
         </button>
         <button type="button" class="text-chip" id="chip-abstain" data-question="Is there a clinical diagnosis here?">
           Test abstention ↗
