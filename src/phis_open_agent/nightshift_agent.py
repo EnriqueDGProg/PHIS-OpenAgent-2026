@@ -65,10 +65,36 @@ def parse_plan(content):
 
 
 def parse_critique(content):
-    obj = _strict_object(content, {"decision"})
-    if obj["decision"] not in {"accept", "replan_coverage", "abstain"}:
+    obj = _strict_object(content, {"schema", "decision", "reason_code",
+                                   "evidence_signal_ids", "requested_check", "explanation"})
+    if obj["schema"] != "phis-critique.v2" or obj["decision"] not in {"accept", "verify", "abstain"}:
         raise PlanRejected("Model selected a forbidden critique decision")
-    return obj["decision"]
+    if obj["reason_code"] not in {"supported_pattern", "descriptive_observation", "coverage_question", "signal_question",
+                                  "trend_question", "insufficient_evidence", "review_uncertain"}:
+        raise PlanRejected("Model selected an unknown reason")
+    if obj["requested_check"] not in {"none", "coverage"}:
+        raise PlanRejected("Model requested an unsupported check")
+    ids = obj["evidence_signal_ids"]
+    if (not isinstance(ids, list) or len(ids) > 3 or len(ids) != len(set(map(str, ids))) or
+            any(not isinstance(sid, str) or not re.fullmatch(r"[0-9a-f]{64}", sid) for sid in ids)):
+        raise PlanRejected("Critique citations invalid")
+    explanation = obj["explanation"]
+    if (not isinstance(explanation, str) or not 1 <= len(explanation) <= 220 or
+            any(ord(char) < 32 for char in explanation)):
+        raise PlanRejected("Critique explanation invalid")
+    if (obj["decision"] == "accept" and
+            (obj["reason_code"], bool(ids), obj["requested_check"]) not in {
+                ("supported_pattern", True, "none"),
+                ("descriptive_observation", False, "none")}):
+        raise PlanRejected("Acceptance requires a supported citation")
+    if (obj["decision"] == "verify" and
+            (obj["reason_code"], obj["requested_check"]) != ("coverage_question", "coverage")):
+        raise PlanRejected("Review reason and check disagree")
+    if obj["decision"] == "abstain" and obj["requested_check"] != "none":
+        raise PlanRejected("Abstention cannot request a check")
+    if obj["reason_code"] == "review_uncertain" and (obj["decision"] != "abstain" or not ids):
+        raise PlanRejected("Review uncertainty requires cited evidence and abstention")
+    return obj
 
 
 class NightshiftPlanner:
@@ -151,7 +177,15 @@ class NightshiftPlanner:
     def critique(self, question, plan, evidence):
         content, receipt = self._complete({"role": "evidence_verifier", "question": question,
                                            "plan": plan, "evidence": evidence,
-                                           "schema": {"decision": ["accept", "replan_coverage", "abstain"]}})
+                                           "schema": {"schema": "phis-critique.v2",
+                                                      "decision": ["accept", "verify", "abstain"],
+                                                      "reason_code": ["supported_pattern", "coverage_question",
+                                                                      "signal_question", "trend_question",
+                                                                      "descriptive_observation",
+                                                                      "insufficient_evidence", "review_uncertain"],
+                                                      "evidence_signal_ids": "up to three existing signal IDs",
+                                                      "requested_check": ["none", "coverage"],
+                                                      "explanation": "short English text, at most 220 characters"}})
         return parse_critique(content), receipt
 
 
@@ -193,18 +227,20 @@ class NvidiaPlanner(NightshiftPlanner):
                     "tool must be discovery, trend, coverage or abstain. Select a tool only; "
                     "do not execute it or invent findings.")
         if role == "evidence_verifier":
-            return (SYSTEM + " CRITIQUE output contract: return exactly one top-level JSON key, "
-                    "decision, whose value is a string. The only valid complete outputs are "
-                    '{"decision":"accept"}, {"decision":"replan_coverage"}, or '
-                    '{"decision":"abstain"}. No parameters, explanation, extra keys, '
-                    "prose or Markdown. Accept only grounded tool evidence; request coverage "
-                    "when evidence needs checking; abstain if evidence is missing or invalid. "
-                    "Use the supplied PHIS signal classifications, effect, N, lag, q and "
-                    "robustness metadata, coverage and provenance to judge the bounded claim. "
-                    "Distinguish ordinary non-causal uncertainty from a failed data gate. "
-                    "A coverage_recheck reports the existing deterministic threshold outcome; "
-                    "do not treat a high observed count alone as proof of causation. "
-                    "Do not calculate, alter or invent measurements or statistical results.")
+            return (SYSTEM + " CRITIQUE: return exactly the six JSON keys in the user schema, "
+                    "including schema='phis-critique.v2'. Cite existing signal IDs only. "
+                    "Accept a qualified candidate_signal with reason_code=supported_pattern and "
+                    "its signal ID. For a trend or coverage tool without Discovery, accept only a "
+                    "descriptive_observation with no signal IDs. Both use requested_check=none. "
+                    "Verify only when a concrete existing check is needed: "
+                    "coverage_question/coverage. Abstain with requested_check=none if "
+                    "the evidence cannot support acceptance. If PHIS has qualified candidates "
+                    "but you still decline endorsement, use review_uncertain and cite those IDs; "
+                    "do not claim they failed the scientific gates. The explanation is short, grounded "
+                    "English and cannot add measurements, causes, confidence or medical advice. "
+                    "Causal uncertainty by itself is not a failed scientific gate. "
+                    "On final critique after a check, choose accept or abstain, never verify again. "
+                    "No extra keys, prose or Markdown.")
         raise InferenceBlocked("Unknown NVIDIA planner role")
 
 
@@ -219,6 +255,24 @@ def _decision_event(store, run_id, *, phase, plan, decision, receipt, digest,
                                  "provider_model": receipt["model"],
                                  "source_digest_sha256": digest,
                                  "evidence_event_id": evidence_event_id,
+                                 "parent_run_id": parent_run_id},
+                        source_record_ids=source_ids)
+
+
+def _review_event(store, run_id, *, stage, review, receipt, digest, science_event_id,
+                  tool_event_id, check_event_id, parent_run_id, source_ids):
+    return store.append(run_id=run_id, kind="agent_review_180d_v2",
+                        payload={"stage": stage, "decision": review["decision"],
+                                 "reason_code": review["reason_code"],
+                                 "evidence_signal_ids": review["evidence_signal_ids"],
+                                 "requested_check": review["requested_check"],
+                                 "explanation": review["explanation"],
+                                 "provider_status": receipt["status"],
+                                 "provider_response_id": receipt["response_id"],
+                                 "source_digest_sha256": digest,
+                                 "scientific_event_id": science_event_id,
+                                 "tool_event_id": tool_event_id,
+                                 "check_event_id": check_event_id,
                                  "parent_run_id": parent_run_id},
                         source_record_ids=source_ids)
 
@@ -239,7 +293,8 @@ def _critic_evidence_packet(result, plan, digest, science_event, tool_event, cov
     The packet carries no raw observations and rejects mismatched provenance.
     Model output cannot add or change any scientific value in the response.
     """
-    packet = {"schema": "phis-critic-evidence.v1", "status": result["status"],
+    packet = {"schema": "phis-critic-evidence.v2", "status": result["status"],
+              "dataset_id": result.get("dataset_id", DATASET_ID),
               "reason_code": result.get("reason_code"), "family": plan["family"],
               "tool": plan["tool"], "source_digest_sha256": digest,
               "tool_evidence_event_id": tool_event["event_id"],
@@ -247,11 +302,13 @@ def _critic_evidence_packet(result, plan, digest, science_event, tool_event, cov
               "coverage": {"variable": coverage["variable"], "observed": coverage["observed"],
                            "eligible": coverage["eligible"]} if coverage else None,
               "signals": [], "classification_counts": {}, "comparison_window_observed": None,
+              "longitudinal": None,
               "uncertainty": []}
     package = result.get("scientific_evidence")
     if plan["tool"] != "discovery" or result["status"] != "PASS":
         return packet
     if (not isinstance(package, dict) or science_event is None or
+            package.get("dataset_id") != DATASET_ID or
             package.get("family") != plan["family"] or
             package.get("record_digest_sha256") != digest or
             science_event["payload"]["record_digest_sha256"] != digest or
@@ -297,11 +354,28 @@ def _critic_evidence_packet(result, plan, digest, science_event, tool_event, cov
                 len(item["exposure"]) > 100 or
                 item.get("route") not in {"levels", "first_differences"}):
             raise PlanRejected("Discovery robustness metadata invalid")
+        source_ids = item.get("source_record_ids")
+        if (not isinstance(source_ids, list) or len(source_ids) > 1080 or
+                any(not isinstance(value, str) or not value.startswith("SYN-180-") or
+                    len(value) > 100 for value in source_ids) or
+                not set(source_ids).issubset(science_event["source_record_ids"])):
+            raise PlanRejected("Discovery source lineage invalid")
+        outcome = item.get("outcome")
+        if outcome != ("energy_central" if plan["family"] == "energy" else "sleep_hours"):
+            raise PlanRejected("Discovery signal outcome invalid")
+        effective_n = item.get("effective_n")
+        if effective_n is not None and (type(effective_n) not in (int, float) or
+                                         not math.isfinite(effective_n) or effective_n < 0):
+            raise PlanRejected("Discovery effective sample invalid")
         clean.append({"signal_id": sid, "classification": cls,
-                      "exposure": item["exposure"], "route": item["route"],
+                      "exposure": item["exposure"], "outcome": outcome,
+                      "route": item["route"],
                       "lag_days": lag, "effect": effect, "raw_n": n,
+                      "effective_n": effective_n,
                       "q": q, "temporal_state": item["temporal_state"],
-                      "block_stable": item["block_stable"], "flags": flags})
+                      "block_stable": item["block_stable"], "flags": flags,
+                      "source_record_count": len(source_ids),
+                      "source_record_ids_sample": source_ids[:3]})
     scientific_counts = science_event["payload"]["classification_counts"]
     if (dict(counts) != scientific_counts or
             {x["signal_id"] for x in clean if x["classification"] == "candidate_signal"} !=
@@ -326,6 +400,31 @@ def _critic_evidence_packet(result, plan, digest, science_event, tool_event, cov
     recent = comparison["comparison"].get("observed")
     if any(type(value) is not int or not 0 <= value <= 28 for value in (prior, recent)):
         raise PlanRejected("Discovery window coverage invalid")
+    longitudinal = result.get("longitudinal")
+    windows = longitudinal.get("windows") if isinstance(longitudinal, dict) else None
+    if (not isinstance(windows, list) or len(windows) != 6 or
+            longitudinal.get("variable") != ("energy_central" if plan["family"] == "energy" else "sleep_hours") or
+            longitudinal.get("inference") != "descriptive_only"):
+        raise PlanRejected("Discovery longitudinal series invalid")
+    clean_windows = []
+    for index, window in enumerate(windows):
+        expected_start = START + timedelta(days=index * 30)
+        expected_end = expected_start + timedelta(days=29)
+        if (not isinstance(window, dict) or window.get("start") != expected_start.isoformat() or
+                window.get("end") != expected_end.isoformat() or window.get("eligible") != 30 or
+                type(window.get("observed")) is not int or not 0 <= window["observed"] <= 30 or
+                (window.get("mean") is not None and
+                 (type(window["mean"]) not in (int, float) or not math.isfinite(window["mean"])))):
+            raise PlanRejected("Discovery longitudinal chronology invalid")
+        clean_windows.append({key: window[key] for key in ("start", "end", "eligible", "observed", "mean")})
+    if coverage and sum(window["observed"] for window in clean_windows) != coverage["observed"]:
+        raise PlanRejected("Longitudinal coverage disagrees with records")
+    difference = longitudinal.get("first_to_last_difference")
+    if ((difference is None) != (clean_windows[0]["mean"] is None or clean_windows[-1]["mean"] is None) or
+            (difference is not None and (type(difference) not in (int, float) or
+             not math.isfinite(difference) or
+             not math.isclose(difference, clean_windows[-1]["mean"] - clean_windows[0]["mean"], abs_tol=1e-10)))):
+        raise PlanRejected("Longitudinal difference invalid")
     uncertainty = [item.get("text") for item in result.get("findings", [])
                    if isinstance(item, dict) and item.get("kind") == "uncertainty"]
     if len(uncertainty) > 3 or any(not isinstance(x, str) or len(x) > 400 for x in uncertainty):
@@ -336,6 +435,10 @@ def _critic_evidence_packet(result, plan, digest, science_event, tool_event, cov
                    "plan_sha256": package["plan_sha256"],
                    "temporal_policy_sha256": package["temporal_policy_sha256"],
                    "classification_counts": dict(counts), "signals": selected,
+                   "longitudinal": {"windows": clean_windows,
+                                    "first_to_last_difference": difference,
+                                    "method": longitudinal["method"],
+                                    "inference": "descriptive_only"},
                    "comparison_window_observed": {"prior": prior, "recent": recent,
                                                    "eligible_each": 28,
                                                    "min_observed_each": MIN_COMPARISON_OBSERVED},
@@ -352,6 +455,50 @@ def _comparison_coverage_passes(result):
     return all(isinstance(window, dict) and window.get("eligible") == 28 and
                type(window.get("observed")) is int and
                window["observed"] >= MIN_COMPARISON_OBSERVED for window in windows)
+
+
+def _validate_review(review, packet, *, final=False):
+    """Bound model judgment to unchanged PHIS facts; reject unsupported claims."""
+    if review is None:
+        raise PlanRejected("Critique missing")
+    if final and review["decision"] == "verify":
+        raise PlanRejected("A second check is not permitted")
+    signals = {item["signal_id"]: item for item in packet["signals"]}
+    cited = []
+    for sid in review["evidence_signal_ids"]:
+        item = signals.get(sid)
+        if item is None or item["outcome"] != packet["coverage"]["variable"]:
+            raise PlanRejected("Critique cites unverified evidence")
+        cited.append(item)
+    reason = review["reason_code"]
+    if review["decision"] == "accept":
+        if reason == "descriptive_observation":
+            if packet["tool"] not in {"trend", "coverage"} or cited:
+                raise PlanRejected("Descriptive acceptance requires a descriptive tool")
+            return review
+        if packet["tool"] != "discovery" or not cited or any(item["classification"] != "candidate_signal" or
+                                item["exposure"] == "unrelated_count" or
+                                not item["block_stable"] for item in cited):
+            raise PlanRejected("Critique promotes unsupported signal")
+    elif reason in {"supported_pattern", "descriptive_observation"}:
+        raise PlanRejected("Non-acceptance cannot claim support")
+    if reason == "coverage_question" and packet["coverage"]["observed"] == packet["coverage"]["eligible"]:
+        raise PlanRejected("Coverage objection contradicts complete observation")
+    if reason == "signal_question" and (not cited or not any(
+            item["classification"] != "candidate_signal" or item["flags"] or
+            not item["block_stable"] for item in cited)):
+        raise PlanRejected("Signal objection lacks a recorded limitation")
+    if reason == "trend_question" and packet["longitudinal"] is None:
+        raise PlanRejected("Trend objection lacks longitudinal evidence")
+    if reason == "insufficient_evidence" and review["decision"] != "abstain":
+        raise PlanRejected("Insufficient evidence requires abstention")
+    qualified = {sid for sid, item in signals.items() if item["classification"] == "candidate_signal"}
+    if reason == "insufficient_evidence" and qualified:
+        raise PlanRejected("Insufficient evidence contradicts qualified PHIS signals")
+    if reason == "review_uncertain" and (not cited or
+            any(item["classification"] != "candidate_signal" for item in cited)):
+        raise PlanRejected("Review uncertainty must cite qualified PHIS signals")
+    return review
 
 
 def _fallback(question, parent_family):
@@ -535,6 +682,9 @@ def investigate_agentic(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY",
     science_event = science[-1] if science else None
     packet = None
     critique_failure = None
+    review = None
+    review_events = []
+    original_science = result if result["status"] == "PASS" and package else None
     if result["status"] == "PASS":
         try:
             packet = _critic_evidence_packet(result, plan, digest, science_event,
@@ -546,29 +696,42 @@ def investigate_agentic(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY",
     elif critique_failure:
         decision, critique_receipt = "abstain", blocked_receipt
     else:
+        critique_receipt = blocked_receipt
         try:
             if planner_mode in {verified_mode, "SIMULATED"}:
-                decision, critique_receipt = planner.critique(question, plan, packet)
+                review, critique_receipt = planner.critique(question, plan, packet)
+                _validate_review(review, packet)
+                decision = review["decision"]
             else:
                 decision, critique_receipt = "accept", blocked_receipt
         except InferenceBlocked:
             decision, critique_receipt = "abstain", blocked_receipt
             critique_failure = "model_unavailable"
+            review = None
         except PlanRejected:
-            decision, critique_receipt = "abstain", blocked_receipt
+            decision = "abstain"
+            critique_receipt = (planner.receipts[-1] if len(getattr(planner, "receipts", [])) >= 2
+                                else blocked_receipt)
             critique_failure = "invalid_critique"
+            review = None
+    if review is not None:
+        review_events.append(_review_event(world_model, run_id, stage="INITIAL", review=review,
+                                           receipt=critique_receipt, digest=digest,
+                                           science_event_id=science_event_id,
+                                           tool_event_id=tool_event["event_id"], check_event_id=None,
+                                           parent_run_id=parent_run_id, source_ids=source_ids))
     if planner_mode == verified_mode and critique_receipt["status"] != "VERIFIED":
         planner_mode = "NVIDIA_PARTIAL" if provider == "nvidia" else "NIGHTSHIFT_PARTIAL"
 
     verification_evidence_id = tool_event["event_id"]
-    if decision == "replan_coverage":
+    if decision == "verify":
         # The original model challenge is durable before any local recheck.
         challenge_event = _decision_event(world_model, run_id, phase="VERIFY", plan=plan,
                                           decision="replan", receipt=critique_receipt,
                                           digest=digest, evidence_event_id=tool_event["event_id"],
                                           parent_run_id=parent_run_id, source_ids=source_ids)
         trace.append({"phase": "VERIFY", "tool": provider + ".evidence_verifier",
-                      "status": critique_receipt["status"], "decision": "replan_coverage",
+                      "status": critique_receipt["status"], "decision": "verify",
                       "provider_response_id": critique_receipt["response_id"],
                       "provider_request_id": critique_receipt["request_id"],
                       "event_id": challenge_event["event_id"],
@@ -577,11 +740,14 @@ def investigate_agentic(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY",
         coverage = _coverage(rows, plan["family"])
         gate_passed = (plan["tool"] == "discovery" and result["status"] == "PASS" and
                        science_event is not None and _comparison_coverage_passes(result))
+        requested = review["requested_check"]
+        check_passed = gate_passed
         windows = packet.get("comparison_window_observed") if packet else None
-        coverage_material = {"tool": "coverage", "variable": coverage["variable"],
+        coverage_material = {"tool": requested, "variable": coverage["variable"],
                              "observed": coverage["observed"], "eligible": coverage["eligible"],
                              "comparison_window_observed": windows,
                              "existing_scientific_gate_passed": gate_passed,
+                             "check_passed": check_passed,
                              "source_digest_sha256": digest,
                              "scientific_evidence_event_id": science_event_id}
         coverage_sha256 = hashlib.sha256(json.dumps(coverage_material, sort_keys=True,
@@ -589,49 +755,95 @@ def investigate_agentic(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY",
         replan_event = world_model.append(
             run_id=run_id, kind="agent_tool_evidence_180d",
             payload={"family": plan["family"], "tool": "coverage",
-                     "status": "PASS" if gate_passed else "BLOCKED",
+                     "status": "PASS" if check_passed else "BLOCKED",
                      "source_digest_sha256": digest, "output_sha256": coverage_sha256,
                      "observed_days": coverage["observed"], "eligible_days": coverage["eligible"],
                      "descriptive_difference": None, "scientific_event_id": science_event_id},
             source_record_ids=coverage["source_record_ids"])
         verification_evidence_id = replan_event["event_id"]
-        trace.append({"phase": "REPLAN", "tool": "coverage",
-                      "status": "PASS" if gate_passed else "BLOCKED",
+        trace.append({"phase": "REPLAN", "tool": requested,
+                      "status": "PASS" if check_passed else "BLOCKED",
                       "event_id": replan_event["event_id"],
                       "engine_event_id": replan_event.get("engine_event_id"),
                       "source_digest_sha256": digest, "output_sha256": coverage_sha256,
                       "existing_scientific_gate_passed": gate_passed,
+                      "check_passed": check_passed,
                       "comparison_window_observed": windows})
-        if gate_passed:
-            rechecked_packet = {**packet, "coverage_recheck": coverage_material,
-                                "prior_decision": "replan_coverage"}
+        if check_passed:
+            rechecked_packet = {**packet, "deterministic_check": coverage_material,
+                                "prior_decision": "verify"}
             try:
-                final_decision, final_receipt = planner.critique(question, plan, rechecked_packet)
+                final_review, final_receipt = planner.critique(question, plan, rechecked_packet)
+                _validate_review(final_review, packet, final=True)
+                final_decision = final_review["decision"]
             except InferenceBlocked:
                 final_decision, final_receipt = "abstain", blocked_receipt
                 critique_failure = "model_unavailable"
+                final_review = None
             except PlanRejected:
-                final_decision, final_receipt = "abstain", blocked_receipt
+                final_decision = "abstain"
+                final_receipt = (planner.receipts[-1] if len(getattr(planner, "receipts", [])) >= 3
+                                 else blocked_receipt)
                 critique_failure = "invalid_critique"
+                final_review = None
             if final_receipt["status"] != "VERIFIED" and planner_mode == verified_mode:
                 planner_mode = "NVIDIA_PARTIAL" if provider == "nvidia" else "NIGHTSHIFT_PARTIAL"
             decision, critique_receipt = final_decision, final_receipt
+            if final_review is not None:
+                review = final_review
+                review_events.append(_review_event(world_model, run_id, stage="FINAL", review=review,
+                                                   receipt=final_receipt, digest=digest,
+                                                   science_event_id=science_event_id,
+                                                   tool_event_id=tool_event["event_id"],
+                                                   check_event_id=replan_event["event_id"],
+                                                   parent_run_id=parent_run_id, source_ids=source_ids))
             if decision != "accept":
                 decision = "abstain"
                 result = {"status": "BLOCKED", "reason_code": critique_failure or "evidence_review_required",
-                          "summary": "The scientific coverage gate passed, but evidence review did not accept a finding.",
+                          "summary": "PHIS scientific checks passed, but the model did not accept the reviewed association.",
                           "coverage": coverage, "scientific_evidence": None, "findings": [],
                           "tool_trace": result.get("tool_trace", [])}
         else:
             decision, critique_receipt = "abstain", blocked_receipt
+            failed_review = {"decision": "abstain", "reason_code": "scientific_gate_failed",
+                             "evidence_signal_ids": review["evidence_signal_ids"],
+                             "requested_check": "none",
+                             "explanation": "The requested deterministic check did not pass."}
+            review_events.append(_review_event(world_model, run_id, stage="FINAL", review=failed_review,
+                                               receipt=blocked_receipt, digest=digest,
+                                               science_event_id=science_event_id,
+                                               tool_event_id=tool_event["event_id"],
+                                               check_event_id=replan_event["event_id"],
+                                               parent_run_id=parent_run_id, source_ids=source_ids))
             result = {"status": "BLOCKED", "reason_code": "evidence_review_required",
-                      "summary": "The requested coverage recheck did not establish an accepted scientific result.",
+                      "summary": "The requested deterministic check did not establish an accepted result.",
                       "coverage": coverage, "scientific_evidence": None, "findings": [],
                       "tool_trace": result.get("tool_trace", [])}
     elif decision == "abstain" and result["status"] == "PASS":
         result = {"status": "BLOCKED", "reason_code": critique_failure or "evidence_rejected",
-                  "summary": "The evidence verifier abstained; no scientific finding is presented.",
+                  "summary": ("The model critique failed validation; PHIS scientific results remain available for audit."
+                              if critique_failure else
+                              "The model abstained; PHIS scientific results remain available for audit."),
                   "scientific_evidence": None, "findings": [], "tool_trace": result.get("tool_trace", [])}
+    if critique_failure and not review_events:
+        failed_review = {"decision": "abstain", "reason_code": critique_failure,
+                         "evidence_signal_ids": [], "requested_check": "none",
+                         "explanation": "The model review could not be validated."}
+        review_events.append(_review_event(world_model, run_id, stage="INITIAL", review=failed_review,
+                                           receipt=critique_receipt, digest=digest,
+                                           science_event_id=science_event_id,
+                                           tool_event_id=tool_event["event_id"], check_event_id=None,
+                                           parent_run_id=parent_run_id, source_ids=source_ids))
+    elif critique_failure and review_events and decision == "abstain":
+        failed_review = {"decision": "abstain", "reason_code": critique_failure,
+                         "evidence_signal_ids": [], "requested_check": "none",
+                         "explanation": "The final model review could not be validated."}
+        review_events.append(_review_event(world_model, run_id, stage="FINAL", review=failed_review,
+                                           receipt=critique_receipt, digest=digest,
+                                           science_event_id=science_event_id,
+                                           tool_event_id=tool_event["event_id"],
+                                           check_event_id=verification_evidence_id,
+                                           parent_run_id=parent_run_id, source_ids=source_ids))
     # A deterministic weak-coverage result is retained verbatim. No model can
     # convert a failing PHIS gate to PASS or label adequate data insufficient.
     verify_event = _decision_event(world_model, run_id, phase="VERIFY", plan=plan,
@@ -641,8 +853,7 @@ def investigate_agentic(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY",
     local_verifier = critique_receipt["status"] == "BLOCKED"
     trace.append({"phase": "VERIFY", "tool": "local.evidence_verifier" if local_verifier
                   else provider + ".evidence_verifier",
-                  "status": ("PASS" if decision == "accept" else "BLOCKED") if local_verifier
-                  else critique_receipt["status"],
+                  "status": "PASS" if decision == "accept" else "BLOCKED",
                   "provider_status": critique_receipt["status"], "decision": decision,
                   "provider_response_id": critique_receipt["response_id"],
                   "provider_request_id": critique_receipt["request_id"],
@@ -654,6 +865,17 @@ def investigate_agentic(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY",
                    "dataset_id": DATASET_ID, "scenario": "opportunity", "timezone": "Europe/Madrid",
                    "window": {"start": START.isoformat(), "end": (START + timedelta(days=DAYS - 1)).isoformat()},
                    "planner_mode": planner_mode, "plan": plan, "verification": decision,
+                   "review": (review if review is not None and decision == review["decision"]
+                              else None),
+                   "review_event_ids": [item["event_id"] for item in review_events],
+                   "scientific_audit": ({"scientific_evidence": original_science["scientific_evidence"],
+                                         "longitudinal": original_science.get("longitudinal"),
+                                         "series": original_science.get("series", []),
+                                         "findings": original_science.get("findings", []),
+                                         "comparison": original_science.get("comparison"),
+                                         "coverage": original_science.get("coverage", []),
+                                         "scientific_event_id": science_event_id}
+                                        if original_science is not None and result["status"] != "PASS" else None),
                    "tool_trace": trace,
                    "nightshift_receipts": getattr(planner, "receipts", []) if provider == "nightshift" else [],
                    "inference_receipts": getattr(planner, "receipts", []),

@@ -419,7 +419,9 @@ function renderFindings(run) {
   const other = run.findings.filter(finding =>
     !['candidate_contributor', 'association', 'observation', 'uncertainty'].includes(finding.kind));
 
-  $('#finding-count').textContent = `${qualified.length} ${qualified.length === 1 ? 'SUPPORTED PATTERN' : 'SUPPORTED PATTERNS'}`;
+  $('#finding-count').textContent = run.scientific_audit
+    ? run.reason_code === 'invalid_critique' ? 'REVIEW FAILED' : 'MODEL ABSTAINED'
+    : `${qualified.length} ${qualified.length === 1 ? 'SUPPORTED PATTERN' : 'SUPPORTED PATTERNS'}`;
   const tierLegend = $('#evidence-tier-legend');
   tierLegend.hidden = qualified.length + exploratory.length === 0;
   $('#exploratory-details').hidden = exploratory.length === 0;
@@ -432,9 +434,12 @@ function renderFindings(run) {
     empty.className = 'finding-card empty-card';
     empty.setAttribute('role', 'listitem');
     const heading = document.createElement('h4');
-    heading.textContent = run.status === 'PASS' ? 'No association qualified for this outcome' : 'No verified findings for this run';
+    heading.textContent = run.scientific_audit ? 'PHIS findings retained for review'
+      : run.status === 'PASS' ? 'No association qualified for this outcome' : 'No verified findings for this run';
     const body = document.createElement('p');
-    body.textContent = run.status === 'PASS'
+    body.textContent = run.scientific_audit
+      ? 'PHIS scientific results remain inspectable in Evidence. The model did not endorse an association for this answer.'
+      : run.status === 'PASS'
       ? 'The pre-planned PHIS Discovery checks did not qualify a tested factor. Inspect all 16 results in evidence.'
       : 'The agent did not publish a scientific result. See the status and trace.';
     empty.append(heading, body);
@@ -444,6 +449,54 @@ function renderFindings(run) {
   exploratory.forEach((finding, index) => exploratoryGrid.append(findingCard(run, finding, index)));
   if (observation) recent.append(findingCard(run, observation, 0));
   other.forEach((finding, index) => grid.append(findingCard(run, finding, qualified.length + index)));
+}
+
+function renderModelReview(run) {
+  const panel = $('#model-review');
+  const review = run.contract_version === 'investigation.v4' ? run.review : null;
+  const modelUsed = run.contract_version === 'investigation.v4' &&
+    !['LOCAL DETERMINISTIC MODE', 'BLOCKED'].includes(run.planner_mode);
+  panel.hidden = !modelUsed;
+  $('#model-review-details').open = false;
+  $('#model-review-technical').replaceChildren();
+  if (!modelUsed) return;
+  const accepted = run.status === 'PASS' && run.verification === 'accept' && review?.decision === 'accept';
+  const descriptive = accepted && review.reason_code === 'descriptive_observation';
+  const invalid = ['invalid_critique', 'evidence_packet_invalid'].includes(run.reason_code);
+  panel.classList.toggle('is-abstention', !accepted);
+  $('#model-review-title').textContent = accepted
+    ? descriptive ? 'Nemotron accepted the PHIS description' : 'Nemotron accepted the cited PHIS evidence'
+    : invalid ? 'Nemotron critique failed validation' : 'Nemotron did not endorse a scientific association';
+  const signals = run.scientific_evidence?.signals ?? run.scientific_audit?.scientific_evidence?.signals ?? [];
+  const cited = review?.evidence_signal_ids?.map(id => signals.find(item => item.signal_id === id)).filter(Boolean) ?? [];
+  const names = cited.map(item => item.exposure.replaceAll('_', ' '));
+  const check = run.tool_trace?.find(step => step.phase === 'REPLAN');
+  $('#model-review-summary').textContent = accepted
+    ? descriptive
+      ? 'The model accepted a descriptive 180-day tool result. No PHIS Discovery association was claimed.'
+      : `The model accepted ${names.join(', ')} as ${names.length === 1 ? 'a qualified association' : 'qualified associations'} in the 180-day PHIS Discovery result. It did not establish a cause.${check ? ` A ${check.tool.replaceAll('_', ' ')} check was performed first.` : ''}`
+    : run.scientific_audit
+      ? invalid
+        ? 'PHIS completed its 180-day scientific checks. The model critique contradicted or failed the validation rules, so its claim was not used. Inspect PHIS output separately in Evidence.'
+        : `PHIS completed its 180-day scientific checks, but the model review did not accept a user-facing association.${check ? ` The requested ${check.tool.replaceAll('_', ' ')} check is recorded below.` : ''} Inspect the PHIS output separately in Evidence.`
+      : 'The investigation did not produce an endorsed scientific finding. Inspect the recorded status and tool trace.';
+  const details = $('#model-review-technical');
+  for (const [label, value] of [
+    ['Review decision', review?.decision ?? run.verification ?? 'unavailable'],
+    ['Validated reason', review?.reason_code ?? run.reason_code ?? 'unavailable'],
+    ['Cited PHIS signal IDs', review?.evidence_signal_ids?.join(', ') || 'none'],
+    ['Reason interpretation', review?.reason_code === 'supported_pattern'
+      ? 'The cited PHIS test qualified; this remains observational.'
+      : review?.reason_code === 'review_uncertain'
+        ? 'The model declined endorsement despite the cited qualified PHIS test.'
+        : review?.reason_code === 'descriptive_observation'
+          ? 'A descriptive tool result was accepted without an association claim.'
+          : 'The model did not accept a scientific association. PHIS results remain separate.'],
+    ['Original model wording', review ? 'Preserved in the cited World Model review event; not used as a scientific explanation.' :
+      invalid ? 'Rejected by deterministic validation and not displayed.' : 'No valid model rationale was returned.'],
+    ['Deterministic check', check ? `${check.tool}: ${check.status}; event ${check.event_id}` : 'none requested'],
+    ['World Model review events', run.review_event_ids?.join(', ') || 'none'],
+  ]) details.append(el('p', {}, `${label}: ${value}`));
 }
 
 // ─── Sponsor proof bar ────────────────────────────────────────────────────────
@@ -519,6 +572,7 @@ function clearPresentation(message) {
   $('#finding-count').textContent = 'NO CURRENT FINDINGS';
   $('#evidence-tier-legend').hidden = true;
   $('#findings-method').hidden = true;
+  $('#model-review').hidden = true;
   $('#sponsor-proof-bar').hidden = true;
   $('#followup-actions').hidden  = true;
   $('#global-study-limit').hidden = true;
@@ -682,10 +736,14 @@ function renderEvidenceContent(run, findingId = null, sourceId = null, activeTab
   }
 
   const days = windowDays(run);
+  const audited = run.scientific_audit && ['tab-finding', 'tab-signals'].includes(activeTab)
+    ? { ...run, ...run.scientific_audit, status: 'PASS' } : run;
+  if (audited !== run) content.append(el('p', { className: 'evidence-limit' },
+    'PHIS Discovery completed these scientific checks. Nemotron did not endorse them as a user-facing finding in this run. This is the retained technical audit.'));
 
   switch (activeTab) {
-    case 'tab-finding':  renderFindingTab(run, findingId, sourceId, days); break;
-    case 'tab-signals':  renderSignalsTab(run, findingId); break;
+    case 'tab-finding':  renderFindingTab(audited, findingId, sourceId, days); break;
+    case 'tab-signals':  renderSignalsTab(audited, findingId); break;
     case 'tab-trace':    renderTraceTab(run); break;
     case 'tab-sponsors': renderSponsorsTab(run); break;
     case 'tab-meta':     renderMetaTab(run, days); break;
@@ -1105,15 +1163,21 @@ form.addEventListener('submit', async event => {
     updateFollowupBanner();
 
     renderTrace(currentRun.tool_trace);
-    renderChart(currentRun);
-    renderLongitudinal(currentRun);
+    const observedView = currentRun.scientific_audit
+      ? { ...currentRun, ...currentRun.scientific_audit, status: 'PASS' }
+      : currentRun;
+    renderChart(observedView);
+    renderLongitudinal(observedView);
     renderTrajectory(currentRun);
     renderPeriod(currentRun);
     renderFindings(currentRun);
+    renderModelReview(currentRun);
     renderSponsorBar(currentRun);
-    $('#global-study-limit').hidden = !(currentRun.status === 'PASS' && currentRun.scientific_evidence);
-    $('#findings-title').textContent = currentRun.status === 'PASS' && currentRun.scientific_evidence
-      ? 'Supported 180-day associations' : 'No verified association published';
+    $('#global-study-limit').hidden = !(currentRun.scientific_evidence || currentRun.scientific_audit);
+    $('#findings-title').textContent = currentRun.scientific_audit
+      ? `${currentRun.reason_code === 'invalid_critique' ? 'Model review failed' : 'Model review abstained'} · PHIS science in Evidence`
+      : currentRun.status === 'PASS' && currentRun.scientific_evidence
+        ? 'Supported 180-day associations' : 'No verified association published';
     $('#findings-method').hidden = !(currentRun.status === 'PASS' && currentRun.scientific_evidence);
     if (currentRun.status === 'PASS' && currentRun.scientific_evidence) {
       $('#findings-method').textContent = `PHIS Discovery ran ${currentRun.scientific_evidence.hypothesis_count} pre-planned tests on the full record for this question. These cards show the qualified findings returned by Python; inspect all tests and exact source IDs in Evidence.`;
@@ -1129,6 +1193,8 @@ form.addEventListener('submit', async event => {
     const ctxEl = $('#result-context');
     ctxEl.textContent = currentRun.parent_run_id
       ? `Follow-up based on the prior investigation saved in agent memory. Inspect the technical trace for the linked run.`
+      : currentRun.scientific_audit
+        ? `PHIS observed the full fictional 180-day history, ${plainDate(currentRun.window.start)}–${plainDate(currentRun.window.end)}. The model review ${currentRun.reason_code === 'invalid_critique' ? 'failed validation' : 'abstained'}; inspect the PHIS tests separately in Evidence.`
       : currentRun.status === 'PASS'
         ? `The full fictional 180-day history, ${plainDate(currentRun.window.start)}–${plainDate(currentRun.window.end)}. The six descriptive intervals and scientific tests use the full returned record.`
         : 'No scientific result was published for this run. The status and evidence panel explain why.';

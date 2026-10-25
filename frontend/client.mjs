@@ -217,6 +217,38 @@ export function validateLongitudinalInvestigation(value) {
         'SIMULATED', 'LOCAL DETERMINISTIC MODE', 'BLOCKED']
         .includes(value.planner_mode))
     throw new Error('Unknown planner provenance');
+  if (value.contract_version === 'investigation.v4') {
+    const audit = value.scientific_audit;
+    if (audit != null && (value.status === 'PASS' || !audit.scientific_evidence ||
+        audit.scientific_evidence.record_digest_sha256 !== value.source_digest_sha256 ||
+        audit.scientific_evidence.signals?.length !== 16 ||
+        !/^[a-f0-9]{64}$/.test(audit.scientific_event_id ?? '') ||
+        engine.status !== 'VERIFIED'))
+      throw new Error('Invalid retained scientific audit');
+    const review = value.review;
+    if (review != null) {
+      const ids = review.evidence_signal_ids;
+      const evidence = value.scientific_evidence ?? audit?.scientific_evidence;
+      if (review.schema !== 'phis-critique.v2' ||
+          !['accept','verify','abstain'].includes(review.decision) ||
+          !['supported_pattern','descriptive_observation','coverage_question','signal_question','trend_question','insufficient_evidence','review_uncertain'].includes(review.reason_code) ||
+          !['none','coverage'].includes(review.requested_check) ||
+          !Array.isArray(ids) || ids.length > 3 || new Set(ids).size !== ids.length ||
+          ids.some(id => !/^[a-f0-9]{64}$/.test(id) || !evidence?.signals?.some(signal => signal.signal_id === id)) ||
+          typeof review.explanation !== 'string' || review.explanation.length > 220 ||
+          (review.reason_code === 'insufficient_evidence' &&
+            evidence?.signals?.some(signal => signal.classification === 'candidate_signal')) ||
+          (review.reason_code === 'review_uncertain' &&
+            (!ids.length || ids.some(id => !evidence?.signals?.some(signal =>
+              signal.signal_id === id && signal.classification === 'candidate_signal')))) ||
+          (review.decision === 'accept' && (value.status !== 'PASS' ||
+            (review.reason_code === 'descriptive_observation'
+              ? ids.length !== 0 || !['trend','coverage'].includes(value.plan?.tool)
+              : !ids.length || ids.some(id => !evidence?.signals?.some(signal => signal.signal_id === id &&
+                signal.classification === 'candidate_signal' && signal.exposure !== 'unrelated_count'))))))
+        throw new Error('Invalid model review');
+    }
+  }
   return value;
 }
 
