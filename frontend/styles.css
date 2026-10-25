@@ -384,6 +384,30 @@ button:focus-visible, textarea:focus-visible, a:focus-visible, summary:focus-vis
 }
 
 /* ─── Chart card ─────────────────────────────────────────────────────────── */
+.longitudinal-summary {
+  margin: 18px 0 16px; padding: 22px;
+  background: #eaf2e8; border: 1px solid #cddfcd; border-radius: var(--radius);
+}
+.longitudinal-summary[hidden], .secondary-panel[hidden] { display: none; }
+.longitudinal-heading { display: flex; justify-content: space-between; align-items: end; gap: 14px; }
+.longitudinal-heading h3 { font: 700 22px/1.18 'Manrope', sans-serif; letter-spacing: -.05em; margin: 7px 0 0; }
+.longitudinal-heading > strong { color: var(--forest); font-size: 12px; white-space: nowrap; }
+#longitudinal-caption, .longitudinal-comparison { color: #536f5e; font-size: 11px; line-height: 1.5; margin: 10px 0 0; }
+.longitudinal-windows { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 7px; margin-top: 17px; }
+.longitudinal-window { min-width: 0; background: #fcfdf8; border: 1px solid #d8e5d6; border-radius: 8px; padding: 11px 9px; }
+.longitudinal-window span, .longitudinal-window strong { display: block; }
+.longitudinal-window-label { font-size: 8px; color: #65836d; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.longitudinal-window-dates { font-size: 9px; color: #5c7561; margin-top: 5px; min-height: 2.6em; }
+.longitudinal-window-mean { color: var(--forest); font: 700 19px/1.1 'Manrope', sans-serif; margin-top: 9px; }
+.longitudinal-window-coverage { color: #68816d; font-size: 8px; margin-top: 6px; }
+.overview-grid { grid-template-columns: minmax(0, 1fr); }
+.secondary-panel { margin-top: 17px; border: 1px solid #d8e4d6; border-radius: var(--radius-sm); padding: 0 20px 18px; background: #fbfcf8; }
+.secondary-panel summary { cursor: pointer; color: var(--forest); font: 700 14px 'Manrope', sans-serif; padding: 17px 0; }
+.secondary-panel > p { color: #62786a; font-size: 11px; line-height: 1.55; margin: 0 0 14px; }
+.secondary-panel .trajectory-strip { margin: 14px 0; }
+.secondary-panel .period-card { min-height: 0; box-shadow: none; }
+.recent-observation .finding-card { min-height: 0; box-shadow: none; }
+.recent-observation .finding-card p { flex: none; }
 .chart-card, .period-card, .finding-card {
   background: var(--paper); border: 1px solid #e0e7dc; border-radius: var(--radius); box-shadow: var(--shadow);
 }
@@ -682,7 +706,8 @@ button:focus-visible, textarea:focus-visible, a:focus-visible, summary:focus-vis
   .app-shell { grid-template-columns: minmax(330px, 38%) minmax(0, 62%); }
   .investigation-rail { padding-left: 26px; padding-right: 26px; }
   .content-wrap { padding-left: 26px; padding-right: 26px; }
-  .overview-grid { grid-template-columns: minmax(0, 1.3fr) minmax(210px, .8fr); }
+  .overview-grid { grid-template-columns: minmax(0, 1fr); }
+  .longitudinal-windows { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .page-title { font-size: 32px; }
   .findings-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -702,7 +727,7 @@ button:focus-visible, textarea:focus-visible, a:focus-visible, summary:focus-vis
   .rail-footer { display: none; }
   .workbench-header { height: 58px; }
   .content-wrap { padding-top: 24px; }
-  .overview-grid { grid-template-columns: minmax(0, 1.4fr) minmax(210px, .7fr); }
+  .overview-grid { grid-template-columns: minmax(0, 1fr); }
   .findings-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
@@ -725,6 +750,10 @@ button:focus-visible, textarea:focus-visible, a:focus-visible, summary:focus-vis
   .window-badge { display: none; }
   .avatar { display: none; }
   .content-wrap { padding: 22px 16px 16px; }
+  .longitudinal-summary { padding: 18px 14px; }
+  .longitudinal-heading { align-items: start; flex-direction: column; }
+  .longitudinal-windows { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .longitudinal-window-dates { min-height: 0; }
   .intro-row { flex-direction: column; align-items: stretch; }
   .evidence-button { align-self: flex-start; }
   .page-title { font-size: 30px; }

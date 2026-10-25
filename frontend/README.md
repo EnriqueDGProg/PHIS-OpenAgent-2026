@@ -2,6 +2,8 @@
 
 The English UI calls the Python `POST /api/investigations` endpoint and displays only returned tool traces, source IDs, and deterministic findings. The chart keeps missing days as gaps. The evidence panel shows separate Zetaris, Meterless Engine, Meterless Runtime, and NVIDIA statuses.
 
+The default investigation now leads with the full 180-day daily record and the six fixed 30-day descriptive windows returned by Python, followed by PHIS Discovery's qualified associations. Unstable tests appear in an expandable exploratory section; the unchanged two adjacent 28-day comparison appears under **Recent changes**. The frontend formats returned numbers and never fits a new trend or fills missing days. See the [judge guide to the fictional generator](../docs/SYNTHETIC_GENERATOR_JUDGE_GUIDE_2026-10-25.md) for known simulation design versus independently reported observational findings.
+
 Start the API from the repository root with `PYTHONPATH=src` and `python -m phis_open_agent.api`; open `http://127.0.0.1:4173`. `npm start` from this directory starts the same Python server. Node.js 24 is required for the official Engine bridge. No npm install is needed for the UI.
 
 Default mode is `SYNTHETIC_LOCAL_ONLY` with the 180-day, 1,080-record fictional scenario. Set `PHIS_DATA_MODE=LIVE_SYNTHETIC_ZETARIS` and the documented Zetaris process environment only when the authorized local service and 1,080-record fictional table are ready. Live mode refuses the local evaluation scenarios. Missing configuration, invalid credentials, incomplete rows, or transport failure produces an abstention and no local fallback. The browser stores only the last synthetic parent run ID. Open `/?analysis=v4` to exercise the bounded model planner when authorized inference is configured.

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { canContinueFrom, comparisonExplanation, displayChange, findingExplanation,
+  longitudinalPresentation,
   signalExplanation, TRACE_GROUPS } from '../presentation.mjs';
 
 const run = {
@@ -55,6 +56,27 @@ test('same-day supported association stays distinct from unstable next-day test'
   assert.match(signalExplanation(sameDay).title, /same day.*Supported association/i);
   assert.match(signalExplanation(nextDay).title, /next day.*Exploratory only/i);
   assert.match(findingExplanation(pairedRun, finding).text, /different test from the supported same-day/i);
+});
+
+test('whole-history summary formats only six returned missing-aware 30-day means', () => {
+  const windows = Array.from({ length: 6 }, (_, index) => ({
+    start: new Date(Date.UTC(2026, 3, 25 + index * 30)).toISOString().slice(0, 10),
+    end: new Date(Date.UTC(2026, 3, 54 + index * 30)).toISOString().slice(0, 10),
+    observed: 28, eligible: 30, mean: 5.1 + index * 0.1,
+  }));
+  const longitudinal = { ...run, window: { start: windows[0].start, end: windows[5].end },
+    series: [{ variable: 'energy_central', unit: 'score/10' }],
+    coverage: [{ variable: 'energy_central', observed: 168, eligible: 180 }],
+    longitudinal: { variable: 'energy_central', method: 'arithmetic_mean_observed_days',
+      inference: 'descriptive_only', windows, first_to_last_difference: 0.5 } };
+  const view = longitudinalPresentation(longitudinal);
+  assert.equal(view.windows.length, 6);
+  assert.equal(view.coverage, '168 of 180 days recorded');
+  assert.match(view.comparison, /\+0\.50\/10.*Descriptive difference only/);
+  assert.equal(longitudinalPresentation({ ...longitudinal,
+    longitudinal: { ...longitudinal.longitudinal, windows: windows.slice(1) } }), null);
+  assert.equal(longitudinalPresentation({ ...longitudinal,
+    coverage: [{ variable: 'energy_central', observed: 180, eligible: 180 }] }), null);
 });
 
 test('qualified findings use original typed signal and preserve temporal direction', () => {
