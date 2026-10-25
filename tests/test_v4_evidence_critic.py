@@ -11,7 +11,8 @@ from unittest.mock import patch
 
 from phis_open_agent.inference import InferenceBlocked, NvidiaClient, NvidiaConfig
 from phis_open_agent.nightshift_agent import (NvidiaPlanner, PlanRejected,
-                                              _critic_evidence_packet, investigate_agentic)
+                                              _critic_evidence_packet, investigate_agentic,
+                                              parse_critique)
 from phis_open_agent.run_world_model import MeterlessRunWorldModel
 from phis_open_agent.stochastic_benchmark import generate_observations
 
@@ -61,6 +62,20 @@ class V4EvidenceCriticTests(unittest.TestCase):
             self.assertEqual(packet["source_digest_sha256"], result["source_digest_sha256"])
             self.assertEqual(packet["coverage"]["observed"], 170)
             self.assertEqual(packet["comparison_window_observed"]["min_observed_each"], 20)
+            self.assertEqual((packet["comparison_window_observed"]["prior"],
+                              packet["comparison_window_observed"]["recent"]), (26, 27))
+            self.assertEqual(packet["classification_counts"],
+                             {"candidate_signal": 3, "unstable_candidate": 2, "weak_candidate": 11})
+            self.assertEqual([item["classification"] for item in packet["signals"]],
+                             ["candidate_signal"] * 3 + ["unstable_candidate", "weak_candidate"])
+            control = next(item for item in packet["signals"]
+                           if item["exposure"] == "unrelated_count")
+            self.assertEqual(control["classification"], "weak_candidate")
+            self.assertNotIn(control["signal_id"],
+                             {item["finding_id"] for item in result["findings"]})
+            self.assertTrue(all(item["block_stable"] for item in packet["signals"][:3]))
+            self.assertTrue(all(item["q"]["q_selection_child_by"] < 0.05
+                                for item in packet["signals"][:3]))
             original = {item["signal_id"]: item for item in result["scientific_evidence"]["signals"]}
             self.assertGreater(len(packet["signals"]), 0)
             self.assertLessEqual(len(packet["signals"]), 5)
@@ -70,6 +85,7 @@ class V4EvidenceCriticTests(unittest.TestCase):
                     self.assertEqual(item[key], source[key])
                 self.assertEqual(item["q"]["q_selection_child_by"], source["q_selection_child_by"])
             self.assertTrue(packet["uncertainty"])
+            self.assertIn("no adjusted or causal effect", packet["uncertainty"][0])
             self.assertNotIn("source_record_ids", json.dumps(packet))
             self.assertEqual(sponsor(result, "nemotron")["status"], "NOT_CONNECTED")
             self.assertEqual([x["status"] for x in result["inference_receipts"]],
@@ -84,6 +100,23 @@ class V4EvidenceCriticTests(unittest.TestCase):
                 _critic_evidence_packet(bad, result["plan"], result["source_digest_sha256"],
                                         science, tool, {"variable": "energy_central",
                                                         "observed": 170, "eligible": 180})
+            contradictory = deepcopy(result)
+            next(item for item in contradictory["scientific_evidence"]["signals"]
+                 if item["classification"] == "candidate_signal")["classification"] = "weak_candidate"
+            with self.assertRaisesRegex(PlanRejected, "disagree with persisted science"):
+                _critic_evidence_packet(contradictory, result["plan"],
+                                        result["source_digest_sha256"], science, tool,
+                                        {"variable": "energy_central", "observed": 170,
+                                         "eligible": 180})
+
+    def test_critique_contract_rejects_unexplained_extra_or_invalid_output(self):
+        self.assertEqual(parse_critique('{"decision":"abstain"}'), "abstain")
+        for output in ('{"decision":"accept","cause":"sleep"}',
+                       '{"decision":"accept","decision":"abstain"}',
+                       '{"decision":"causal_claim"}',
+                       'The evidence is inconclusive.'):
+            with self.subTest(output=output), self.assertRaises(PlanRejected):
+                parse_critique(output)
 
     def test_high_coverage_challenge_then_model_accept_restores_pass(self):
         with tempfile.TemporaryDirectory() as folder:
