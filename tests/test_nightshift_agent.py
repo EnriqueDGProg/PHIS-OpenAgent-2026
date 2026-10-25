@@ -15,6 +15,13 @@ from phis_open_agent.nightshift_agent import (
 )
 from phis_open_agent.run_world_model import MeterlessRunWorldModel, SyntheticRunWorldModel
 
+DESCRIPTIVE_ACCEPT = json.dumps({"schema": "phis-critique.v2", "decision": "accept",
+    "reason_code": "descriptive_observation", "evidence_signal_ids": [],
+    "requested_check": "none", "explanation": "The recorded descriptive tool result is bounded."})
+COVERAGE_VERIFY = json.dumps({"schema": "phis-critique.v2", "decision": "verify",
+    "reason_code": "coverage_question", "evidence_signal_ids": [],
+    "requested_check": "coverage", "explanation": "Check recorded coverage against the existing gate."})
+
 
 class ScriptedTransport:
     def __init__(self, *answers):
@@ -41,9 +48,9 @@ class PlannerContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             store = MeterlessRunWorldModel(Path(folder) / "events.jsonl")
             transport = ScriptedTransport('{"family":"energy","tool":"trend"}',
-                                          '{"decision":"accept"}',
+                                          DESCRIPTIVE_ACCEPT,
                                           '{"family":"sleep","tool":"coverage"}',
-                                          '{"decision":"replan_coverage"}')
+                                          COVERAGE_VERIFY)
             planner = NvidiaPlanner(NvidiaClient(
                 NvidiaConfig.from_env({"NVIDIA_API_KEY": "simulated-token"}), transport))
             self.assertFalse(planner.requires_http_request_id)
@@ -71,8 +78,8 @@ class PlannerContractTests(unittest.TestCase):
             critique_system = json.loads(transport.requests[1][0].data)["messages"][0]["content"]
             self.assertIn('exactly two top-level JSON keys, family and tool', plan_system)
             self.assertIn('No parameters, arguments, nested objects', plan_system)
-            self.assertIn('exactly one top-level JSON key, decision', critique_system)
-            self.assertIn('{"decision":"abstain"}', critique_system)
+            self.assertIn('exactly the six JSON keys', critique_system)
+            self.assertIn('phis-critique.v2', critique_system)
             for result in (first, second):
                 self.assertEqual(next(p for p in result["sponsor_proofs"]
                                       if p["sponsor"] == "nemotron")["status"], "NOT_CONNECTED")
@@ -95,7 +102,7 @@ class PlannerContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             store = MeterlessRunWorldModel(Path(folder) / "agent.jsonl")
             first, transport = planner('{"family":"energy","tool":"trend"}',
-                                       '{"decision":"accept"}')
+                                       DESCRIPTIVE_ACCEPT)
             result = investigate_agentic("How has my energy evolved?", world_model=store,
                                          planner=first)
             self.assertEqual((result["status"], result["plan"]["tool"]), ("PASS", "trend"))
@@ -108,7 +115,8 @@ class PlannerContractTests(unittest.TestCase):
             reopened = MeterlessRunWorldModel(Path(folder) / "agent.jsonl")
             saved = reopened.read(result["run_id"])
             self.assertEqual([item["kind"] for item in saved],
-                             ["agent_decision_180d", "agent_tool_evidence_180d", "agent_decision_180d"])
+                             ["agent_decision_180d", "agent_tool_evidence_180d",
+                              "agent_review_180d_v2", "agent_decision_180d"])
             self.assertEqual(saved[-1]["payload"]["decision"], "accept")
             self.assertEqual(saved[-1]["payload"]["evidence_event_id"], saved[1]["event_id"])
             self.assertTrue(all(item.get("engine_event_id") for item in saved))
@@ -116,7 +124,7 @@ class PlannerContractTests(unittest.TestCase):
                              "NOT_CONNECTED")
 
             second, _ = planner('{"family":"sleep","tool":"coverage"}',
-                                '{"decision":"replan_coverage"}')
+                                COVERAGE_VERIFY)
             followup = investigate_agentic("Could coffee affect sleep?", world_model=reopened,
                                            parent_run_id=result["run_id"], planner=second)
             self.assertEqual(followup["plan"], {"family": "sleep", "tool": "coverage"})
@@ -124,14 +132,13 @@ class PlannerContractTests(unittest.TestCase):
                              ("abstain", "BLOCKED", "evidence_review_required"))
             self.assertNotEqual(result["plan"], followup["plan"])
             followup_events = reopened.read(followup["run_id"])
-            self.assertEqual([event["kind"] for event in followup_events],
-                             ["agent_decision_180d", "agent_tool_evidence_180d",
-                              "agent_decision_180d", "agent_tool_evidence_180d",
-                              "agent_decision_180d"])
-            self.assertEqual(followup_events[2]["payload"]["decision"], "replan")
-            self.assertEqual(followup_events[3]["payload"]["tool"], "coverage")
-            self.assertEqual(followup_events[4]["payload"]["evidence_event_id"],
-                             followup_events[3]["event_id"])
+            decisions = [event for event in followup_events if event["kind"] == "agent_decision_180d"]
+            tools = [event for event in followup_events if event["kind"] == "agent_tool_evidence_180d"]
+            reviews = [event for event in followup_events if event["kind"] == "agent_review_180d_v2"]
+            self.assertEqual(decisions[1]["payload"]["decision"], "replan")
+            self.assertEqual(tools[-1]["payload"]["tool"], "coverage")
+            self.assertEqual(decisions[-1]["payload"]["evidence_event_id"], tools[-1]["event_id"])
+            self.assertEqual([event["payload"]["stage"] for event in reviews], ["INITIAL", "FINAL"])
 
     def test_model_injection_and_invalid_response_abstain(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -146,7 +153,7 @@ class PlannerContractTests(unittest.TestCase):
     def test_medical_request_forces_abstention_even_if_model_selects_discovery(self):
         with tempfile.TemporaryDirectory() as folder:
             scripted, _ = planner('{"family":"energy","tool":"discovery"}',
-                                  '{"decision":"accept"}')
+                                  DESCRIPTIVE_ACCEPT)
             result = investigate_agentic("What medication dose should I take for fatigue?",
                                          world_model=SyntheticRunWorldModel(Path(folder) / "events.jsonl"),
                                          planner=scripted)

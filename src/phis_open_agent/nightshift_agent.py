@@ -69,10 +69,10 @@ def parse_critique(content):
                                    "evidence_signal_ids", "requested_check", "explanation"})
     if obj["schema"] != "phis-critique.v2" or obj["decision"] not in {"accept", "verify", "abstain"}:
         raise PlanRejected("Model selected a forbidden critique decision")
-    if obj["reason_code"] not in {"supported_pattern", "coverage_question", "signal_question",
-                                  "trend_question", "insufficient_evidence"}:
+    if obj["reason_code"] not in {"supported_pattern", "descriptive_observation", "coverage_question", "signal_question",
+                                  "trend_question", "insufficient_evidence", "review_uncertain"}:
         raise PlanRejected("Model selected an unknown reason")
-    if obj["requested_check"] not in {"none", "coverage", "signal_consistency", "trend_consistency"}:
+    if obj["requested_check"] not in {"none", "coverage"}:
         raise PlanRejected("Model requested an unsupported check")
     ids = obj["evidence_signal_ids"]
     if (not isinstance(ids, list) or len(ids) > 3 or len(ids) != len(set(map(str, ids))) or
@@ -83,15 +83,17 @@ def parse_critique(content):
             any(ord(char) < 32 for char in explanation)):
         raise PlanRejected("Critique explanation invalid")
     if (obj["decision"] == "accept" and
-            (obj["reason_code"] != "supported_pattern" or obj["requested_check"] != "none" or not ids)):
+            (obj["reason_code"], bool(ids), obj["requested_check"]) not in {
+                ("supported_pattern", True, "none"),
+                ("descriptive_observation", False, "none")}):
         raise PlanRejected("Acceptance requires a supported citation")
     if (obj["decision"] == "verify" and
-            (obj["reason_code"], obj["requested_check"]) not in {
-                ("coverage_question", "coverage"), ("signal_question", "signal_consistency"),
-                ("trend_question", "trend_consistency")}):
+            (obj["reason_code"], obj["requested_check"]) != ("coverage_question", "coverage")):
         raise PlanRejected("Review reason and check disagree")
     if obj["decision"] == "abstain" and obj["requested_check"] != "none":
         raise PlanRejected("Abstention cannot request a check")
+    if obj["reason_code"] == "review_uncertain" and (obj["decision"] != "abstain" or not ids):
+        raise PlanRejected("Review uncertainty requires cited evidence and abstention")
     return obj
 
 
@@ -179,10 +181,10 @@ class NightshiftPlanner:
                                                       "decision": ["accept", "verify", "abstain"],
                                                       "reason_code": ["supported_pattern", "coverage_question",
                                                                       "signal_question", "trend_question",
-                                                                      "insufficient_evidence"],
+                                                                      "descriptive_observation",
+                                                                      "insufficient_evidence", "review_uncertain"],
                                                       "evidence_signal_ids": "up to three existing signal IDs",
-                                                      "requested_check": ["none", "coverage",
-                                                                          "signal_consistency", "trend_consistency"],
+                                                      "requested_check": ["none", "coverage"],
                                                       "explanation": "short English text, at most 220 characters"}})
         return parse_critique(content), receipt
 
@@ -227,11 +229,14 @@ class NvidiaPlanner(NightshiftPlanner):
         if role == "evidence_verifier":
             return (SYSTEM + " CRITIQUE: return exactly the six JSON keys in the user schema, "
                     "including schema='phis-critique.v2'. Cite existing signal IDs only. "
-                    "Accept only a qualified candidate_signal, reason_code=supported_pattern, "
-                    "requested_check=none. Verify only when a concrete existing check is needed: "
-                    "coverage_question/coverage, signal_question/signal_consistency, or "
-                    "trend_question/trend_consistency. Abstain with requested_check=none if "
-                    "the evidence cannot support acceptance. The explanation is short, grounded "
+                    "Accept a qualified candidate_signal with reason_code=supported_pattern and "
+                    "its signal ID. For a trend or coverage tool without Discovery, accept only a "
+                    "descriptive_observation with no signal IDs. Both use requested_check=none. "
+                    "Verify only when a concrete existing check is needed: "
+                    "coverage_question/coverage. Abstain with requested_check=none if "
+                    "the evidence cannot support acceptance. If PHIS has qualified candidates "
+                    "but you still decline endorsement, use review_uncertain and cite those IDs; "
+                    "do not claim they failed the scientific gates. The explanation is short, grounded "
                     "English and cannot add measurements, causes, confidence or medical advice. "
                     "Causal uncertainty by itself is not a failed scientific gate. "
                     "On final critique after a check, choose accept or abstain, never verify again. "
@@ -303,6 +308,7 @@ def _critic_evidence_packet(result, plan, digest, science_event, tool_event, cov
     if plan["tool"] != "discovery" or result["status"] != "PASS":
         return packet
     if (not isinstance(package, dict) or science_event is None or
+            package.get("dataset_id") != DATASET_ID or
             package.get("family") != plan["family"] or
             package.get("record_digest_sha256") != digest or
             science_event["payload"]["record_digest_sha256"] != digest or
@@ -351,7 +357,8 @@ def _critic_evidence_packet(result, plan, digest, science_event, tool_event, cov
         source_ids = item.get("source_record_ids")
         if (not isinstance(source_ids, list) or len(source_ids) > 1080 or
                 any(not isinstance(value, str) or not value.startswith("SYN-180-") or
-                    len(value) > 100 for value in source_ids)):
+                    len(value) > 100 for value in source_ids) or
+                not set(source_ids).issubset(science_event["source_record_ids"])):
             raise PlanRejected("Discovery source lineage invalid")
         outcome = item.get("outcome")
         if outcome != ("energy_central" if plan["family"] == "energy" else "sleep_hours"):
@@ -399,7 +406,6 @@ def _critic_evidence_packet(result, plan, digest, science_event, tool_event, cov
             longitudinal.get("variable") != ("energy_central" if plan["family"] == "energy" else "sleep_hours") or
             longitudinal.get("inference") != "descriptive_only"):
         raise PlanRejected("Discovery longitudinal series invalid")
-    from datetime import date
     clean_windows = []
     for index, window in enumerate(windows):
         expected_start = START + timedelta(days=index * 30)
@@ -466,11 +472,15 @@ def _validate_review(review, packet, *, final=False):
         cited.append(item)
     reason = review["reason_code"]
     if review["decision"] == "accept":
-        if not cited or any(item["classification"] != "candidate_signal" or
+        if reason == "descriptive_observation":
+            if packet["tool"] not in {"trend", "coverage"} or cited:
+                raise PlanRejected("Descriptive acceptance requires a descriptive tool")
+            return review
+        if packet["tool"] != "discovery" or not cited or any(item["classification"] != "candidate_signal" or
                                 item["exposure"] == "unrelated_count" or
                                 not item["block_stable"] for item in cited):
             raise PlanRejected("Critique promotes unsupported signal")
-    elif reason == "supported_pattern":
+    elif reason in {"supported_pattern", "descriptive_observation"}:
         raise PlanRejected("Non-acceptance cannot claim support")
     if reason == "coverage_question" and packet["coverage"]["observed"] == packet["coverage"]["eligible"]:
         raise PlanRejected("Coverage objection contradicts complete observation")
@@ -482,6 +492,12 @@ def _validate_review(review, packet, *, final=False):
         raise PlanRejected("Trend objection lacks longitudinal evidence")
     if reason == "insufficient_evidence" and review["decision"] != "abstain":
         raise PlanRejected("Insufficient evidence requires abstention")
+    qualified = {sid for sid, item in signals.items() if item["classification"] == "candidate_signal"}
+    if reason == "insufficient_evidence" and qualified:
+        raise PlanRejected("Insufficient evidence contradicts qualified PHIS signals")
+    if reason == "review_uncertain" and (not cited or
+            any(item["classification"] != "candidate_signal" for item in cited)):
+        raise PlanRejected("Review uncertainty must cite qualified PHIS signals")
     return review
 
 
@@ -680,6 +696,7 @@ def investigate_agentic(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY",
     elif critique_failure:
         decision, critique_receipt = "abstain", blocked_receipt
     else:
+        critique_receipt = blocked_receipt
         try:
             if planner_mode in {verified_mode, "SIMULATED"}:
                 review, critique_receipt = planner.critique(question, plan, packet)
@@ -692,7 +709,9 @@ def investigate_agentic(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY",
             critique_failure = "model_unavailable"
             review = None
         except PlanRejected:
-            decision, critique_receipt = "abstain", blocked_receipt
+            decision = "abstain"
+            critique_receipt = (planner.receipts[-1] if len(getattr(planner, "receipts", [])) >= 2
+                                else blocked_receipt)
             critique_failure = "invalid_critique"
             review = None
     if review is not None:
@@ -722,14 +741,7 @@ def investigate_agentic(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY",
         gate_passed = (plan["tool"] == "discovery" and result["status"] == "PASS" and
                        science_event is not None and _comparison_coverage_passes(result))
         requested = review["requested_check"]
-        if requested == "signal_consistency":
-            check_passed = gate_passed and all(
-                item["signal_id"] in {signal["signal_id"] for signal in package["signals"]}
-                for item in packet["signals"])
-        elif requested == "trend_consistency":
-            check_passed = gate_passed and packet["longitudinal"]["first_to_last_difference"] == result["longitudinal"]["first_to_last_difference"]
-        else:
-            check_passed = gate_passed
+        check_passed = gate_passed
         windows = packet.get("comparison_window_observed") if packet else None
         coverage_material = {"tool": requested, "variable": coverage["variable"],
                              "observed": coverage["observed"], "eligible": coverage["eligible"],
@@ -742,8 +754,7 @@ def investigate_agentic(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY",
                                                    separators=(",", ":"), allow_nan=False).encode()).hexdigest()
         replan_event = world_model.append(
             run_id=run_id, kind="agent_tool_evidence_180d",
-            payload={"family": plan["family"], "tool": ("coverage" if requested == "coverage" else
-                     "trend" if requested == "trend_consistency" else "discovery"),
+            payload={"family": plan["family"], "tool": "coverage",
                      "status": "PASS" if check_passed else "BLOCKED",
                      "source_digest_sha256": digest, "output_sha256": coverage_sha256,
                      "observed_days": coverage["observed"], "eligible_days": coverage["eligible"],
@@ -770,7 +781,9 @@ def investigate_agentic(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY",
                 critique_failure = "model_unavailable"
                 final_review = None
             except PlanRejected:
-                final_decision, final_receipt = "abstain", blocked_receipt
+                final_decision = "abstain"
+                final_receipt = (planner.receipts[-1] if len(getattr(planner, "receipts", [])) >= 3
+                                 else blocked_receipt)
                 critique_failure = "invalid_critique"
                 final_review = None
             if final_receipt["status"] != "VERIFIED" and planner_mode == verified_mode:
@@ -808,14 +821,16 @@ def investigate_agentic(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY",
                       "tool_trace": result.get("tool_trace", [])}
     elif decision == "abstain" and result["status"] == "PASS":
         result = {"status": "BLOCKED", "reason_code": critique_failure or "evidence_rejected",
-                  "summary": "The evidence verifier abstained; no scientific finding is presented.",
+                  "summary": ("The model critique failed validation; PHIS scientific results remain available for audit."
+                              if critique_failure else
+                              "The model abstained; PHIS scientific results remain available for audit."),
                   "scientific_evidence": None, "findings": [], "tool_trace": result.get("tool_trace", [])}
     if critique_failure and not review_events:
         failed_review = {"decision": "abstain", "reason_code": critique_failure,
                          "evidence_signal_ids": [], "requested_check": "none",
                          "explanation": "The model review could not be validated."}
         review_events.append(_review_event(world_model, run_id, stage="INITIAL", review=failed_review,
-                                           receipt=blocked_receipt, digest=digest,
+                                           receipt=critique_receipt, digest=digest,
                                            science_event_id=science_event_id,
                                            tool_event_id=tool_event["event_id"], check_event_id=None,
                                            parent_run_id=parent_run_id, source_ids=source_ids))
@@ -824,7 +839,7 @@ def investigate_agentic(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY",
                          "evidence_signal_ids": [], "requested_check": "none",
                          "explanation": "The final model review could not be validated."}
         review_events.append(_review_event(world_model, run_id, stage="FINAL", review=failed_review,
-                                           receipt=blocked_receipt, digest=digest,
+                                           receipt=critique_receipt, digest=digest,
                                            science_event_id=science_event_id,
                                            tool_event_id=tool_event["event_id"],
                                            check_event_id=verification_evidence_id,
@@ -838,8 +853,7 @@ def investigate_agentic(question, *, world_model, mode="SYNTHETIC_LOCAL_ONLY",
     local_verifier = critique_receipt["status"] == "BLOCKED"
     trace.append({"phase": "VERIFY", "tool": "local.evidence_verifier" if local_verifier
                   else provider + ".evidence_verifier",
-                  "status": ("PASS" if decision == "accept" else "BLOCKED") if local_verifier
-                  else critique_receipt["status"],
+                  "status": "PASS" if decision == "accept" else "BLOCKED",
                   "provider_status": critique_receipt["status"], "decision": decision,
                   "provider_response_id": critique_receipt["response_id"],
                   "provider_request_id": critique_receipt["request_id"],

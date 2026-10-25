@@ -127,6 +127,7 @@ class V4ReasoningTests(unittest.TestCase):
             lambda p: response("accept", p["evidence"], signal="f" * 64),
             lambda p: response("accept", p["evidence"], signal=next(
                 s["signal_id"] for s in p["evidence"]["signals"] if s["exposure"] == "unrelated_count")),
+            lambda p: response("abstain", p["evidence"], reason="insufficient_evidence"),
             '{"schema":"phis-critique.v2","decision":"accept"}',
             InferenceBlocked("simulated outage"),
         ]
@@ -140,6 +141,16 @@ class V4ReasoningTests(unittest.TestCase):
                 self.assertEqual(result["scientific_audit"]["scientific_evidence"]["hypothesis_count"], 16)
                 self.assertEqual(next(p for p in result["sponsor_proofs"]
                                       if p["sponsor"] == "nemotron")["status"], "NOT_CONNECTED")
+
+    def test_model_may_abstain_without_overriding_qualified_science(self):
+        with tempfile.TemporaryDirectory() as folder:
+            result, _ = run(self.energy, {"family": "energy", "tool": "discovery"},
+                            lambda p: response("abstain", p["evidence"], reason="review_uncertain"),
+                            store=MeterlessRunWorldModel(Path(folder) / "state.json"))
+            self.assertEqual((result["status"], result["verification"], result["review"]["reason_code"]),
+                             ("BLOCKED", "abstain", "review_uncertain"))
+            self.assertIsNone(result["scientific_evidence"])
+            self.assertEqual(result["scientific_audit"]["scientific_evidence"]["hypothesis_count"], 16)
 
     def test_low_coverage_and_clinical_abstention(self):
         rows = [dict(row) for row in generate_observations("opportunity", 4101)]

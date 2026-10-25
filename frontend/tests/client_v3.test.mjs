@@ -72,11 +72,15 @@ test('v4 review cites a qualified PHIS signal and abstention retains separate au
   const abstained = structuredClone(run);
   abstained.status = 'BLOCKED';
   abstained.review = { ...abstained.review, decision: 'abstain',
-    reason_code: 'insufficient_evidence', evidence_signal_ids: [] };
+    reason_code: 'review_uncertain', evidence_signal_ids: [hash] };
   abstained.scientific_audit = { scientific_evidence: abstained.scientific_evidence,
     scientific_event_id: hash };
   abstained.scientific_evidence = null;
   assert.equal(validateLongitudinalInvestigation(abstained).status, 'BLOCKED');
+  const contradictory = structuredClone(abstained);
+  contradictory.review.reason_code = 'insufficient_evidence';
+  contradictory.review.evidence_signal_ids = [];
+  assert.throws(() => validateLongitudinalInvestigation(contradictory), /model review/);
   abstained.scientific_audit.scientific_event_id = 'invented';
   assert.throws(() => validateLongitudinalInvestigation(abstained), /scientific audit/);
 });

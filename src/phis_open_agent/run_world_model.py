@@ -104,17 +104,16 @@ def _make_event(run_id, kind, payload, source_record_ids):
         valid_payload = (isinstance(payload, dict) and set(payload) == expected and
                          payload["stage"] in {"INITIAL", "FINAL"} and
                          payload["decision"] in {"accept", "verify", "abstain"} and
-                         payload["reason_code"] in {"supported_pattern", "coverage_question",
+                         payload["reason_code"] in {"supported_pattern", "descriptive_observation", "coverage_question",
                                                     "signal_question", "trend_question",
-                                                    "insufficient_evidence", "invalid_critique",
+                                                    "insufficient_evidence", "review_uncertain", "invalid_critique",
                                                     "model_unavailable", "scientific_gate_failed",
                                                     "evidence_packet_invalid"} and
                          isinstance(payload["evidence_signal_ids"], list) and
                          len(payload["evidence_signal_ids"]) <= 3 and
                          all(isinstance(sid, str) and re.fullmatch(r"[0-9a-f]{64}", sid)
                              for sid in payload["evidence_signal_ids"]) and
-                         payload["requested_check"] in {"none", "coverage", "signal_consistency",
-                                                        "trend_consistency"} and
+                         payload["requested_check"] in {"none", "coverage"} and
                          isinstance(payload["explanation"], str) and
                          len(payload["explanation"]) <= 220 and
                          payload["provider_status"] in {"VERIFIED", "SIMULATED", "BLOCKED"} and

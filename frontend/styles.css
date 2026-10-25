@@ -492,7 +492,7 @@ button:focus-visible, textarea:focus-visible, a:focus-visible, summary:focus-vis
 .model-review details { margin-top: 8px; font-size: 11px; line-height: 1.55; }
 .model-review summary { cursor: pointer; font-weight: 700; }
 .model-review summary:focus-visible { outline: 3px solid #3b7953; outline-offset: 3px; }
-.model-review-technical { overflow-wrap: anywhere; }
+#model-review-technical { overflow-wrap: anywhere; }
 .findings-meta { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; justify-content: flex-end; }
 #finding-count { font-size: 9px; letter-spacing: .12em; font-weight: 800; color: #778b7c; }
 
