@@ -34,7 +34,6 @@
       <div class="rail-topline" role="status" aria-live="polite">
         <span class="live-dot" aria-hidden="true"></span>
         <span id="rail-mode-label">EVIDENCE LAB</span>
-        <span id="rail-run-counter" aria-label="Run 0">00 / 00</span>
       </div>
 
       <!-- Hero -->
@@ -56,7 +55,7 @@
           <button type="button" class="entry-option active" data-fill="How did my recorded energy change between the fixed earlier and recent 28-day periods?" aria-pressed="true">Explore my energy <span aria-hidden="true">↗</span></button>
           <button type="button" class="entry-option" data-fill="How did my recorded sleep change between the fixed earlier and recent 28-day periods?" aria-pressed="false">Explore my sleep <span aria-hidden="true">↗</span></button>
         </div>
-        <label for="question">01 / YOUR QUESTION</label>
+        <label for="question">YOUR QUESTION</label>
         <div class="question-field">
           <textarea
             id="question"
@@ -71,7 +70,7 @@
         <p id="question-hint" class="question-hint">
           Demo scope: energy and sleep patterns in one fixed 180-day fictional record. Edit the question within that scope.
         </p>
-        <p class="fixed-window-note">Fixed demo dates: 25 Apr–21 Oct 2026. PHIS compares 27 Aug–23 Sep with 24 Sep–21 Oct; these periods cannot be changed by the question.</p>
+        <p class="fixed-window-note">PHIS reviews 180 days (25 Apr–21 Oct 2026). To summarize recent change, it compares two adjacent, equal 28-day periods: 27 Aug–23 Sep and 24 Sep–21 Oct. The dates were fixed before analysis and cannot be changed by the question.</p>
         <div class="question-actions">
           <button class="ask-button" type="submit" id="ask-button">
             <span class="ask-label">Investigate records</span>
@@ -93,14 +92,14 @@
       <div id="followup-actions" class="followup-actions" hidden aria-label="Follow-up actions">
         <span class="followup-actions-label">NEXT QUESTIONS · CLICK INVESTIGATE AFTER SELECTING</span>
         <button type="button" class="text-chip" id="chip-sleep" data-question="How did my recorded sleep change between the fixed earlier and recent 28-day periods?">
-          Start separate sleep investigation (no memory link) ↗
+          Explore sleep independently ↗
         </button>
         <button type="button" class="text-chip" id="chip-next" data-question="What should we investigate next?">
-          Continue with this run's memory ↗
+          Follow up with prior context ↗
         </button>
-        <button type="button" class="text-chip" id="chip-abstain" data-question="Is there a clinical diagnosis here?">
-          Test abstention ↗
-        </button>
+        <details class="reviewer-tools"><summary>Reviewer demo / Test limits</summary>
+          <button type="button" class="text-chip" id="chip-abstain" data-question="Is there a clinical diagnosis here?">Test clinical abstention ↗</button>
+        </details>
       </div>
 
       <!-- Synthetic data notice -->
@@ -159,7 +158,6 @@
         <div class="intro-row">
           <div>
             <div class="section-kicker">
-              <span class="section-number" aria-hidden="true">02</span>
               RESULT
               <span class="kicker-line" aria-hidden="true"></span>
               <span id="window-label" aria-label="Analysis window dates">— / — 2026</span>
@@ -275,11 +273,16 @@
           </aside>
         </div><!-- /overview-grid -->
 
+        <div id="global-study-limit" class="global-study-limit" role="note" hidden>
+          <strong>Study limit</strong>
+          <span>PHIS Discovery finds evidence-supported associations in fictional records. These patterns do not establish which factor caused the change or provide a diagnosis.</span>
+        </div>
+
         <!-- Findings section -->
         <div class="findings-heading">
           <div>
-            <p class="card-eyebrow">YOUR INSIGHTS</p>
-            <h3>What changed, and what might be related?</h3>
+            <p class="card-eyebrow">YOUR INSIGHTS · ANALYZED BY PHIS DISCOVERY</p>
+            <h3 id="findings-title">What changed, and what might be related?</h3>
           </div>
           <div class="findings-meta">
             <span id="finding-count" aria-live="polite">NO FINDINGS</span>
