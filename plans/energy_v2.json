@@ -1,0 +1,28 @@
+{
+  "schema_version": "phis-discovery-plan-v2",
+  "dataset_id": "PHIS-SYN-84D-v2r2",
+  "family": "energy",
+  "outcome": "energy_central",
+  "pairs": [
+    ["sleep_hours", "energy_central"],
+    ["exercise_load", "energy_central"],
+    ["stress_score", "energy_central"],
+    ["unrelated_count", "energy_central"]
+  ],
+  "routes": ["levels", "first_differences"],
+  "policy": {
+    "lags": [0, 1],
+    "windows": [1],
+    "resamples": 999,
+    "block_days": 7,
+    "block_lengths": [3, 7, 14],
+    "methods": ["linear"],
+    "min_n": 30,
+    "min_effective_n": 20,
+    "min_coverage": 0.7,
+    "min_abs_r": 0.3,
+    "max_q": 0.05,
+    "min_group_n": 15
+  },
+  "seed": 20261023
+}

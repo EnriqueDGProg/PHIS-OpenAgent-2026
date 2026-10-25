@@ -1,0 +1,19 @@
+# Authenticated PR #43 combined investigation — sanitized receipt
+
+**Application SHA:** `9c871532a2debd9877483dad9c937dbb881508ad` (PR #43). **Mode:** `LIVE_SYNTHETIC_ZETARIS` with direct NVIDIA Nemotron. **Chrome Energy run:** `SYN-RUN-64e7acc2fa5e`. This is an actual local authenticated execution against **fictional** records, not a hosted public app or simulated sponsor call.
+
+| Stage | Actual observed receipt |
+| --- | --- |
+| Zetaris | Six authenticated HTTP query pages with 200, 200, 200, 200, 200 and 80 rows. PHIS-sent query correlation IDs: `52ad6f30-1f87-4230-988e-83d29e4e098f`, `e78ca700-92f5-44a4-a95b-ff12b18b7b55`, `d1246c05-f39e-4b58-9c88-1871e965b94f`, `4351da30-39a1-4773-9896-bd9cb5796b4b`, `2600271c-6482-4683-81f6-b657621fb5c7`, `e32c127f-bcbc-4dee-b45e-65384b78ddbc`. These were **sent** with the queries; server-issued echo is not proven. |
+| Source validation | Exactly 1,080 unique fictional variable-day slots across 180 calendar days. Canonical digest `fbc8653d5f0d8aeb84c65d06607d7821fbf1c3195088c6d023f17ae2c32a7cea`. No local fallback substitution. |
+| NVIDIA PLAN | Provider-issued `chatcmpl-0a91ce32-a642-4e8c-9472-2532d2d9c511`, model `nvidia/nemotron-3.5-lightning-30b-a3b`; selected Energy and PHIS Discovery. |
+| PHIS Discovery | 180 days; Energy 170/180 measured days; six 30-day descriptive intervals; 16 pre-planned tests; 3 qualified, 2 unstable and 11 weak classifications. The unchanged scientific engine owns these results. |
+| NVIDIA CRITIQUE | Provider-issued `chatcmpl-109cfe2d-87f6-486e-820e-980dcc037255`; accepted a cited qualified same-day association with signal `90ef93bc76d478a9059f1b1fefcf6486a10aeddab94aa349cbf8364ac77ab86a`, positive direction, lag 0; uncertainty `confounding_and_no_causality`. No causal or clinical claim. |
+| Meterless World Model Engine | Six read-back events: plan `b8dd34382d4b4718a49017dd884159857eb61d6398efffeac9460bb284b8d94e` (`evt_2`); agent state `98a48bc16305efe183d983ed84c368c41f37639f091238c2eb961ef6df46501c` (`evt_4`); science `1818db21dc02e570d3d809674774ada46b609fabb0e111fe367030c55e8dace6` (`evt_6`); agent state `7a35a204f68c79dc0e8a550d9f67e9d2c6bc5a14ed6b911b1293eb1d53922efe` (`evt_8`); tool `304a1d02deb261908b303437b3f33af48652482a5214e83a8b21caa2ff250384` (`evt_10`); final review `48a05fc94d1d5a8bffb61e1c194ca6f36644c6ed9c70ef3951ebe9662b7faeca` (`evt_12`). Engine is verified; Runtime/Power are `NOT_CONNECTED`. |
+| User result | `PASS` observational result in the 180-day-first UI; Zetaris, Nemotron and Meterless Engine marked `VERIFIED` for this run. |
+
+**Genuine captures:** [desktop](evidence/combined-pr43-founder-desktop.png), [mobile](evidence/combined-pr43-founder-mobile.png), [inspectable source evidence](evidence/combined-pr43-founder-source-evidence.png). Earlier original acceptance captures from same code SHA are [desktop](evidence/combined-pr43-original-desktop.png), [mobile](evidence/combined-pr43-original-mobile.png), [source evidence](evidence/combined-pr43-original-source-evidence.png). Screenshots were visually reviewed before inclusion; no raw rows, secrets or protected config files were copied.
+
+The independent original acceptance run `SYN-RUN-848ce9559e5e` used the same digest, scientific classifications and PR #43 code. Its NVIDIA PLAN was `chatcmpl-de95d8e5-7540-4ccc-8c52-0f04a5dcfeac` and CRITIQUE `chatcmpl-95a1d2ec-b56f-43ae-8727-2083b4f05509`; six Engine events were read back. These identifiers are historical proof, not the current browser run's IDs.
+
+Source basis: [PR #43](https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026/pull/43), the ignored local acceptance response/receipt in `.local-state`, the actual captured browser screens, the [scientific NOTICE](../src/phis_master/NOTICE.md), and the [official event page](https://hackathon.genai.works/event/open-agent-hackathon-2026). No raw provider prompts or credential material is published here.

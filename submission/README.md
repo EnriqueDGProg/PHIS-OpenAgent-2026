@@ -1,0 +1,9 @@
+# PHIS Open Agent — final Track 02 submission package
+
+This package documents an authenticated, accepted PR #43 investigation on exact application SHA `9c871532a2debd9877483dad9c937dbb881508ad`. It is **not** a HackOS submission or finished video. All demo records are fictional. The [sanitized same-run receipt](FINAL_COMBINED_RECEIPT.md) connects Zetaris retrieval, unchanged PHIS Discovery, genuine NVIDIA plan and review, official Meterless World Model Engine persistence, and the 180-day-first UI.
+
+**Founder assets:** [editable final ten-slide PPTX](deck/PHIS_Open_Agent_2026_Track02_Final_PR43.pptx) with [visual QA](DECK_QA.md); [2:45 narration and shot order](DEMO_SCRIPT_AND_STORYBOARD.md) for recording tomorrow; [paste-ready HackOS form draft](HACKOS_FORM_DRAFT.md); [capability/sponsor matrix](CAPABILITY_AND_SPONSOR_MATRIX.md); [claim ledger](SOURCES_AND_CLAIMS.md); [final readiness checklist](FINAL_READINESS_CHECKLIST.md); and [local example inputs/outputs](EXAMPLE_INPUTS_OUTPUTS.md).
+
+[Track 02 — The Agent That Can Explain Why](NARRATIVE_AND_TRACK.md) was selected by the founder. Exactly five original PHIS Discovery modules predate the competition; their authorized MIT provenance is in [NOTICE](../src/phis_master/NOTICE.md). The vendored World Model is Apache-2.0. The later Cursor-optional clarification is preserved in the [founder comment](https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026/pull/31#issuecomment-6380902839); coding used Codex, not claimed Cursor.
+
+The [official event page](https://hackathon.genai.works/event/open-agent-hackathon-2026) lists the 27 October 2026, 23:45 UTC deadline. Recheck live HackOS fields and anonymous links before founder submission. GitHub hosts source code, not a running application. The credential-free judge demo is reproducible locally; authenticated Zetaris and NVIDIA require authorized local services/credentials. Meterless World Model Engine is connected; Meterless Runtime/Power are not.
