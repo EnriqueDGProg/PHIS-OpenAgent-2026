@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canContinueFrom, comparisonExplanation, findingExplanation,
+import { canContinueFrom, comparisonExplanation, displayChange, findingExplanation,
   signalExplanation, TRACE_GROUPS } from '../presentation.mjs';
 
 const run = {
@@ -29,7 +29,32 @@ test('positive energy change stays positive, dated and descriptive', () => {
   assert.equal(explanation.recent, '24 Sept 2026–21 Oct 2026');
   assert.match(comparisonExplanation({ ...run, comparison: { ...run.comparison,
     difference: -0.5, baseline: { ...run.comparison.baseline, mean: 6.1 },
-    comparison: { ...run.comparison.comparison, mean: 5.6 } } }).text, /decreased by 0\.50/);
+    comparison: { ...run.comparison.comparison, mean: 5.6 } } }).text, /−0\.50 points.*energy decreased/);
+});
+
+test('near-zero sleep is broadly stable under the documented display-only band', () => {
+  const sleep = { ...run, comparison: { ...run.comparison, variable: 'sleep_hours',
+    unit: 'hours', difference: -0.01,
+    baseline: { ...run.comparison.baseline, mean: 7.01 },
+    comparison: { ...run.comparison.comparison, mean: 7.00 } } };
+  assert.equal(displayChange(-0.01), 'flat');
+  assert.equal(displayChange(-0.05), 'flat');
+  assert.equal(displayChange(-0.051), 'down');
+  assert.match(comparisonExplanation(sleep).title, /broadly stable/i);
+  assert.match(comparisonExplanation(sleep).text, /−0\.01 hours.*±0\.05 display band/);
+  assert.doesNotMatch(comparisonExplanation(sleep).text, /sleep decreased/);
+});
+
+test('same-day supported association stays distinct from unstable next-day test', () => {
+  const sameDay = { signal_id: 'same-day', exposure: 'sleep_hours', outcome: 'energy_central',
+    lag_days: 0, effect: 0.5, classification: 'candidate_signal' };
+  const nextDay = { ...sameDay, signal_id: 'next-day', lag_days: 1,
+    classification: 'unstable_candidate', temporal_state: 'unstable' };
+  const pairedRun = { ...run, scientific_evidence: { signals: [sameDay, nextDay] } };
+  const finding = { kind: 'association', evidence_signal_id: 'next-day', text: 'Technical result' };
+  assert.match(signalExplanation(sameDay).title, /same day.*Supported association/i);
+  assert.match(signalExplanation(nextDay).title, /next day.*Exploratory only/i);
+  assert.match(findingExplanation(pairedRun, finding).text, /different test from the supported same-day/i);
 });
 
 test('qualified findings use original typed signal and preserve temporal direction', () => {

@@ -617,10 +617,20 @@ button:focus-visible, textarea:focus-visible, a:focus-visible, summary:focus-vis
 .source-list code { font-size: 9px; background: #eef4ea; border-radius: 3px; padding: 4px 5px; color: #2d5840; }
 .selected-source { display: inline-block; background: #e4efe0; padding: 7px 10px; color: #203e2e; border-radius: var(--radius-xs); font-size: 11px; margin-top: 6px; }
 
-.sponsor-block { border-left: 3px solid var(--amber-line); padding: 10px 12px; background: var(--amber-bg); border-radius: 0 var(--radius-xs) var(--radius-xs) 0; margin: 8px 0; }
-.sponsor-block p { color: var(--amber) !important; margin: 0; font-size: 11px; }
-.sponsor-block .sponsor-proof-verified { border-left-color: #7ab07a; background: #f0f8f0; }
-.sponsor-block .sponsor-proof-verified p { color: #2a5a38 !important; }
+.sponsor-block { border-left: 3px solid #a4aaa8; padding: 10px 12px; background: #f1f3f2; border-radius: 0 var(--radius-xs) var(--radius-xs) 0; margin: 8px 0; }
+.sponsor-block p { color: #4d5854 !important; margin: 0; font-size: 11px; }
+.sponsor-block.sponsor-proof-verified { border-left-color: #7ab07a; background: #f0f8f0; }
+.sponsor-block.sponsor-proof-verified p { color: #2a5a38 !important; }
+.sponsor-block.sponsor-proof-failed { border-left-color: #b74542; background: #fcf0ef; }
+.sponsor-block.sponsor-proof-failed p { color: #8d302d !important; }
+.selected-signal { background: #f0f8f0; }
+.source-record-table { display: block; max-height: 260px; overflow: auto; width: 100%; border-collapse: collapse; font-size: 10px; }
+.source-record-table th, .source-record-table td { padding: 5px 8px; border-bottom: 1px solid var(--line); text-align: left; }
+.source-record-table td:first-child { font-family: monospace; overflow-wrap: anywhere; }
+.scientific-json { max-height: 250px; overflow: auto; font-size: 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.global-study-limit { margin: 18px 0; padding: 14px 17px; border-left: 3px solid var(--ink); background: #f3f5f1; font-size: 13px; line-height: 1.5; }
+.reviewer-tools { margin-top: 12px; font-size: 11px; color: var(--muted); }
+.reviewer-tools summary { cursor: pointer; }
 
 .evidence-limit { color: #7a5820 !important; }
 

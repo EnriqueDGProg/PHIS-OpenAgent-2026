@@ -5,7 +5,8 @@
  */
 import { fetchInvestigation } from './client.mjs';
 import { windowDays, isOfflineScientificRun, sourceLabel, canContinueFrom,
-  comparisonExplanation, findingExplanation, plainDate, TRACE_GROUPS } from './presentation.mjs';
+  comparisonExplanation, findingExplanation, plainDate, displayChange,
+  trajectoryArrow, TRACE_GROUPS } from './presentation.mjs';
 
 // ─── DOM helpers ──────────────────────────────────────────────────────────────
 const $ = sel => document.querySelector(sel);
@@ -14,7 +15,7 @@ const $$ = sel => [...document.querySelectorAll(sel)];
 // ─── State ────────────────────────────────────────────────────────────────────
 let currentRun = null;
 let pendingParentRunId = null;
-let runCount = 0;
+const evidenceSelection = { findingId: null, sourceId: null, tabId: 'tab-finding' };
 
 // ─── Element refs ─────────────────────────────────────────────────────────────
 const form          = $('#question-form');
@@ -34,7 +35,7 @@ function formatDate(iso) {
 
 function setTitle(subject) {
   document.title = subject
-    ? `PHIS — ${subject} investigation`
+    ? `PHIS — ${subject}`
     : 'PHIS — Personal Health Intelligence System';
 }
 
@@ -47,12 +48,6 @@ function setStatus(kind, label, message, id = 'NO RUN') {
   $('#status-label').textContent = label;
   $('#status-copy').textContent  = message;
   $('#run-id').textContent = id;
-}
-
-// ─── Run counter ──────────────────────────────────────────────────────────────
-function incrementRunCounter() {
-  runCount++;
-  $('#rail-run-counter').textContent = `${String(runCount).padStart(2, '0')} / ${String(runCount).padStart(2, '0')}`;
 }
 
 // ─── Trajectory strip ─────────────────────────────────────────────────────────
@@ -70,9 +65,11 @@ function renderTrajectory(run) {
   const diff = typeof difference === 'number' ? difference : (comparison.mean - baseline.mean);
   const absDiff = Math.abs(diff).toFixed(2);
 
-  dirEl.textContent = diff < -0.05 ? '▼' : diff > 0.05 ? '▲' : '→';
-  dirEl.className = 'trajectory-direction ' + (diff < -0.05 ? 'down' : diff > 0.05 ? 'up' : 'flat');
-  deltaEl.textContent = `${diff < 0 ? '−' : diff > 0 ? '+' : ''}${absDiff}${unitLabel}`;
+  const display = displayChange(diff);
+  dirEl.textContent = trajectoryArrow(diff);
+  dirEl.className = `trajectory-direction ${display}`;
+  const exactChange = `${diff < 0 ? '−' : diff > 0 ? '+' : ''}${absDiff}${unitLabel}`;
+  deltaEl.textContent = display === 'flat' ? `Broadly stable (${exactChange})` : exactChange;
   labelEl.textContent = `${plainDate(comparison.start)}–${plainDate(comparison.end)} vs ${plainDate(baseline.start)}–${plainDate(baseline.end)}`;
   bValEl.textContent  = `${baseline.mean?.toFixed(2) ?? '—'}${unitLabel} (earlier 28-day mean)`;
   $('#trajectory-baseline-label').textContent = 'Earlier 28-day mean';
@@ -100,12 +97,15 @@ function renderPeriod(run) {
     $('#period-recent-dates').textContent = `${plainDate(comparison.start)}–${plainDate(comparison.end)}`;
 
     const diff = typeof difference === 'number' ? difference : (comparison.mean - baseline.mean);
-    diffVal.textContent = `${diff >= 0 ? '+' : ''}${diff.toFixed(2)}${unitLabel}`;
-    diffVal.className   = 'diff-value ' + (diff < -0.05 ? 'negative' : diff > 0.05 ? 'positive' : 'neutral');
+    const display = displayChange(diff);
+    const exactChange = `${diff < 0 ? '−' : diff > 0 ? '+' : ''}${Math.abs(diff).toFixed(2)}${unitLabel}`;
+    diffVal.textContent = display === 'flat' ? `${exactChange} · broadly stable` : exactChange;
+    diffVal.className = `diff-value ${display === 'down' ? 'negative' : display === 'up' ? 'positive' : 'neutral'}`;
+    $('#period-diff-label').textContent = display === 'flat' ? 'Small recorded difference' : 'Change';
     diffEl.hidden = false;
     $('#period-description').textContent = comparisonExplanation(run)?.coverage ??
-      'Only recorded measurements are compared. The difference does not establish a cause.';
-    footnote.textContent = `Means rounded to 2 decimals; change uses unrounded means · source IDs in evidence`;
+      'Only recorded measurements are compared.';
+    footnote.textContent = 'Means rounded to 2 decimals; change uses unrounded means. Display-only stable band: ±0.05 in the shown unit. This does not change scientific tests.';
   } else {
     earlierEl.textContent = '—';
     recentEl.textContent  = '—';
@@ -355,10 +355,10 @@ function renderTrace(steps) {
 
 // ─── Finding cards ────────────────────────────────────────────────────────────
 const KIND_LABELS = {
-  observation:           'OBSERVATION',
-  association:           'ASSOCIATION',
+  observation:           'WHAT CHANGED',
+  association:           'EXPLORATORY ONLY',
   hypothesis:            'HYPOTHESIS',
-  candidate_contributor: 'QUALIFIED SIGNAL',
+  candidate_contributor: 'SUPPORTED ASSOCIATION',
   unsupported_hypothesis:'NO EVIDENCE',
   uncertainty:           'CONFOUNDING LIMIT',
   abstention:            'ABSTAINED',
@@ -367,12 +367,13 @@ const KIND_LABELS = {
 function renderFindings(run) {
   const grid = $('#findings');
   grid.replaceChildren();
+  const visibleFindings = run.findings.filter(finding => finding.kind !== 'uncertainty');
 
-  $('#finding-count').textContent = `${run.findings.length} ${run.findings.length === 1 ? 'FINDING' : 'FINDINGS'}`;
+  $('#finding-count').textContent = `${visibleFindings.length} ${visibleFindings.length === 1 ? 'INSIGHT' : 'INSIGHTS'}`;
   const tierLegend = $('#evidence-tier-legend');
-  tierLegend.hidden = run.findings.length === 0;
+  tierLegend.hidden = visibleFindings.length === 0;
 
-  if (!run.findings.length) {
+  if (!visibleFindings.length) {
     const empty = document.createElement('article');
     empty.className = 'finding-card empty-card';
     empty.setAttribute('role', 'listitem');
@@ -383,7 +384,7 @@ function renderFindings(run) {
     return;
   }
 
-  for (const [idx, finding] of run.findings.entries()) {
+  for (const [idx, finding] of visibleFindings.entries()) {
     const card = document.createElement('article');
     card.className = `finding-card ${finding.kind}`;
     card.setAttribute('role', 'listitem');
@@ -411,7 +412,7 @@ function renderFindings(run) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.textContent = finding.source_record_ids?.length ? 'Inspect records ↗' : 'Examine limit ↗';
-    btn.setAttribute('aria-label', `${btn.textContent}: ${finding.title}`);
+    btn.setAttribute('aria-label', `${btn.textContent}: ${explanation.title}`);
     btn.addEventListener('click', () => openEvidence(finding.finding_id));
     actions.append(btn);
 
@@ -419,8 +420,8 @@ function renderFindings(run) {
     if (finding.evidence_signal_id && currentRun?.scientific_evidence?.signals) {
       const sigBtn = document.createElement('button');
       sigBtn.type = 'button';
-      sigBtn.textContent = 'Signal detail ↗';
-      sigBtn.setAttribute('aria-label', `Signal detail for ${finding.title}`);
+      sigBtn.textContent = 'View scientific test ↗';
+      sigBtn.setAttribute('aria-label', `View scientific test for ${explanation.title}`);
       sigBtn.addEventListener('click', () => openEvidenceTab('tab-signals', finding.finding_id));
       actions.append(sigBtn);
     }
@@ -497,6 +498,8 @@ function clearPresentation(message) {
   $('#evidence-tier-legend').hidden = true;
   $('#sponsor-proof-bar').hidden = true;
   $('#followup-actions').hidden  = true;
+  $('#global-study-limit').hidden = true;
+  $('#findings-title').textContent = 'What changed, and what might be related?';
   setTitle(null);
 }
 
@@ -529,7 +532,12 @@ for (const chip of $$('[data-fill]')) {
 
 // ─── Follow-up action chips (post-result) ─────────────────────────────────────
 function wireFollowupChips(run) {
-  $('#chip-next').textContent = `Continue with ${run.family === 'energy' ? 'sleep' : 'energy'} using this run's memory ↗`;
+  const nextFamily = run.family === 'energy' ? 'sleep' : 'energy';
+  $('#chip-next').textContent = `Follow up with prior context: ${nextFamily} ↗`;
+  $('#chip-sleep').textContent = `Explore ${nextFamily} independently ↗`;
+  $('#chip-sleep').dataset.question = nextFamily === 'sleep'
+    ? 'How did my recorded sleep change between the fixed earlier and recent 28-day periods?'
+    : 'How did my recorded energy change between the fixed earlier and recent 28-day periods?';
   for (const chip of $$('#followup-actions [data-question]')) {
     chip.onclick = () => {
       const q = chip.dataset.question;
@@ -549,17 +557,19 @@ function wireFollowupChips(run) {
 // ─── Evidence dialog ──────────────────────────────────────────────────────────
 function openEvidence(findingId = null, sourceId = null) {
   if (!currentRun) return;
+  evidenceSelection.findingId = findingId;
+  evidenceSelection.sourceId = sourceId;
   activateTab('tab-finding');
-  renderEvidenceContent(currentRun, findingId, sourceId);
   $('#dialog-description').textContent = sourceId ? 'Selected fictional record and its source ID.'
-    : findingId ? 'Selected finding and its original scientific support.' : 'Sources, scientific tests and run verification.';
+    : findingId ? 'Exact source identifiers for the selected finding.' : 'How this result was produced and where to inspect its evidence.';
   dialog.showModal();
 }
 
 function openEvidenceTab(tabId, findingId = null) {
   if (!currentRun) return;
+  evidenceSelection.findingId = findingId;
+  evidenceSelection.sourceId = null;
   activateTab(tabId);
-  renderEvidenceContent(currentRun, findingId, null);
   dialog.showModal();
 }
 
@@ -570,6 +580,7 @@ dialog.addEventListener('keydown', e => { if (e.key === 'Escape') dialog.close()
 
 // ─── Tab switching ────────────────────────────────────────────────────────────
 function activateTab(tabId) {
+  evidenceSelection.tabId = tabId;
   $('#dialog-title').textContent = 'Evidence & verification';
   const subtitles = {
     'tab-finding': 'Finding and source records', 'tab-signals': 'All pre-planned scientific tests',
@@ -584,7 +595,9 @@ function activateTab(tabId) {
     tab.tabIndex = active ? 0 : -1;
   }
   $('#dialog-content').setAttribute('aria-labelledby', tabId);
-  renderEvidenceContent(currentRun, null, null, tabId);
+  renderEvidenceContent(currentRun, evidenceSelection.findingId,
+    evidenceSelection.sourceId, tabId);
+  $('#dialog-content').scrollTop = 0;
 }
 
 $('.dialog-tabs').addEventListener('keydown', event => {
@@ -599,10 +612,7 @@ $('.dialog-tabs').addEventListener('keydown', event => {
 });
 
 for (const tab of $$('.dialog-tab')) {
-  tab.addEventListener('click', () => {
-    activateTab(tab.id);
-    renderEvidenceContent(currentRun, null, null, tab.id);
-  });
+  tab.addEventListener('click', () => activateTab(tab.id));
 }
 
 // ─── Evidence drawer rendering ────────────────────────────────────────────────
@@ -667,38 +677,57 @@ function renderFindingTab(run, findingId, sourceId, days) {
   // Offline benchmark badge
   if (isBenchmarkRun(run)) {
     const badge = el('div', { className: 'benchmark-badge' });
-    badge.innerHTML = `⚗ OFFLINE SCIENTIFIC EXHIBIT &nbsp;·&nbsp; ${days}-DAY SYNTHETIC BENCHMARK &nbsp;·&nbsp; NOT A LIVE RESULT`;
+    badge.textContent = `Synthetic demonstration · PHIS Discovery calculated locally in this run · ${days}-day window`;
     content.append(badge);
   }
 
-  const selected = run.findings.find(f => f.finding_id === findingId) || run.findings[0];
+  const selected = run.findings.find(f => f.finding_id === findingId);
   const point    = sourceId
     ? run.series?.flatMap(s => s.points.map(p => ({ ...p, unit: s.unit }))).find(p => p.source_record_id === sourceId)
     : null;
 
-  // Lead block
-  const lead = mkBlock(sourceId ? 'SELECTED CHART RECORD' : 'SELECTED FINDING');
+  // The overview never silently substitutes the first finding for a selected one.
+  const lead = mkBlock(sourceId ? 'SELECTED CHART RECORD' : selected ? 'SELECTED FINDING' : 'EVIDENCE OVERVIEW');
   const heading = el('h4', {}, point
     ? `${point.local_date} · ${point.value} ${point.unit}`
-    : selected ? findingExplanation(run, selected).title : 'No finding available');
+    : selected ? findingExplanation(run, selected).title : 'How PHIS checked this investigation');
   const summary = el('p', {}, point
     ? 'This data point was returned by the Python core. The ID identifies a typed synthetic record.'
-    : (selected ? findingExplanation(run, selected).text : run.summary));
+    : (selected ? findingExplanation(run, selected).text :
+      'PHIS Discovery calculated the scientific tests locally from fictional records. Choose a finding to inspect its exact source IDs, or open Scientific tests to see all pre-planned checks.'));
   lead.append(heading, summary);
   if (selected) {
     const raw = mkDisclosure('Original scientific wording and source IDs');
     raw.append(el('p', {}, selected.text));
+    lead.append(raw);
+  } else if (!sourceId) {
+    const raw = mkDisclosure('Original scientific findings and limitations');
+    for (const finding of run.findings ?? []) {
+      raw.append(el('p', {}, `${finding.kind} · ${finding.title}: ${finding.text}`));
+    }
     lead.append(raw);
   }
 
   if (point) {
     lead.append(el('code', { className: 'selected-source' }, point.source_record_id));
   } else if (selected?.source_record_ids?.length) {
-    const disc = mkDisclosure(`Show ${selected.source_record_ids.length} synthetic record IDs`);
-    const ids = el('div', { className: 'source-list' });
-    for (const id of selected.source_record_ids) ids.append(el('code', {}, id));
-    disc.append(ids); lead.append(disc);
-  } else {
+    const records = mkDisclosure(`Inspect ${selected.source_record_ids.length} exact source records`, true);
+    const table = el('table', { className: 'source-record-table' });
+    const head = el('thead');
+    head.append(el('tr'));
+    for (const label of ['Source ID', 'Date', 'Recorded value']) head.firstChild.append(el('th', {}, label));
+    const body = el('tbody');
+    const points = new Map((run.series ?? []).flatMap(series =>
+      (series.points ?? []).map(point => [point.source_record_id, { ...point, unit: series.unit }])));
+    for (const id of selected.source_record_ids) {
+      const pointForId = points.get(id);
+      const row = el('tr', { 'data-source-id': id });
+      row.append(el('td', {}, id), el('td', {}, pointForId?.local_date ?? 'Not returned'),
+        el('td', {}, pointForId ? `${pointForId.value} ${pointForId.unit}` : 'Value not included in this response'));
+      body.append(row);
+    }
+    table.append(head, body); records.append(table); lead.append(records);
+  } else if (selected) {
     lead.append(el('p', { className: 'evidence-limit' },
       'This limit statement is not attributed to a measured record.'));
   }
@@ -708,8 +737,8 @@ function renderFindingTab(run, findingId, sourceId, days) {
   if (selected?.kind) {
     const kindBlock = mkBlock('EVIDENCE TIER');
     const kindMap = {
-      candidate_contributor: 'QUALIFIED SIGNAL — passed all predeclared temporal, block-bootstrap and multiple-testing gates.',
-      association:           'UNQUALIFIED ASSOCIATION — raw correlation did not pass every gate. Do not interpret as a cause.',
+      candidate_contributor: 'SUPPORTED ASSOCIATION — this pre-planned test passed the recorded scientific checks. Open Scientific tests for the exact values.',
+      association:           'EXPLORATORY ASSOCIATION — this test did not pass every check. Open Scientific tests for the exact values.',
       hypothesis:            'HYPOTHESIS — exploratory. Requires further investigation and preregistration.',
       unsupported_hypothesis:'NO EVIDENCE — no tested factor met the required gates for this outcome.',
       uncertainty:           'UNCERTAINTY — overlapping factors may change together. The analysis cannot isolate a cause.',
@@ -738,7 +767,7 @@ function renderSignalsTab(run, findingId) {
   // Benchmark badge
   if (isBenchmarkRun(run)) {
     const badge = el('div', { className: 'benchmark-badge' });
-    badge.innerHTML = `⚗ OFFLINE BENCHMARK SIGNALS &nbsp;·&nbsp; ${windowDays(run)}-DAY WINDOW &nbsp;·&nbsp; SEED NOT LIVE-CONNECTED`;
+    badge.textContent = `Synthetic demonstration · PHIS Discovery calculated locally in this run · ${windowDays(run)}-day window`;
     content.append(badge);
   }
 
@@ -759,7 +788,7 @@ function renderSignalsTab(run, findingId) {
   // Signal table
   const tableBlock = mkBlock('ALL SCIENTIFIC TEST RESULTS');
   tableBlock.append(el('p', { className: 'evidence-limit' },
-    'These are unadjusted pairwise observational associations in fictional synthetic data. Not causal or clinical claims.'));
+    'All tests use fictional synthetic records; see the study limitation above the insights.'));
   tableBlock.append(el('p', {}, 'Technical statistics below: r is correlation, N is the number of paired observations, CI is an uncertainty interval, and p and q are statistical checks.'));
 
   const table = el('table', { className: 'signal-table' });
@@ -777,16 +806,33 @@ function renderSignalsTab(run, findingId) {
   </tr>`;
   const tbody = el('tbody');
 
-  const selected = findingId
-    ? signals.find(s => s.signal_id === findingId)
-    : null;
+  const finding = run.findings.find(item => item.finding_id === findingId);
+  const selected = finding?.evidence_signal_id
+    ? signals.find(signal => signal.signal_id === finding.evidence_signal_id) : null;
+
+  if (selected) {
+    const detail = mkBlock('SELECTED PRE-PLANNED SCIENTIFIC TEST');
+    detail.append(mkDl([
+      ['Signal ID', selected.signal_id], ['Hypothesis', `${selected.exposure} → ${selected.outcome}`],
+      ['Lag', `${selected.lag_days} day${selected.lag_days === 1 ? '' : 's'}`],
+      ['Classification', selected.classification], ['Effect', `${selected.effect ?? '—'} (${selected.effect_type ?? '—'})`],
+      ['Paired observations', selected.raw_n], ['Effective N', selected.effective_n],
+      ['95% interval', selected.ci95?.join(' to ') ?? '—'],
+      ['Temporal check', selected.temporal_state ?? '—'],
+      ['Block stability', selected.block_stable === true ? 'Passed' : selected.block_stable === false ? 'Did not pass' : 'Not reported'],
+      ['Selection q (BY)', selected.q_selection_child_by ?? '—'],
+      ['Source records', selected.source_record_ids?.length ?? 0],
+    ]));
+    const checks = mkDisclosure('All returned scientific checks and flags');
+    checks.append(el('pre', { className: 'scientific-json' }, JSON.stringify(selected, null, 2)));
+    detail.append(checks); content.append(detail);
+  }
 
   for (const sig of signals) {
     const tr = el('tr');
     tr.className = sig.classification;
-    if (sig.signal_id === (selected?.signal_id ?? signals[0]?.signal_id)) {
-      tr.style.background = '#f0f8f0';
-    }
+    tr.setAttribute('data-signal-id', sig.signal_id);
+    if (sig.signal_id === selected?.signal_id) tr.classList.add('selected-signal');
 
     const pill = el('span', { className: `sig-class-pill ${sig.classification}` },
       sig.classification.replace('_', ' '));
@@ -874,7 +920,8 @@ function renderSponsorsTab(run) {
 
   for (const proof of (run.sponsor_proofs ?? [])) {
     const block = mkBlock(`${SPONSOR_LABELS[proof.sponsor] ?? proof.sponsor}`);
-    const cls   = proof.status === 'VERIFIED' ? 'sponsor-proof-verified' : '';
+    const cls = proof.status === 'VERIFIED' ? 'sponsor-proof-verified'
+      : proof.status === 'FAILED' ? 'sponsor-proof-failed' : 'sponsor-proof-disconnected';
     const sb    = el('div', { className: `sponsor-block ${cls}` });
     sb.append(el('p', {}, `Status: ${proof.status.replace('_', ' ')}`));
 
@@ -893,7 +940,7 @@ function renderSponsorsTab(run) {
   for (const [key, label] of Object.entries(SPONSOR_LABELS)) {
     if (!present.includes(key)) {
       const block = mkBlock(label);
-      const sb    = el('div', { className: 'sponsor-block' });
+      const sb    = el('div', { className: 'sponsor-block sponsor-proof-disconnected' });
       sb.append(el('p', {}, 'Status: NOT_CONNECTED — not wired in this run.'));
       block.append(sb);
       content.append(block);
@@ -909,7 +956,7 @@ function renderMetaTab(run, days) {
   const isBenchmark = isBenchmarkRun(run);
   if (isBenchmark) {
     const badge = el('div', { className: 'benchmark-badge' });
-    badge.innerHTML = `⚗ OFFLINE BENCHMARK &nbsp;·&nbsp; ${days}-DAY SYNTHETIC WINDOW &nbsp;·&nbsp; NOT CONNECTED TO LIVE ZETARIS`;
+    badge.textContent = `Synthetic demonstration · PHIS Discovery calculated locally in this run · ${days}-day window`;
     block.append(badge);
   }
 
@@ -978,8 +1025,8 @@ const STATUS_STATES = {
     kind: '',
     label: 'RESULT READY',
     copy: (run) => run.scientific_evidence
-      ? 'See the recorded change and the patterns that passed scientific checks below. None proves a cause.'
-      : 'A recorded change is available below. Cause is not established.',
+      ? 'PHIS Discovery analyzed the fictional records. See the measured change and supported patterns below.'
+      : 'A recorded change is available below.',
   },
   EXECUTED_PARTIAL: { kind: 'warning', label: 'PARTIAL RESULT',  copy: (run) => run.summary },
   INSUFFICIENT_DATA:{ kind: 'warning', label: 'INSUFFICIENT EVIDENCE', copy: (run) => run.summary },
@@ -1027,7 +1074,6 @@ form.addEventListener('submit', async event => {
     const scenario = params.get('scenario') || (analysisVersion === 'v1' || analysisVersion === 'v2' ? 'normal' : 'opportunity');
 
     currentRun = await fetchInvestigation(question, { scenario, parentRunId, analysisVersion });
-    incrementRunCounter();
 
     updateModeUI(currentRun);
     updateWindowLabel(currentRun);
@@ -1041,6 +1087,9 @@ form.addEventListener('submit', async event => {
     renderPeriod(currentRun);
     renderFindings(currentRun);
     renderSponsorBar(currentRun);
+    $('#global-study-limit').hidden = !(currentRun.status === 'PASS' && currentRun.scientific_evidence);
+    $('#findings-title').textContent = currentRun.status === 'PASS' && currentRun.scientific_evidence
+      ? 'What PHIS Discovery found' : 'What changed, and what might be related?';
 
     // Status
     const state = STATUS_STATES[currentRun.status] || STATUS_STATES.ERROR;
@@ -1062,9 +1111,6 @@ form.addEventListener('submit', async event => {
       $('#followup-actions').hidden = false;
       wireFollowupChips(currentRun);
     }
-
-    // Open signals tab by default if scientific_evidence present
-    if (currentRun.scientific_evidence?.signals?.length) activateTab('tab-signals');
 
     $('#main').focus();
   } catch (error) {
