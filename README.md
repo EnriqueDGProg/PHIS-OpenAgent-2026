@@ -6,18 +6,25 @@ The [judge guide to the fictional 180-day generator](docs/SYNTHETIC_GENERATOR_JU
 
 ## Release candidate
 
-This submission branch is based on exact PR #43 application SHA `9c871532a2debd9877483dad9c937dbb881508ad`. The release includes the 180-day scientific scenario, Zetaris adapter, official Meterless World Model Engine, bounded v4 planner, NVIDIA direct adapter and adversarial suite. Its [authenticated same-run receipt](submission/FINAL_COMBINED_RECEIPT.md) and [submission package](submission/README.md) distinguish current proof from earlier historical gates. No branch has been merged or deployed. GitHub hosts source code, not a running application.
+The public `main` release contains the exact PR #43 application code SHA `9c871532a2debd9877483dad9c937dbb881508ad`. The release includes the 180-day scientific scenario, Zetaris adapter, official Meterless World Model Engine, bounded v4 planner, NVIDIA direct adapter and adversarial suite. Its [authenticated same-run receipt](submission/FINAL_COMBINED_RECEIPT.md) and [submission package](submission/README.md) distinguish current proof from earlier historical gates. The release and submission materials are merged into `main`. GitHub hosts source code, not a running application.
 
 The Python agent selects deterministic coverage, trend, and Discovery tools. Zetaris live mode reads and validates all 1,080 fictional source records in six bounded pages; a failed query abstains without substituting the local fixture. The World Model Engine persists synthetic decision events, reopens its state in a fresh process, and changes follow-up decisions. Discovery alone computes scientific results. The authenticated PR #43 Chrome run genuinely combined Zetaris, NVIDIA PLAN and CRITIQUE, PHIS Discovery and Meterless Engine on one application SHA. Meterless Runtime/Power and Nightshift remain disconnected. The credential-free local mode uses only synthetic fixtures; its Zetaris and NVIDIA statuses are `NOT_CONNECTED`.
 
+## Choose how to evaluate PHIS
+
+1. **Quick start, no credentials:** follow [Run locally](#run-locally) to inspect the 180-day synthetic Energy/Sleep investigations, qualified evidence, clinical abstention and official Meterless World Model Engine. The browser correctly labels Zetaris and NVIDIA `NOT_CONNECTED` in this mode.
+2. **Genuine NVIDIA review using your key:** after starting the same application with `NVIDIA_API_KEY` and `PHIS_INFERENCE_PROVIDER=nvidia_direct`, use `/?analysis=v4`. The source remains `SYNTHETIC_LOCAL_ONLY`, and only genuine provider receipts can verify NVIDIA; this does not require Zetaris.
+3. **Full sponsor reproduction:** provision an authorized Zetaris instance, register the exact frozen 1,080-row fictional dataset, configure the documented [Zetaris adapter](#run-locally) and genuine NVIDIA API credentials, then run `/?analysis=v4` with `PHIS_DATA_MODE=LIVE_SYNTHETIC_ZETARIS`. An API key alone is insufficient without the registered table. This more demanding setup was verified on the owner's preconfigured local stack, **not** independently from a new judge-owned Zetaris environment. Review the [authenticated combined-run receipt](submission/FINAL_COMBINED_RECEIPT.md), [desktop/mobile evidence](submission/evidence/) and [sponsor claim ledger](submission/SOURCES_AND_CLAIMS.md).
+
+**Evidence rule:** archived sponsor receipts attest to historical authenticated runs, not to an unauthenticated judge's current local process. All demonstration observations are fictional; PHIS Discovery associations are not causal or clinical findings.
+
 ## Run locally
 
-Requires Python 3.11+ and Node.js 24. The core and Engine require no Python or npm package installation, external account, or paid service. From a clean public clone, check out this Draft PR branch while it is under review:
+Requires Python 3.11+ and Node.js 24. The core and Engine require no Python or npm package installation, external account, or paid service. From a clean public clone, run the published `main` branch:
 
 ```powershell
 git clone https://github.com/EnriqueDGProg/PHIS-OpenAgent-2026.git
 cd PHIS-OpenAgent-2026
-git switch codex/phis-final-submission-20261025
 ```
 
 ```powershell
